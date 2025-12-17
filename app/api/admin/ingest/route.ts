@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         // B. Import to Search Store
         let operation = await ai.fileSearchStores.importFile({
           fileSearchStoreName: targetStoreId,
-          fileName: uploadResult.name
+          fileName: uploadResult.name as string
         });
 
         // C. Poll for completion
