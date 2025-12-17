@@ -58,7 +58,17 @@ export async function POST(req: NextRequest) {
         });
 
         // 4. Extract Text and Citations
-        const responseText = response.text || "No response generated.";
+        const responseText = response.text ?? "No response generated.";
+
+        console.dir(
+            {
+                text: response.text,
+                promptFeedback: (response as any).promptFeedback,
+                functionCalls: (response as any).functionCalls,
+                usage: (response as any).usageMetadata,
+            },
+            { depth: null }
+        );
 
         // Parse grounding metadata for citations
         const candidates = response.candidates;
