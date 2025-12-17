@@ -5,20 +5,20 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "UTAR Knowledge • AI",
-  description: "University Knowledge Base",
+    title: "UTAR Knowledge • AI",
+    description: "University Knowledge Base",
 };
 
 export default function RootLayout({
-  children,
+    children,
 }: Readonly<{
-  children: React.ReactNode;
+    children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en" className="antialiased">
-      <body className={`${inter.variable} font-sans bg-[#FDFDFD] text-zinc-900 selection:bg-zinc-200`}>
-        {children}
-      </body>
-    </html>
-  );
+    return (
+        <html lang="en" className={inter.variable}>
+            <body className="font-sans bg-white text-zinc-900 selection:bg-zinc-900 selection:text-white antialiased">
+                {children}
+            </body>
+        </html>
+    );
 }

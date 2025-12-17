@@ -6,11 +6,10 @@ import remarkGfm from "remark-gfm";
 import {
     Send,
     Sparkles,
-    User,
     ArrowUpRight,
     Mail,
-    AlignLeft,
-    Info,
+    Command,
+    Disc,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
@@ -26,12 +25,14 @@ export default function Home() {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: "model",
-            text: "Welcome to UTAR. How may I assist you with your academic inquiries today?",
+            text: "Welcome to UTAR Knowledge. I can access university documents, guidelines, and staff contacts. How can I help?",
         },
     ]);
     const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
+    // Auto-scroll logic
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTo({
@@ -40,6 +41,11 @@ export default function Home() {
             });
         }
     }, [messages, isLoading]);
+
+    // Focus input on load
+    useEffect(() => {
+        inputRef.current?.focus();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,7 +81,7 @@ export default function Home() {
                 ...prev,
                 {
                     role: "model",
-                    text: "I apologize, but I am unable to access that information at the moment.",
+                    text: "I encountered a connection error. Please try again.",
                 },
             ]);
         } finally {
@@ -84,87 +90,66 @@ export default function Home() {
     };
 
     return (
-        <div className="flex flex-col h-screen max-w-4xl mx-auto border-x border-zinc-100/50 bg-[#FDFDFD]">
-            {/* Premium Header */}
-            <header className="sticky top-0 z-20 bg-[#FDFDFD]/80 backdrop-blur-md border-b border-zinc-100 px-8 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-zinc-900 text-white rounded-lg flex items-center justify-center shadow-lg shadow-zinc-200">
-                        <Sparkles
-                            size={14}
-                            fill="currentColor"
-                            className="text-zinc-400"
-                        />
+        <div className="flex flex-col h-screen bg-white text-zinc-900 selection:bg-zinc-100">
+            {/* Minimal Header */}
+            <header className="fixed top-0 w-full z-10 bg-white/80 backdrop-blur-xl border-b border-zinc-100">
+                <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-zinc-900 rounded-full" />
+                        <span className="text-xs font-semibold tracking-tight text-zinc-900">
+                            UTAR / INTELLIGENCE
+                        </span>
                     </div>
-                    <div>
-                        <h1 className="font-medium text-sm text-zinc-900 tracking-tight">
-                            UTAR Knowledge Base
-                        </h1>
-                        <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-medium">
-                            Official AI Assistant
-                        </p>
-                    </div>
+                    <a
+                        href="/admin/upload"
+                        className="opacity-0 hover:opacity-100 transition-opacity"
+                        aria-label="Admin Access"
+                    >
+                        <div className="w-1.5 h-1.5 bg-zinc-200 hover:bg-zinc-400 rounded-full" />
+                    </a>
                 </div>
-                <a
-                    href="/admin/upload"
-                    className="opacity-0 hover:opacity-100 transition-opacity"
-                >
-                    <div className="w-2 h-2 rounded-full bg-zinc-200 hover:bg-zinc-400" />
-                </a>
             </header>
 
-            {/* Chat Area */}
-            <div
-                ref={scrollRef}
-                className="flex-1 overflow-y-auto p-6 space-y-10 scrollbar-hide pb-32"
-            >
-                <AnimatePresence initial={false}>
-                    {messages.map((msg, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={clsx(
-                                "flex gap-5 max-w-2xl",
-                                msg.role === "user"
-                                    ? "ml-auto flex-row-reverse"
-                                    : ""
-                            )}
-                        >
-                            {/* Avatar */}
-                            <div
+            {/* Chat Container */}
+            <div className="flex-1 w-full max-w-3xl mx-auto flex flex-col pt-24 pb-36 px-6">
+                <div
+                    ref={scrollRef}
+                    className="flex-1 overflow-y-auto scrollbar-hidden space-y-8"
+                >
+                    <AnimatePresence initial={false}>
+                        {messages.map((msg, idx) => (
+                            <motion.div
+                                key={idx}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3, ease: "easeOut" }}
                                 className={clsx(
-                                    "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border",
+                                    "flex flex-col gap-2",
                                     msg.role === "user"
-                                        ? "bg-zinc-100 border-zinc-200 text-zinc-600"
-                                        : "bg-white border-zinc-100 text-zinc-900 shadow-sm"
+                                        ? "items-end"
+                                        : "items-start"
                                 )}
                             >
-                                {msg.role === "user" ? (
-                                    <User size={14} />
-                                ) : (
-                                    <AlignLeft size={14} />
+                                {/* Role Label (Only for AI) */}
+                                {msg.role === "model" && (
+                                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-400 font-medium ml-1">
+                                        <Sparkles size={10} strokeWidth={2} />
+                                        <span>Assistant</span>
+                                    </div>
                                 )}
-                            </div>
 
-                            {/* Bubble */}
-                            <div
-                                className={clsx(
-                                    "space-y-2",
-                                    msg.role === "user"
-                                        ? "text-right"
-                                        : "text-left"
-                                )}
-                            >
+                                {/* Message Content */}
                                 <div
                                     className={clsx(
-                                        "px-6 py-4 rounded-2xl text-sm leading-7 shadow-sm",
+                                        "relative px-4 py-2.5 max-w-2xl text-[15px] leading-7",
                                         msg.role === "user"
-                                            ? "bg-zinc-900 text-zinc-50 rounded-tr-sm"
-                                            : "bg-white border border-zinc-100 text-zinc-700 rounded-tl-sm shadow-zinc-100/50"
+                                            ? "bg-zinc-100 text-zinc-900 rounded-2xl rounded-tr-sm font-medium"
+                                            : "pl-0 text-zinc-800"
                                     )}
                                 >
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
+                                        className="prose prose-zinc prose-sm max-w-none prose-p:my-1 prose-headings:font-medium prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:font-semibold prose-ul:my-2"
                                         components={{
                                             a: ({ href, children }) => {
                                                 const isMail =
@@ -178,104 +163,96 @@ export default function Home() {
                                                                 : "_blank"
                                                         }
                                                         rel="noreferrer"
-                                                        className="inline-flex items-center gap-1 font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-900 transition-all mx-1"
+                                                        className="inline-flex items-baseline gap-0.5 font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-900 transition-all"
                                                     >
-                                                        {children}
+                                                        <span>{children}</span>
                                                         {isMail ? (
-                                                            <Mail size={10} />
+                                                            <Mail
+                                                                size={10}
+                                                                className="self-center opacity-50"
+                                                            />
                                                         ) : (
                                                             <ArrowUpRight
                                                                 size={10}
+                                                                className="self-center opacity-50"
                                                             />
                                                         )}
                                                     </a>
                                                 );
                                             },
-                                            p: ({ children }) => (
-                                                <p className="mb-2 last:mb-0">
-                                                    {children}
-                                                </p>
-                                            ),
-                                            ul: ({ children }) => (
-                                                <ul className="list-disc pl-4 space-y-1 my-2">
-                                                    {children}
-                                                </ul>
-                                            ),
-                                            strong: ({ children }) => (
-                                                <span className="font-semibold text-zinc-900">
-                                                    {children}
-                                                </span>
-                                            ),
                                         }}
                                     >
                                         {msg.text}
                                     </ReactMarkdown>
                                 </div>
 
-                                {/* Citations Footer */}
+                                {/* Citations (Footnotes style) */}
                                 {msg.citations && msg.citations.length > 0 && (
                                     <motion.div
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
-                                        className="flex flex-wrap gap-2 mt-2 ml-1"
+                                        transition={{ delay: 0.2 }}
+                                        className="flex flex-wrap gap-2 mt-1 ml-0.5"
                                     >
                                         {msg.citations.map((cite, cIdx) => (
-                                            <span
+                                            <button
                                                 key={cIdx}
-                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-50 border border-zinc-100 text-[10px] font-medium text-zinc-500 uppercase tracking-wider"
+                                                className="group flex items-center gap-1.5 px-2 py-1 rounded-md bg-white border border-zinc-100 hover:border-zinc-200 transition-colors shadow-sm"
                                             >
-                                                <Info size={10} /> {cite}
-                                            </span>
+                                                <Disc
+                                                    size={10}
+                                                    className="text-zinc-300 group-hover:text-blue-500 transition-colors"
+                                                />
+                                                <span className="text-[10px] text-zinc-500 font-medium max-w-[150px] truncate">
+                                                    {cite}
+                                                </span>
+                                            </button>
                                         ))}
                                     </motion.div>
                                 )}
-                            </div>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
 
-                {isLoading && (
-                    <div className="flex gap-5 max-w-2xl">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-zinc-100 shadow-sm">
-                            <Sparkles
-                                size={14}
-                                className="animate-pulse text-zinc-400"
-                            />
+                    {/* Loading State (Minimalist) */}
+                    {isLoading && (
+                        <div className="flex items-center gap-2 text-zinc-300 pl-1">
+                            <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" />
+                            <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:0.1s]" />
+                            <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:0.2s]" />
                         </div>
-                        <div className="flex gap-1.5 items-center px-4">
-                            <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce" />
-                            <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.1s]" />
-                            <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.2s]" />
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
-            {/* Floating Input */}
-            <div className="fixed bottom-0 w-full max-w-4xl p-6 z-10">
-                <div className="relative group">
-                    <form onSubmit={handleSubmit}>
+            {/* Floating Input Area */}
+            <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white/90 to-transparent pt-10 pb-8 px-6 z-20">
+                <div className="max-w-2xl mx-auto relative">
+                    <form onSubmit={handleSubmit} className="relative group">
+                        <div className="absolute inset-0 bg-zinc-200/50 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-50 transition-opacity duration-500" />
                         <input
+                            ref={inputRef}
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Ask a question..."
-                            className="w-full pl-6 pr-14 py-4 bg-white/80 backdrop-blur-xl border border-zinc-200/80 rounded-2xl shadow-2xl shadow-zinc-200/50 focus:outline-none focus:ring-1 focus:ring-zinc-300 focus:bg-white transition-all text-sm placeholder:text-zinc-400 font-medium"
+                            placeholder="Ask about courses, guidelines, or staff..."
+                            className="w-full pl-5 pr-14 py-4 bg-white/50 backdrop-blur-xl border border-zinc-200 rounded-2xl shadow-[0_2px_20px_-12px_rgba(0,0,0,0.1)] focus:outline-none focus:ring-[1px] focus:ring-zinc-300 focus:bg-white transition-all text-[15px] placeholder:text-zinc-400 font-normal"
                             disabled={isLoading}
                         />
                         <button
                             type="submit"
                             disabled={!input.trim() || isLoading}
-                            className="absolute right-2 top-2 p-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl transition-all disabled:opacity-0 disabled:scale-95"
+                            className="absolute right-2 top-2 p-2.5 bg-zinc-900 hover:bg-black text-white rounded-xl transition-all disabled:opacity-0 disabled:scale-90"
                         >
-                            <Send size={16} />
+                            <Send size={16} strokeWidth={2} />
                         </button>
                     </form>
-                </div>
-                <div className="text-center mt-3">
-                    <p className="text-[10px] text-zinc-300 font-medium">
-                        AI can make mistakes. Check important info.
-                    </p>
+
+                    <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-zinc-400 font-medium uppercase tracking-widest opacity-60">
+                        <span className="flex items-center gap-1">
+                            <Command size={10} /> Powered by Gemini
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
