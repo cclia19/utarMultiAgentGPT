@@ -66,6 +66,7 @@ function AdminUploadContent() {
             headers: {
                 "Content-Length": fileToUpload.size.toString(),
                 "X-Goog-Upload-Command": "upload, finalize",
+                "X-Goog-Upload-Offset": "0", // <--- THIS LINE IS REQUIRED
             },
             body: fileToUpload,
         });
