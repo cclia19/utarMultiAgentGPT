@@ -6,20 +6,21 @@ import {
     Check,
     X,
     Loader2,
-    File,
+    File as FileIcon,
     FolderArchive,
     Lock,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import clsx from "clsx";
+import JSZip from "jszip";
 
 function AdminUploadContent() {
     const [file, setFile] = useState<File | null>(null);
     const [status, setStatus] = useState<
-        "idle" | "uploading" | "success" | "error"
+        "idle" | "uploading" | "success" | "error" | "unzipping"
     >("idle");
     const [log, setLog] = useState<string>("");
     const [secret, setSecret] = useState("");
+    const [progress, setProgress] = useState("");
 
     const searchParams = useSearchParams();
 
@@ -33,31 +34,133 @@ function AdminUploadContent() {
             setFile(e.target.files[0]);
             setStatus("idle");
             setLog("");
+            setProgress("");
         }
+    };
+
+    // --- NEW: Two-Phase Direct Upload ---
+    const processSingleFile = async (blob: Blob, fileName: string) => {
+        // Phase 1: Get Upload URL
+        const initRes = await fetch("/api/admin/ingest", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-secret": secret,
+            },
+            body: JSON.stringify({
+                phase: "init",
+                filename: fileName,
+                mimeType: blob.type || "application/pdf",
+                size: blob.size,
+            }),
+        });
+
+        if (!initRes.ok) throw new Error("Failed to initialize upload");
+        const { uploadUrl } = await initRes.json();
+
+        // Phase 2: Upload Direct to Google (Bypass Vercel)
+        const uploadRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+                "Content-Length": blob.size.toString(),
+                "X-Goog-Upload-Command": "upload, finalize",
+            },
+            body: blob,
+        });
+
+        if (!uploadRes.ok) throw new Error("Google upload failed");
+        const googleData = await uploadRes.json();
+        const fileUri = googleData.file.uri; // e.g., https://.../files/123
+
+        // Phase 3: Link to Knowledge Base
+        const linkRes = await fetch("/api/admin/ingest", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-secret": secret,
+            },
+            body: JSON.stringify({
+                phase: "link",
+                fileUri: fileUri,
+                mimeType: blob.type,
+            }),
+        });
+
+        if (!linkRes.ok) throw new Error("Failed to index file");
     };
 
     const handleUpload = async () => {
         if (!file || !secret) return;
         setStatus("uploading");
-
-        const formData = new FormData();
-        formData.append("file", file);
+        setLog("Starting process...");
 
         try {
-            const res = await fetch("/api/admin/ingest", {
-                method: "POST",
-                headers: { "x-admin-secret": secret },
-                body: formData,
-            });
+            let totalCount = 0;
+            const filesToProcess: { name: string; blob: Blob }[] = [];
 
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Upload failed");
+            // 1. Prepare Files (Unzip if needed)
+            if (file.name.toLowerCase().endsWith(".zip")) {
+                setStatus("unzipping");
+                setLog("Unzipping file...");
+
+                const zip = new JSZip();
+                const zipContent = await zip.loadAsync(file);
+
+                for (const [relativePath, zipEntry] of Object.entries(
+                    zipContent.files
+                )) {
+                    const isJunk =
+                        zipEntry.name.startsWith("__MACOSX") ||
+                        zipEntry.name.startsWith(".");
+                    const isSupported = /\.(pdf|txt|md|docx|html)$/i.test(
+                        zipEntry.name
+                    );
+
+                    if (!zipEntry.dir && !isJunk && isSupported) {
+                        const b = await zipEntry.async("blob");
+                        // JSZip blobs might miss type, guess it roughly or default
+                        const type = zipEntry.name.endsWith(".pdf")
+                            ? "application/pdf"
+                            : "text/plain";
+                        filesToProcess.push({
+                            name: zipEntry.name.split("/").pop()!,
+                            blob: b.slice(0, b.size, type),
+                        });
+                    }
+                }
+            } else {
+                filesToProcess.push({ name: file.name, blob: file });
+            }
+
+            if (filesToProcess.length === 0)
+                throw new Error("No valid files found.");
+
+            setStatus("uploading");
+
+            // 2. Process Queue
+            for (let i = 0; i < filesToProcess.length; i++) {
+                const f = filesToProcess[i];
+                setProgress(`${i + 1} / ${filesToProcess.length}`);
+                setLog(
+                    `Uploading: ${f.name} (${(
+                        f.blob.size /
+                        1024 /
+                        1024
+                    ).toFixed(2)} MB)`
+                );
+
+                await processSingleFile(f.blob, f.name);
+                totalCount++;
+            }
 
             setStatus("success");
-            setLog(`${data.count} files indexed successfully.`);
+            setLog(`${totalCount} documents uploaded & indexed.`);
+            setProgress("");
         } catch (error: any) {
+            console.error(error);
             setStatus("error");
-            setLog(error.message);
+            setLog(error.message || "An unexpected error occurred");
+            setProgress("");
         }
     };
 
@@ -82,22 +185,20 @@ function AdminUploadContent() {
     return (
         <div className="min-h-screen bg-[#FDFDFD] flex items-center justify-center p-6">
             <div className="w-full max-w-lg">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
                         Data Ingestion
                     </h1>
                     <p className="text-zinc-500 text-sm mt-2">
-                        Upload university documents to the vector store.
+                        Upload university documents (Unlimited Size).
                     </p>
                 </div>
 
-                {/* Upload Card */}
                 <div className="bg-white rounded-3xl border border-zinc-100 shadow-xl shadow-zinc-100/50 p-2">
                     <div className="relative group border border-dashed border-zinc-200 rounded-2xl p-12 transition-all hover:bg-zinc-50 hover:border-zinc-300">
                         <input
                             type="file"
-                            accept=".pdf,.txt,.md,.zip"
+                            accept=".pdf,.txt,.md,.zip,.docx"
                             onChange={handleFileChange}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         />
@@ -111,7 +212,7 @@ function AdminUploadContent() {
                                             className="text-zinc-700"
                                         />
                                     ) : (
-                                        <File
+                                        <FileIcon
                                             size={20}
                                             className="text-zinc-700"
                                         />
@@ -134,23 +235,28 @@ function AdminUploadContent() {
                                         ? `${(file.size / 1024 / 1024).toFixed(
                                               2
                                           )} MB`
-                                        : "PDF, TXT, or ZIP archives"}
+                                        : "PDF, TXT, DOCX, ZIP"}
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Action Button */}
                 <div className="mt-6 flex flex-col items-center gap-4">
                     <button
                         onClick={handleUpload}
-                        disabled={!file || status === "uploading"}
+                        disabled={
+                            !file ||
+                            status === "uploading" ||
+                            status === "unzipping"
+                        }
                         className="w-full py-4 bg-zinc-900 hover:bg-black text-white rounded-2xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {status === "uploading" ? (
+                        {status === "uploading" || status === "unzipping" ? (
                             <>
-                                Processing{" "}
+                                {status === "unzipping"
+                                    ? "Unzipping..."
+                                    : `Uploading ${progress}`}
                                 <Loader2
                                     size={14}
                                     className="animate-spin opacity-50"
@@ -161,10 +267,14 @@ function AdminUploadContent() {
                         )}
                     </button>
 
-                    {/* Status Messages */}
-                    {status === "success" && (
-                        <div className="flex items-center gap-2 text-emerald-600 text-xs font-medium bg-emerald-50 px-3 py-1.5 rounded-full">
-                            <Check size={12} /> {log}
+                    {(status === "success" || status === "uploading") && (
+                        <div className="flex items-center gap-2 text-zinc-600 text-xs font-medium bg-zinc-50 px-3 py-1.5 rounded-full">
+                            {status === "success" ? (
+                                <Check size={12} className="text-emerald-500" />
+                            ) : (
+                                <Loader2 size={12} className="animate-spin" />
+                            )}
+                            {log}
                         </div>
                     )}
 

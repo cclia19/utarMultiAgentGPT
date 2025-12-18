@@ -1,159 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ai, STORE_DISPLAY_NAME } from "@/lib/gemini";
-import AdmZip from "adm-zip";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import fs from "fs";
-import os from "os";
 
 export async function POST(req: NextRequest) {
     // 1. Auth Check
     const authHeader = req.headers.get("x-admin-secret");
     if (authHeader !== process.env.ADMIN_SECRET) {
-        return NextResponse.json(
-            { error: "Unauthorized access" },
-            { status: 401 }
-        );
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const tempDir = path.join(os.tmpdir(), `utar-ingest-${Date.now()}`);
-
     try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File;
+        const body = await req.json();
+        const { phase } = body;
 
-        if (!file) {
-            return NextResponse.json(
-                { error: "No file detected" },
-                { status: 400 }
-            );
-        }
+        // --- PHASE 1: Generate Upload URL (Server-Side) ---
+        // We do this here so the Client doesn't need the API Key
+        if (phase === "init") {
+            const { filename, mimeType, size } = body;
 
-        // 2. Prepare Temp Environment
-        await mkdir(tempDir, { recursive: true });
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const originalFilePath = path.join(tempDir, file.name);
-        await writeFile(originalFilePath, buffer);
+            const reqUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${process.env.GEMINI_API_KEY}`;
 
-        // 3. File Processing Strategy
-        let filesToProcess: string[] = [];
-
-        if (file.name.toLowerCase().endsWith(".zip")) {
-            console.log("Mode: ZIP Extraction");
-            const zip = new AdmZip(originalFilePath);
-            zip.extractAllTo(tempDir, true); // overwrite = true
-
-            // Recursive crawler to find supported files
-            const walkSync = (dir: string, filelist: string[] = []) => {
-                const files = fs.readdirSync(dir);
-                files.forEach((file) => {
-                    const filepath = path.join(dir, file);
-                    const stat = fs.statSync(filepath);
-                    if (stat.isDirectory()) {
-                        filelist = walkSync(filepath, filelist);
-                    } else {
-                        // Filter junk files and unsupported types
-                        if (
-                            !file.startsWith(".") &&
-                            !file.startsWith("__MACOSX")
-                        ) {
-                            const ext = path.extname(file).toLowerCase();
-                            if (
-                                [
-                                    ".pdf",
-                                    ".txt",
-                                    ".md",
-                                    ".html",
-                                    ".docx",
-                                ].includes(ext)
-                            ) {
-                                filelist.push(filepath);
-                            }
-                        }
-                    }
-                });
-                return filelist;
-            };
-
-            filesToProcess = walkSync(tempDir);
-        } else {
-            console.log("Mode: Single File");
-            filesToProcess.push(originalFilePath);
-        }
-
-        if (filesToProcess.length === 0) {
-            throw new Error("No valid documents found (PDF, TXT, MD, DOCX)");
-        }
-
-        // 4. Gemini Store Management
-        // Efficiently find or create store
-        const stores = await ai.fileSearchStores.list();
-        let targetStoreId = "";
-
-        for await (const store of stores) {
-            if (store.displayName === STORE_DISPLAY_NAME) {
-                targetStoreId = store.name as string;
-                break;
-            }
-        }
-
-        if (!targetStoreId) {
-            const newStore = await ai.fileSearchStores.create({
-                config: { displayName: STORE_DISPLAY_NAME },
+            const initRes = await fetch(reqUrl, {
+                method: "POST",
+                headers: {
+                    "X-Goog-Upload-Protocol": "resumable",
+                    "X-Goog-Upload-Command": "start",
+                    "X-Goog-Upload-Header-Content-Length": size.toString(),
+                    "X-Goog-Upload-Header-Content-Type": mimeType,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ file: { display_name: filename } }),
             });
-            targetStoreId = newStore.name as string;
+
+            const uploadUrl = initRes.headers.get("x-goog-upload-url");
+
+            if (!uploadUrl) {
+                throw new Error("Failed to get upload URL from Google");
+            }
+
+            return NextResponse.json({ uploadUrl });
         }
 
-        // 5. Batch Upload & Import
-        // We limit concurrency to avoid rate limits
-        const BATCH_SIZE = 3;
-        let processedCount = 0;
+        // --- PHASE 2: Link File to Store (After Upload) ---
+        if (phase === "link") {
+            const { fileUri, mimeType } = body;
 
-        for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
-            const batch = filesToProcess.slice(i, i + BATCH_SIZE);
+            // 1. Find/Create Store
+            const stores = await ai.fileSearchStores.list();
+            let storeId = "";
+            for await (const s of stores) {
+                if (s.displayName === STORE_DISPLAY_NAME) {
+                    storeId = s.name as string;
+                    break;
+                }
+            }
+            if (!storeId) {
+                const newStore = await ai.fileSearchStores.create({
+                    config: { displayName: STORE_DISPLAY_NAME },
+                });
+                storeId = newStore.name as string;
+            }
 
-            await Promise.all(
-                batch.map(async (filePath) => {
-                    // A. Upload to Files API
-                    const uploadResult = await ai.files.upload({
-                        file: filePath,
-                        config: { displayName: path.basename(filePath) },
-                    });
+            // 2. Add to Store
+            // The fileUri looks like "https://generativelanguage.googleapis.com/v1beta/files/xxxx"
+            // We need just the name "files/xxxx"
+            const resourceName = fileUri.split("/v1beta/")[1];
 
-                    // B. Import to Search Store
-                    let operation = await ai.fileSearchStores.importFile({
-                        fileSearchStoreName: targetStoreId,
-                        fileName: uploadResult.name as string,
-                    });
+            await ai.fileSearchStores.importFile({
+                fileSearchStoreName: storeId,
+                fileName: resourceName,
+            });
 
-                    // C. Poll for completion
-                    while (!operation.done) {
-                        await new Promise((r) => setTimeout(r, 1000));
-                        operation = await ai.operations.get({ operation });
-                    }
-                })
-            );
-
-            processedCount += batch.length;
+            return NextResponse.json({ success: true, storeId });
         }
 
-        return NextResponse.json({
-            success: true,
-            count: processedCount,
-            storeId: targetStoreId,
-        });
+        return NextResponse.json({ error: "Invalid phase" }, { status: 400 });
     } catch (error: any) {
         console.error("Ingest Error:", error);
         return NextResponse.json(
             { error: error.message || "Internal Server Error" },
             { status: 500 }
         );
-    } finally {
-        // 6. Cleanup (Critical for server health)
-        try {
-            await fs.promises.rm(tempDir, { recursive: true, force: true });
-        } catch (e) {
-            console.error("Cleanup failed:", e);
-        }
     }
 }
