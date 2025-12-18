@@ -39,18 +39,56 @@ function AdminUploadContent() {
     };
 
     const uploadSingleFile = async (fileToUpload: Blob, fileName: string) => {
-        const formData = new FormData();
-        formData.append("file", fileToUpload, fileName);
-
-        const res = await fetch("/api/admin/ingest", {
+        // Phase 1: Get Upload URL
+        const initRes = await fetch("/api/admin/ingest", {
             method: "POST",
-            headers: { "x-admin-secret": secret },
-            body: formData,
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-secret": secret,
+            },
+            body: JSON.stringify({
+                phase: "init",
+                filename: fileName,
+                mimeType: fileToUpload.type || "application/pdf",
+                size: fileToUpload.size,
+            }),
         });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Failed: ${fileName}`);
-        return data;
+        if (!initRes.ok) {
+            const errData = await initRes.json();
+            throw new Error(errData.error || "Failed to initialize upload");
+        }
+        const { uploadUrl } = await initRes.json();
+
+        // Phase 2: Upload Direct to Google (Bypass Vercel Limit)
+        const uploadRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+                "Content-Length": fileToUpload.size.toString(),
+                "X-Goog-Upload-Command": "upload, finalize",
+            },
+            body: fileToUpload,
+        });
+
+        if (!uploadRes.ok) throw new Error("Google upload failed");
+        const googleData = await uploadRes.json();
+        const fileUri = googleData.file.uri;
+
+        // Phase 3: Link to Knowledge Base
+        const linkRes = await fetch("/api/admin/ingest", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-secret": secret,
+            },
+            body: JSON.stringify({
+                phase: "link",
+                fileUri: fileUri,
+                mimeType: fileToUpload.type,
+            }),
+        });
+
+        if (!linkRes.ok) throw new Error("Failed to index file");
     };
 
     const handleUpload = async () => {
@@ -113,9 +151,7 @@ function AdminUploadContent() {
                 }
             } else {
                 // 2. Handle Single File (Non-ZIP)
-                if (file.size > 4.5 * 1024 * 1024) {
-                    throw new Error("Single file exceeds 4.5MB limit.");
-                }
+                // Direct upload allows large files, so we remove the limit check
                 await uploadSingleFile(file, file.name);
                 totalCount = 1;
             }
