@@ -55,7 +55,10 @@ function AdminUploadContent() {
             }),
         });
 
-        if (!initRes.ok) throw new Error("Failed to initialize upload");
+        if (!initRes.ok) {
+            const errData = await initRes.json();
+            throw new Error(errData.error || "Failed to initialize upload");
+        }
         const { uploadUrl } = await initRes.json();
 
         // Phase 2: Upload Direct to Google (Bypass Vercel)
@@ -70,7 +73,7 @@ function AdminUploadContent() {
 
         if (!uploadRes.ok) throw new Error("Google upload failed");
         const googleData = await uploadRes.json();
-        const fileUri = googleData.file.uri; // e.g., https://.../files/123
+        const fileUri = googleData.file.uri;
 
         // Phase 3: Link to Knowledge Base
         const linkRes = await fetch("/api/admin/ingest", {
@@ -118,7 +121,6 @@ function AdminUploadContent() {
 
                     if (!zipEntry.dir && !isJunk && isSupported) {
                         const b = await zipEntry.async("blob");
-                        // JSZip blobs might miss type, guess it roughly or default
                         const type = zipEntry.name.endsWith(".pdf")
                             ? "application/pdf"
                             : "text/plain";
