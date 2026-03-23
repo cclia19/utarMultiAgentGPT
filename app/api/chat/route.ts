@@ -34,8 +34,9 @@ export async function POST(req: NextRequest) {
       FORMATTING REQUIRED:
       - **Emails**: When mentioning a staff member's email or a department email, ALWAYS format it as a markdown link with a subject line.
         Example: [registrar@utar.edu.my](mailto:registrar@utar.edu.my?subject=Student%20Inquiry)
-      - **Links**: If the context contains a URL, ensure it is clickable.
-        Example: [Student Portal](https://portal.utar.edu.my)
+      - **Links**: ONLY include a URL as a clickable link if that exact URL appears verbatim in the retrieved document context.
+        Do NOT generate, infer, guess, or construct any URL that is not literally present in the source documents.
+        Do NOT include URLs you are uncertain about. If in doubt, omit the link entirely and just mention the resource by name.
     `;
 
         // 3. Generate Content
@@ -58,7 +59,16 @@ export async function POST(req: NextRequest) {
         });
 
         // 4. Extract Text and Citations
-        const responseText = response.text ?? "No response generated.";
+        // response.text may be null/empty when Gemini uses the fileSearch tool and
+        // returns the answer inside candidates[0].content.parts instead.
+        let responseText = response.text ?? "";
+        if (!responseText && response.candidates && response.candidates[0]?.content?.parts) {
+            responseText = response.candidates[0].content.parts
+                .filter((p: any) => typeof p.text === "string")
+                .map((p: any) => p.text as string)
+                .join("");
+        }
+        if (!responseText) responseText = "No response generated.";
 
         console.dir(
             {
