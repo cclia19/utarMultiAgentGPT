@@ -26,7 +26,7 @@ interface HistoryEntry {
 
 const WELCOME: Message = {
     role: "model",
-    text: "Hi! I'm the UTAR AI Assistant. Ask me anything about UTAR — courses, admissions, fees, contacts, student support, and more. 😊",
+    text: "Hi! I'm AvaTAR, your friendly UTAR buddy! Ask me anything about UTAR—courses, admissions, fees, contacts, student support, and more 😊",
     citations: [],
     sourceMode: "none",
     storeDisplayName: "",
@@ -232,16 +232,18 @@ export default function ChatPage() {
             <header className="border-b border-zinc-100 px-4 py-3 bg-white">
                 <div className="max-w-2xl mx-auto w-full flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center">
-                            <MessageSquare size={14} className="text-white" />
-                        </div>
+                        <img
+                            src="/logo.jpeg"
+                            alt="AvaTAR Logo"
+                            className="w-8 h-8 rounded-full object-cover"
+                        />
 
                         <div>
                             <p className="text-sm font-semibold text-zinc-900">
                                 UTAR AI Assistant
                             </p>
                             <p className="text-xs text-zinc-400">
-                                Ask naturally. I’ll route your question to the right UTAR context.
+                                Ask naturally. I’ll route your question to the right UTAR place.
                             </p>
                         </div>
                     </div>
@@ -261,18 +263,16 @@ export default function ChatPage() {
                 {messages.map((msg, i) => (
                     <div
                         key={i}
-                        className={`flex ${
-                            msg.role === "user"
-                                ? "justify-end"
-                                : "justify-start"
-                        }`}
+                        className={`flex ${msg.role === "user"
+                            ? "justify-end"
+                            : "justify-start"
+                            }`}
                     >
                         <div
-                            className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm ${
-                                msg.role === "user"
-                                    ? "bg-zinc-900 text-white rounded-br-sm"
-                                    : "bg-white border border-zinc-100 text-zinc-800 rounded-bl-sm shadow-sm"
-                            }`}
+                            className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm ${msg.role === "user"
+                                ? "bg-zinc-900 text-white rounded-br-sm"
+                                : "bg-white border border-zinc-100 text-zinc-800 rounded-bl-sm shadow-sm"
+                                }`}
                         >
                             {msg.role === "model" ? (
                                 <div
