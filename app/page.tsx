@@ -416,6 +416,9 @@ export default function ChatPage() {
                         )}
                     </button>
                 </div>
+                <div className="mt-2 text-center text-[11px] text-zinc-400">
+                    UTARGPT can make mistake. Check important info
+                </div>
             </footer>
         </div>
     );
