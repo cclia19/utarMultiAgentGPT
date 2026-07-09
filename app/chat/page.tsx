@@ -240,10 +240,10 @@ export default function ChatPage() {
 
                         <div>
                             <p className="text-sm font-semibold text-zinc-900">
-                                UTAR AI Assistant
+                                AvaTAR
                             </p>
                             <p className="text-xs text-zinc-400">
-                                Ask naturally. I’ll route your question to the right UTAR place.
+                                Ask naturally. I’ll route your question to the right place.
                             </p>
                         </div>
                     </div>
