@@ -476,6 +476,8 @@ Routing principles:
 14. Retrieval:
    - retrievalNeeded = false for greetings, thanks, small talk, jokes, playful social messages, academic integrity refusals, and simple conversational replies.
    - retrievalNeeded = true for factual UTAR questions, policies, staff, contacts, programme info, fees, exams, offices, procedures, complaints, and academic matters.
+15. Language preference:
+   - If the user query specifies a target language, translation, or reply format preference (e.g. "respond in Chinese", "translate to Malay", "reply in Mandarin"), you MUST preserve this instruction/constraint verbatim in the output "rewrittenQuestion".
 
 Conversation relation:
 - If there is a pendingPreviousQuestion, decide if the latest message is:

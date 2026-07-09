@@ -18,10 +18,10 @@ type WebFallbackResult = {
 
 type ContextResolverResult = {
     relation:
-        | "new_standalone_question"
-        | "clarification_for_pending"
-        | "follow_up_same_topic"
-        | "casual_no_retrieval";
+    | "new_standalone_question"
+    | "clarification_for_pending"
+    | "follow_up_same_topic"
+    | "casual_no_retrieval";
     resolvedQuestion: string;
     updatedContextSummary: string;
     needsRetrieval: boolean;
@@ -978,6 +978,7 @@ Rules:
 - If the user asks you to do their assignment, politely refuse to do it for them, but offer to guide, explain, outline, review, or help them learn.
 - If the message is casual, social, playful, or appreciation, reply naturally and briefly.
 - Keep it concise.
+- LANGUAGE RULE: Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). If the query is in English or language is not specified, default to English.
 `,
                         },
                     ],
@@ -1317,6 +1318,10 @@ STYLE AND FORMAT:
 - Use emojis where helpful.
 - Do not glue different information into one paragraph.
 - Do not create empty link labels.
+
+LANGUAGE RULE:
+- Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
+- If the query is in English or language is not specified, default to English.
 `;
 
     try {
@@ -1413,9 +1418,9 @@ Important:
 
         const finalText = shouldAppendLinks
             ? finalCleanWebAnswer(
-                  appendOfficialLinks(baseText, allowedLinks),
-                  allowedLinks
-              )
+                appendOfficialLinks(baseText, allowedLinks),
+                allowedLinks
+            )
             : baseText;
 
         return {
@@ -1479,9 +1484,9 @@ function compactHistoryForResolver(history: any[]): string {
 function validateContextResolverResult(raw: any, fallbackMessage: string): ContextResolverResult {
     const relation =
         raw?.relation === "clarification_for_pending" ||
-        raw?.relation === "follow_up_same_topic" ||
-        raw?.relation === "casual_no_retrieval" ||
-        raw?.relation === "new_standalone_question"
+            raw?.relation === "follow_up_same_topic" ||
+            raw?.relation === "casual_no_retrieval" ||
+            raw?.relation === "new_standalone_question"
             ? raw.relation
             : "new_standalone_question";
 
@@ -1489,7 +1494,7 @@ function validateContextResolverResult(raw: any, fallbackMessage: string): Conte
         relation,
         resolvedQuestion:
             typeof raw?.resolvedQuestion === "string" &&
-            raw.resolvedQuestion.trim()
+                raw.resolvedQuestion.trim()
                 ? raw.resolvedQuestion.trim()
                 : fallbackMessage,
         updatedContextSummary:
@@ -1504,8 +1509,8 @@ function validateContextResolverResult(raw: any, fallbackMessage: string): Conte
             typeof raw?.clearPendingQuestion === "boolean"
                 ? raw.clearPendingQuestion
                 : relation === "new_standalone_question" ||
-                  relation === "clarification_for_pending" ||
-                  relation === "follow_up_same_topic",
+                relation === "clarification_for_pending" ||
+                relation === "follow_up_same_topic",
     };
 }
 
@@ -1556,6 +1561,7 @@ Rules:
 - If the message is casual, thanks, appreciation, joke, or does not need UTAR facts, relation = "casual_no_retrieval".
 - For elective/course/study-plan questions, if user later provides programme/year/semester, combine it with the pending question.
 - For complaint questions, if user later provides course/faculty/programme, combine it with the complaint question.
+- If the user specifies a response language, translation, or format preference (e.g. "respond in Chinese", "translate to Malay", "reply in Mandarin"), you MUST preserve this instruction/constraint verbatim in the output resolvedQuestion.
 - The resolvedQuestion must be phrased as a normal user question, not as system instructions.
 - Never include internal words such as "Task:", "Router:", "Resolve:", "System:", "Use pending", "retrieval query", or JSON explanation inside resolvedQuestion.
 
@@ -1623,14 +1629,14 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
-      const {
-    message,
-    pendingQuestion: frontendPendingQuestion = null,
-    history = [],
-    selectedAgentId,
-    lastResolvedTopic = null,
-    contextSummary: incomingContextSummary = "",
-} = body;
+        const {
+            message,
+            pendingQuestion: frontendPendingQuestion = null,
+            history = [],
+            selectedAgentId,
+            lastResolvedTopic = null,
+            contextSummary: incomingContextSummary = "",
+        } = body;
 
         fallbackAgentId = selectedAgentId || "general";
         const rawMessage = String(message || "").trim();
@@ -1664,7 +1670,7 @@ export async function POST(req: NextRequest) {
                 needsClarification: false,
                 pendingQuestion: null,
                 lastResolvedTopic,
-                
+
                 routeType: "general_public",
             });
         }
@@ -1679,47 +1685,47 @@ export async function POST(req: NextRequest) {
                 ? getPreviousUserQuestion(history, rawMessage)
                 : null;
 
-                const contextResolution = await resolveConversationContext({
-    latestMessage: rawMessage,
-    contextSummary: String(incomingContextSummary || ""),
-    pendingQuestion,
-    history,
-});
+        const contextResolution = await resolveConversationContext({
+            latestMessage: rawMessage,
+            contextSummary: String(incomingContextSummary || ""),
+            pendingQuestion,
+            history,
+        });
 
-const resolvedMessage = contextResolution.resolvedQuestion || rawMessage;
-const updatedContextSummary = contextResolution.updatedContextSummary || "";
-const resolverSaysNoRetrieval = contextResolution.needsRetrieval === false;
+        const resolvedMessage = contextResolution.resolvedQuestion || rawMessage;
+        const updatedContextSummary = contextResolution.updatedContextSummary || "";
+        const resolverSaysNoRetrieval = contextResolution.needsRetrieval === false;
 
-const pendingForRouter =
-    contextResolution.relation === "clarification_for_pending" ||
-    contextResolution.relation === "follow_up_same_topic"
-        ? pendingQuestion
-        : null;
+        const pendingForRouter =
+            contextResolution.relation === "clarification_for_pending" ||
+                contextResolution.relation === "follow_up_same_topic"
+                ? pendingQuestion
+                : null;
 
-      const routerResult = await routeWithLLM({
-    message: resolvedMessage,
-    currentAgentId: fallbackAgentId,
-    pendingQuestion: pendingForRouter,
-});
+        const routerResult = await routeWithLLM({
+            message: resolvedMessage,
+            currentAgentId: fallbackAgentId,
+            pendingQuestion: pendingForRouter,
+        });
 
         const selectedAgent = getAgentById(routerResult.agentId);
 
         if (resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false) {
-    const directText = await generateDirectNoRetrievalResponse(rawMessage);
+            const directText = await generateDirectNoRetrievalResponse(rawMessage);
 
-    return NextResponse.json({
-        text: directText,
-        citations: [],
-        sourceMode: "none",
-        storeDisplayName: "",
-        selectedAgentId: selectedAgent.id,
-        selectedAgentLabel: selectedAgent.label,
-        needsClarification: false,
-        pendingQuestion: null,
-        lastResolvedTopic,
-        routeType: routerResult.routeType,
-    });
-}
+            return NextResponse.json({
+                text: directText,
+                citations: [],
+                sourceMode: "none",
+                storeDisplayName: "",
+                selectedAgentId: selectedAgent.id,
+                selectedAgentLabel: selectedAgent.label,
+                needsClarification: false,
+                pendingQuestion: null,
+                lastResolvedTopic,
+                routeType: routerResult.routeType,
+            });
+        }
 
 
         if (routerResult.routeType === "context_setting") {
@@ -1757,17 +1763,17 @@ const pendingForRouter =
                 routeType: routerResult.routeType,
             });
         }
-const shouldUsePendingQuestion =
-    Boolean((routerResult as any).usePendingQuestion) &&
-    Boolean(pendingForRouter);
+        const shouldUsePendingQuestion =
+            Boolean((routerResult as any).usePendingQuestion) &&
+            Boolean(pendingForRouter);
 
-const effectiveMessage = shouldUsePendingQuestion
-    ? buildClarifiedRetrievalQuestion({
-          pendingQuestion: String(pendingForRouter),
-          latestMessage: rawMessage,
-          routerRewrite: routerResult.rewrittenQuestion || resolvedMessage,
-      })
-    : routerResult.rewrittenQuestion || resolvedMessage;
+        const effectiveMessage = shouldUsePendingQuestion
+            ? buildClarifiedRetrievalQuestion({
+                pendingQuestion: String(pendingForRouter),
+                latestMessage: rawMessage,
+                routerRewrite: routerResult.rewrittenQuestion || resolvedMessage,
+            })
+            : routerResult.rewrittenQuestion || resolvedMessage;
 
         const profileMode = isProfileQuestion(effectiveMessage);
         const sensitiveMode =
@@ -1849,6 +1855,10 @@ FORMAT:
 - Use bullets for lists.
 - Keep contact details visible.
 - Do not glue different sections into one paragraph.
+
+LANGUAGE RULE:
+- Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
+- If the query is in English or language is not specified, default to English.
 `;
 
         let fileResponse: any;
@@ -1960,9 +1970,9 @@ FORMAT:
             selectedAgentLabel: selectedAgent.label,
             needsClarification: Boolean(webFallback.needsClarification),
             pendingQuestion: webFallback.pendingQuestion || null,
-            
+
             lastResolvedTopic: newTopic,
-         contextSummary: updatedContextSummary,
+            contextSummary: updatedContextSummary,
             routeType: routerResult.routeType,
         });
     } catch (error: any) {
