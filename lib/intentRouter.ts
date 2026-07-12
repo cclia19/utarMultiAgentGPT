@@ -4,7 +4,7 @@ import {
     getOrgUnitById,
     type OrgUnit,
 } from "./orgUnits";
-import { detectAgentFromText, routeQuestion } from "./routing";
+import { detectAgentFromText, routeQuestion, resolveControlledAcronym } from "./routing";
 
 export interface IntentRouteResult {
     agentId: string;
@@ -416,6 +416,28 @@ export async function routeWithLLM(params: {
     const currentAgentId = params.currentAgentId || "general";
     const pendingQuestion = params.pendingQuestion || null;
 
+    const acronymResult = resolveControlledAcronym(message);
+    if (acronymResult) {
+        const selectedUnit = getOrgUnitById(acronymResult.agentId);
+        return {
+            agentId: acronymResult.agentId,
+            intentCategory: "admin_service",
+            retrievalNeeded: true,
+            conversationRelation: "none",
+            usePendingQuestion: false,
+            needsClarification: acronymResult.needsClarification,
+            clarificationQuestion: acronymResult.clarificationMessage || "",
+            rewrittenQuestion: message,
+            allowWebFallback: false,
+            routeType: acronymResult.needsClarification
+                ? "unclear"
+                : selectedUnit.type === "faculty"
+                    ? "faculty_specific"
+                    : "admin_specific",
+            confidence: 1.0,
+        };
+    }
+
     const currentUnit = getOrgUnitById(currentAgentId);
     const orgUnitList = buildOrgUnitList();
 
@@ -441,6 +463,7 @@ Routing principles:
 2. Broad university-wide questions go to General Assistant.
    Examples: UTAR president, vice president, campus, location, faculties, general offices, academic calendar, university-wide info.
 3. Faculty/programme-specific questions go to the relevant faculty only when faculty/programme is known.
+   - NOTE: If the user states they belong to a specific faculty (e.g. "FCS student" or "我是中文系学生") or asks about a procedure (like "certification letter", "internship application", "student assistance fund", or "financial aid / 助学金") in a faculty context, you MUST route to that specific faculty assistant (e.g., "fcs"). Do NOT automatically route to central departments (like "registrar" or "darp") because faculties at UTAR administer their own local forms, placement guidelines, and student funds.
 4. If faculty/programme context is missing and required, ask one concise clarification question.
 5. If current context is a faculty and the latest question is a faculty-dependent follow-up, keep that faculty unless the user clearly asks about another unit or university-wide topic.
 6. Unknown UTAR staff/person:
@@ -456,28 +479,34 @@ Routing principles:
    - If missing, ask for programme and year/semester.
    - Do not answer with generic advice.
 9. Borrow / loan / request resource:
-   - Financial loan / PTPTN / scholarship / funding -> scholarship or finance.
+    - Financial loan / PTPTN / scholarship / funding -> scholarship or finance. (NOTE: Local faculty student assistance funds / "助学金" asked within a faculty context should stay in the faculty context, as some faculties like FCS/中华研究院 administer their own local student assistance funds).
    - Book / academic resource -> library.
    - Physical object / equipment / cable / adapter / tool -> faculty/lab/IT context, not scholarship.
    - Room / venue / facility -> ask campus/facility clarification unless a clear unit exists.
 10. Acronyms:
-   - Infer using context when reasonable.
-   - If ambiguous, ask clarification.
+    - Infer using context when reasonable.
+    - If ambiguous, ask clarification.
 11. Supervisor recommendation:
-   - Faculty/programme context required.
-   - Ask if missing.
-   - Later answer should say "potential suitable supervisors", not objective "best".
+    - Faculty/programme context required.
+    - Ask if missing.
+    - Later answer should say "potential suitable supervisors", not objective "best".
 12. Private/sensitive:
-   - CGPA, result, payment record, password, student ID, personal records -> private_sensitive.
-   - No web fallback.
+    - CGPA, result, payment record, password, student ID, personal records -> private_sensitive.
+    - NOTE: Only classify as "private_sensitive" if the user is asking to VIEW, REVEAL, check, or retrieve their specific personal value (e.g. checking their grades or showing their actual phone number/address).
+    - If the user is asking HOW to update, change, or submit a request to update their personal information (e.g. asking for the "student details change form" or "FM-DACE-031" procedure), this is a public procedural request, NOT private_sensitive. It should be routed to the respective faculty or general assistant to search the knowledge base for the procedure.
+    - No web fallback for private_sensitive.
 13. Context-setting:
-   - routeType "context_setting" only when user explicitly says they/the person are from a faculty/department/programme.
-   - Do not use context_setting for normal questions.
+    - routeType "context_setting" only when user explicitly says they/the person are from a faculty/department/programme.
+    - Do not use context_setting for normal questions.
 14. Retrieval:
-   - retrievalNeeded = false for greetings, thanks, small talk, jokes, playful social messages, academic integrity refusals, and simple conversational replies.
-   - retrievalNeeded = true for factual UTAR questions, policies, staff, contacts, programme info, fees, exams, offices, procedures, complaints, and academic matters.
+    - retrievalNeeded = false for greetings, thanks, small talk, jokes, playful social messages, academic integrity refusals, and simple conversational replies.
+    - retrievalNeeded = true for factual UTAR questions, policies, staff, contacts, programme info, fees, exams, offices, procedures, complaints, and academic matters.
 15. Language preference:
-   - If the user query specifies a target language, translation, or reply format preference (e.g. "respond in Chinese", "translate to Malay", "reply in Mandarin"), you MUST preserve this instruction/constraint verbatim in the output "rewrittenQuestion".
+    - If the user query specifies a target language, translation, or reply format preference (e.g. "respond in Chinese", "translate to Malay", "reply in Mandarin"), you MUST preserve this instruction/constraint verbatim in the output "rewrittenQuestion".
+16. Add/Drop / Course Registration:
+    - Add/Drop, manual registration, and credit hour overload/probation limits are faculty/centre-specific at UTAR.
+    - If the user is already in a faculty context (e.g., FCS), keep them in that faculty context.
+    - If the user is in the General context and asks about Add/Drop or manual registration without specifying their faculty/centre, you MUST set "needsClarification" to true and ask them which faculty/centre they belong to (e.g. "Could you please specify which faculty or centre you belong to so I can provide the correct add/drop procedures?").
 
 Conversation relation:
 - If there is a pendingPreviousQuestion, decide if the latest message is:

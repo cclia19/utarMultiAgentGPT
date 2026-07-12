@@ -61,11 +61,23 @@ function detectAgentFromMessage(text: string): AgentId | null {
 
         ipsr: "ipsr",
         dhr: "dhr",
+        dssm: "dssm",
         dfn: "dfn",
-        dea: "dea",
+        dea: "deas",
+        deas: "deas",
         dace: "dace",
         oia: "oia",
         library: "library",
+        diss: "diss",
+        "dss sungai long": "dss-sungai-long",
+        "dss sl": "dss-sungai-long",
+        "dss kampar": "dss-kampar",
+        "dss kpr": "dss-kampar",
+        "dsa sungai long": "dsa-sungai-long",
+        "dsa sl": "dsa-sungai-long",
+        "dsa kampar": "dsa-kampar",
+        "dsa kpr": "dsa-kampar",
+        dgs: "dgs-kampar",
     };
 
     return map[normalized] || null;

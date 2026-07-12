@@ -235,7 +235,7 @@ function getCanonicalLinksForAgent(agentId: string, question = ""): OfficialLink
         });
     }
 
-    if (id === "dea" || q.includes("exam") || q.includes("examination")) {
+    if (id === "deas" || id === "dea" || q.includes("exam") || q.includes("examination")) {
         links.push({
             title: "Division of Examination and Awards",
             uri: "https://dea.utar.edu.my/",
@@ -364,6 +364,24 @@ function appendOfficialLinks(text: string, links: OfficialLink[]): string {
 ${linkBlock}`;
 }
 
+function linkifyRawUrls(text: string): string {
+    const pattern = /(\[.*?\]\(.*?\)|<[^>]*href=["'].*?["'][^>]*>)|(https?:\/\/[^\s<>\)]+)/gi;
+
+    return text.replace(pattern, (match, p1, p2) => {
+        if (p1) return match;
+
+        let url = match;
+        let trailing = "";
+
+        while (url.length > 0 && /[.,;:!?'")\]]$/.test(url)) {
+            trailing = url.slice(-1) + trailing;
+            url = url.slice(0, -1);
+        }
+
+        return `[${url}](${url})${trailing}`;
+    });
+}
+
 function finalCleanWebAnswer(
     text: string,
     allowedLinks: OfficialLink[]
@@ -372,13 +390,15 @@ function finalCleanWebAnswer(
     const markdownSafe = sanitizeMarkdownLinksAgainstAllowed(cleaned, allowedLinks);
     const rawSafe = stripRawUnverifiedUrls(markdownSafe, allowedLinks);
 
-    return removeEmptyOfficialLinksSection(rawSafe)
+    const base = removeEmptyOfficialLinksSection(rawSafe)
         .replace(/\n{3,}/g, "\n\n")
         .trim();
+    return linkifyRawUrls(base);
 }
 
 function finalClean(text: string): string {
-    return cleanUserFacingText(text).replace(/\n{3,}/g, "\n\n").trim();
+    const base = cleanUserFacingText(text).replace(/\n{3,}/g, "\n\n").trim();
+    return linkifyRawUrls(base);
 }
 
 function extractResponseText(response: any): string {
@@ -640,9 +660,12 @@ function isLikelyUtarQuestion(message: string): boolean {
         "fas",
         "dsa",
         "dea",
+        "deas",
         "dfn",
         "dace",
         "ipsr",
+        "dss",
+        "dgs",
         "exam",
         "fee",
         "payment",
@@ -1677,7 +1700,9 @@ export async function POST(req: NextRequest) {
 
         const detectedAgentFromReply = detectAgentFromText(rawMessage);
         const wasClarificationReply =
-            Boolean(detectedAgentFromReply) && lastAssistantAskedForScope(history);
+            (Boolean(detectedAgentFromReply) ||
+             /kampar|sungai\s*long|sungai|long|kpr|sl|both/i.test(rawMessage)) &&
+            lastAssistantAskedForScope(history);
 
         const pendingQuestion = frontendPendingQuestion
             ? String(frontendPendingQuestion)
@@ -1710,7 +1735,7 @@ export async function POST(req: NextRequest) {
 
         const selectedAgent = getAgentById(routerResult.agentId);
 
-        if (resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false) {
+        if (!routerResult.needsClarification && (resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false)) {
             const directText = await generateDirectNoRetrievalResponse(rawMessage);
 
             return NextResponse.json({
