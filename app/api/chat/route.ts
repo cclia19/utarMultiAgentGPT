@@ -1822,12 +1822,17 @@ export async function POST(req: NextRequest) {
 
         const stores = await ai.fileSearchStores.list();
         let storeName = "";
+        
+        let lookupName = selectedAgent.storeDisplayName;
+        if (lookupName === "UTAR THP FBF Knowledge Base") {
+            lookupName = "UTAR FBF Knowledge Base";
+        }
 
         for await (const s of stores) {
             const displayName =
                 (s as any).displayName || (s as any).display_name || "";
 
-            if (displayName === selectedAgent.storeDisplayName) {
+            if (displayName === lookupName) {
                 storeName = s.name as string;
                 break;
             }

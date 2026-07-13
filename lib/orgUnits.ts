@@ -427,7 +427,7 @@ export const ORG_UNITS: OrgUnit[] = [
         type: "faculty",
         campus: "Kampar",
         aliases: ["fbf", "thp fbf", "thpfbf", "business and finance", "teh hong piow", "business faculty", "finance faculty"],
-        fileStoreDisplayName: "UTAR FBF Knowledge Base",
+        fileStoreDisplayName: "UTAR THP FBF Knowledge Base",
         enabledForChat: true,
         enabledForUpload: true,
         studentFacing: true,

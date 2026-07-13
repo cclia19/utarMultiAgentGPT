@@ -26,7 +26,7 @@ interface HistoryEntry {
 
 const WELCOME: Message = {
     role: "model",
-    text: "Hi! I'm AvaTAR, your friendly UTAR buddy! Ask me anything about UTAR—courses, admissions, fees, contacts, student support, and more 😊",
+    text: "Hi! I'm TARo, your friendly UTAR buddy! Ask me anything about UTAR—courses, admissions, fees, contacts, student support, and more 😊",
     citations: [],
     sourceMode: "none",
     storeDisplayName: "",
@@ -249,14 +249,14 @@ export default function ChatPage() {
                 <div className="max-w-2xl mx-auto w-full flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <img
-                            src="/logo.jpeg"
+                            src="/TARo.png"
                             alt="UTAR Logo"
-                            className="w-8 h-8 rounded-full object-cover"
+                            className="w-12 h-12 object-contain"
                         />
 
                         <div>
                             <p className="text-sm font-semibold text-zinc-900">
-                                AvaTAR
+                                TARo
                             </p>
                             <p className="text-xs text-zinc-400">
                                 Ask naturally. I’ll route your question to the right place.
@@ -429,7 +429,7 @@ export default function ChatPage() {
                     </button>
                 </div>
                 <div className="mt-2 text-center text-[11px] text-zinc-400">
-                    AvaTAR can make mistake. Check important info
+                    TARo can make mistake. Check important info
                 </div>
             </footer>
         </div>
