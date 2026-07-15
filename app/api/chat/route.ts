@@ -1668,38 +1668,7 @@ For the Stanford and McDonald's route, please refer to the official notices on t
 }
 
 
-function tryHandleProbationCredits(message: string) {
-    const normalized = String(message || "")
-        .toLowerCase()
-        .replace(/[^\w\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-    
-    const words = normalized.split(" ");
-    const hasWord = (word: string) => words.includes(word);
-    
-    const hasProbation = hasWord("probation") || hasWord("probationary");
-    const hasLimit = hasWord("credits") || hasWord("credit") || hasWord("course") || hasWord("courses") || hasWord("load") || hasWord("limit") || hasWord("take") || hasWord("register");
 
-    if (!hasProbation || !hasLimit) return null;
-
-    return {
-        text: `
-According to **Regulation II (Programme Registration, Refund of Fees, Leave of Absence and Withdrawal from Studies)**, students who are placed under academic probation are restricted to the following study load limits:
-
-*   **Long Trimester (14 lecture weeks):** Up to a maximum of three (3) courses or nine (9) credit hours, whichever is lower.
-*   **Short Trimester (7 lecture weeks):** Up to a maximum of 6 credit hours (with a minimum of 1 course).
-
-Please consult your Academic Advisor (AA) or your Faculty General Office (FGO) if you need assistance with your study plan.
-`.trim(),
-        selectedAgentId: "general",
-        selectedAgentLabel: "General Assistant",
-        storeDisplayName: "UTAR General Knowledge Base",
-        needsClarification: false,
-        routeType: "general_public" as const,
-        citations: []
-    };
-}
 
 
 async function resolveConversationContext(params: {
@@ -1903,22 +1872,6 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const probationCreditsReply = tryHandleProbationCredits(resolvedMessage);
-        if (probationCreditsReply) {
-            return NextResponse.json({
-                text: probationCreditsReply.text,
-                citations: probationCreditsReply.citations,
-                sourceMode: "fileSearch",
-                storeDisplayName: probationCreditsReply.storeDisplayName,
-                selectedAgentId: probationCreditsReply.selectedAgentId,
-                selectedAgentLabel: probationCreditsReply.selectedAgentLabel,
-                needsClarification: probationCreditsReply.needsClarification,
-                pendingQuestion: null,
-                lastResolvedTopic,
-                contextSummary: updatedContextSummary,
-                routeType: probationCreditsReply.routeType,
-            });
-        }
 
         const pendingForRouter =
             contextResolution.relation === "clarification_for_pending" ||

@@ -504,7 +504,8 @@ Routing principles:
 15. Language preference:
     - If the user query specifies a target language, translation, or reply format preference (e.g. "respond in Chinese", "translate to Malay", "reply in Mandarin"), you MUST preserve this instruction/constraint verbatim in the output "rewrittenQuestion".
 16. Add/Drop / Course Registration:
-    - Add/Drop, manual registration, and credit hour overload/probation limits are faculty/centre-specific at UTAR.
+    - Add/Drop, manual registration, and credit hour overload are faculty/centre-specific at UTAR.
+    - Academic probation credit limits (governed by Regulation II) are university-wide and NOT faculty-specific. If the user asks about credit limits or study load limits under academic probation, route them directly to the General Assistant (retrievalNeeded = true) to consult Regulation II from the General Knowledge Base. Do NOT ask for clarification or faculty context for academic probation limits.
     - If the user is already in a faculty context (e.g., FCS), keep them in that faculty context.
     - If the user is in the General context and asks about Add/Drop or manual registration without specifying their faculty/centre, you MUST set "needsClarification" to true and ask them which faculty/centre they belong to (e.g. "Could you please specify which faculty or centre you belong to so I can provide the correct add/drop procedures?").
 
