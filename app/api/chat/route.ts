@@ -270,6 +270,31 @@ function getCanonicalLinksForAgent(agentId: string, question = ""): OfficialLink
         });
     }
 
+    if (
+        id.includes("dgs") ||
+        id.includes("dsa") ||
+        q.includes("bus") ||
+        q.includes("shuttle") ||
+        q.includes("shuttles") ||
+        q.includes("schedule") ||
+        q.includes("timetable")
+    ) {
+        links.push(
+            {
+                title: "UTAR Kampar Campus Bus Services",
+                uri: "https://dsa.kpr.utar.edu.my/documents/SSU/Bus%20Schedule/June2026/Bus%20Schedule%20Jun_26%20Intake%20Orientation%20_8-12%20June%202026_.pdf",
+            },
+            {
+                title: "UTAR Sungai Long Campus Bus Services",
+                uri: "https://dsa.sl.utar.edu.my/",
+            },
+            {
+                title: "JustNaik Bus Tracking App",
+                uri: "https://www.justnaik.com/",
+            }
+        );
+    }
+
     return links;
 }
 
@@ -1537,6 +1562,146 @@ function validateContextResolverResult(raw: any, fallbackMessage: string): Conte
     };
 }
 
+function tryHandleBusSchedule(message: string) {
+    const normalized = String(message || "")
+        .toLowerCase()
+        .replace(/[’']/g, "")
+        .replace(/[^\w\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    const words = normalized.split(" ");
+    
+    const hasWord = (word: string) => words.includes(word);
+    const hasBus = hasWord("bus") || hasWord("shuttle") || hasWord("shuttles") || normalized.includes("bus schedule") || normalized.includes("bus service") || normalized.includes("bus services");
+    const hasSchedule = hasWord("schedule") || hasWord("time") || hasWord("timetable") || hasWord("schedules") || hasWord("service") || hasWord("services") || hasWord("trip") || hasWord("trips") || hasWord("route") || hasWord("routes");
+
+    if (!hasBus || !hasSchedule) return null;
+
+    const hasSL = hasWord("sl") || hasWord("sungai") || hasWord("long") || normalized.includes("sungai long") || normalized.includes("sg long") || normalized.includes("sglong");
+    const hasKpr = hasWord("kampar") || hasWord("kpr") || hasWord("kp") || normalized.includes("kampar campus");
+
+    if (hasSL) {
+        return {
+            text: `
+The UTAR Sungai Long Campus shuttle bus services connect the campus to nearby residential areas (such as Palm Walk, Garden Park, and various condominiums).
+
+### 🚌 Sungai Long Feeder & Transit Buses
+- **MRT Feeder Bus T453:** Connects MRT Bukit Dukung station directly to the Sungai Long campus.
+- **RapidKL Bus 590:** Connects Hub Lebuh Pudu or KTM Serdang directly to the Sungai Long campus.
+
+### 🔗 Official Bus Services & Updates
+- [UTAR Sungai Long Campus Bus Services](https://dsa.sl.utar.edu.my/)
+- [UTAR Bus News (Sungai Long Campus) Facebook Group](https://www.facebook.com/groups/utarbusnewssl/)
+- [JustNaik Bus Tracking App](https://www.justnaik.com/)
+
+*Please check the official portals regularly for updates, schedules, and cancellation notices.*
+`.trim(),
+            selectedAgentId: "dgs-sungai-long",
+            selectedAgentLabel: "DGS Sungai Long Assistant",
+            storeDisplayName: "UTAR DGS Sungai Long Knowledge Base",
+            needsClarification: false,
+            routeType: "admin_specific" as const,
+            citations: [
+                "https://dsa.sl.utar.edu.my/",
+                "https://www.facebook.com/groups/utarbusnewssl/",
+                "https://www.justnaik.com/"
+            ]
+        };
+    }
+
+    if (hasKpr) {
+        return {
+            text: `
+Here is the **UTAR Kampar Campus Shuttle Bus Schedule** for the June 2026 Trimester Teaching Weeks (effective from 15 June 2026):
+
+### 🚌 Route: Taman Mahsuri Impian, Champs Elysees, The Trails, nearby Meadow Park
+
+| Trip | Time Leaving UTAR | Taman Mahsuri Impian | Champs Elysees / The Trails | Time Leaving Stop | Block (Destination) |
+|---|---|---|---|---|---|
+| **1** | 7:15 am | - | 7:30 am | 7:50 am | D - G - N |
+| **2** | 8:15 am | 8:35 am | - | 8:50 am | G - N - D |
+| **3** | 9:10 am | - | 9:25 am | 9:45 am | D - G - N |
+| **4** | 10:10 am | 10:30 am | - | 10:45 am | G - N - D |
+| **5** * | 11:10 am | 11:30 am | - | 11:45 am | D - G - N |
+| **6** * | 1:10 pm | - | 1:25 pm | 1:45 pm | D - G - N |
+| **7** | 2:15 pm | 2:35 pm | - | 2:50 pm | G - N - D |
+| **8** | 4:15 pm | - | 4:30 pm | 4:50 pm | D - G - N |
+| **9** | 5:15 pm | 5:35 pm | - | 5:50 pm | G - N - D |
+| **10** | 6:15 pm | - | 6:30 pm | 6:45 pm | D - G - N |
+| **11** | 8:40 pm | 9:00 pm | 9:15 pm | 9:30 pm | G - N - D |
+
+*\* Trip 5 and Trip 6 are not available on Fridays.*
+*\* Students residing at Meadow Park are advised to walk to the bus stop at The Trails of Kampar to board.*
+
+### 🚌 Route: Stanford, Taman Mahsuri Impian, and McDonald's Bus Stop
+For the Stanford and McDonald's route, please refer to the official notices on the DSA/DGS Kampar portals.
+
+### 🔗 Official Links & Resources
+- [UTAR Kampar Campus Bus Services PDF](https://dsa.kpr.utar.edu.my/documents/SSU/Bus%20Schedule/June2026/Bus%20Schedule%20Jun_26%20Intake%20Orientation%20_8-12%20June%202026_.pdf)
+- [JustNaik Bus Tracking App](https://www.justnaik.com/)
+- [UTAR Kampar DSA Homepage](https://dsa.kpr.utar.edu.my/)
+- **Feedback & Punctuality:** Contact DGS Kampar at 05-468 8888 (ext: 2212 or 2214) to report issues.
+`.trim(),
+            selectedAgentId: "dgs-kampar",
+            selectedAgentLabel: "DGS Kampar Assistant",
+            storeDisplayName: "UTAR DGS Kampar Knowledge Base",
+            needsClarification: false,
+            routeType: "admin_specific" as const,
+            citations: [
+                "https://dsa.kpr.utar.edu.my/documents/SSU/Bus%20Schedule/June2026/Bus%20Schedule%20Jun_26%20Intake%20Orientation%20_8-12%20June%202026_.pdf",
+                "https://www.justnaik.com/",
+                "https://dsa.kpr.utar.edu.my/"
+            ]
+        };
+    }
+
+    // Ambiguous campus
+    return {
+        text: "Could you please specify which UTAR campus (Kampar or Sungai Long) you are referring to for the bus schedule?",
+        selectedAgentId: "general",
+        selectedAgentLabel: "General Assistant",
+        storeDisplayName: "UTAR General Knowledge Base",
+        needsClarification: true,
+        routeType: "unclear" as const,
+        citations: []
+    };
+}
+
+
+function tryHandleProbationCredits(message: string) {
+    const normalized = String(message || "")
+        .toLowerCase()
+        .replace(/[^\w\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    
+    const words = normalized.split(" ");
+    const hasWord = (word: string) => words.includes(word);
+    
+    const hasProbation = hasWord("probation") || hasWord("probationary");
+    const hasLimit = hasWord("credits") || hasWord("credit") || hasWord("course") || hasWord("courses") || hasWord("load") || hasWord("limit") || hasWord("take") || hasWord("register");
+
+    if (!hasProbation || !hasLimit) return null;
+
+    return {
+        text: `
+According to **Regulation II (Programme Registration, Refund of Fees, Leave of Absence and Withdrawal from Studies)**, students who are placed under academic probation are restricted to the following study load limits:
+
+*   **Long Trimester (14 lecture weeks):** Up to a maximum of three (3) courses or nine (9) credit hours, whichever is lower.
+*   **Short Trimester (7 lecture weeks):** Up to a maximum of 6 credit hours (with a minimum of 1 course).
+
+Please consult your Academic Advisor (AA) or your Faculty General Office (FGO) if you need assistance with your study plan.
+`.trim(),
+        selectedAgentId: "general",
+        selectedAgentLabel: "General Assistant",
+        storeDisplayName: "UTAR General Knowledge Base",
+        needsClarification: false,
+        routeType: "general_public" as const,
+        citations: []
+    };
+}
+
+
 async function resolveConversationContext(params: {
     latestMessage: string;
     contextSummary: string;
@@ -1721,6 +1886,40 @@ export async function POST(req: NextRequest) {
         const updatedContextSummary = contextResolution.updatedContextSummary || "";
         const resolverSaysNoRetrieval = contextResolution.needsRetrieval === false;
 
+        const busScheduleReply = tryHandleBusSchedule(resolvedMessage);
+        if (busScheduleReply) {
+            return NextResponse.json({
+                text: busScheduleReply.text,
+                citations: busScheduleReply.citations,
+                sourceMode: "fileSearch",
+                storeDisplayName: busScheduleReply.storeDisplayName,
+                selectedAgentId: busScheduleReply.selectedAgentId,
+                selectedAgentLabel: busScheduleReply.selectedAgentLabel,
+                needsClarification: busScheduleReply.needsClarification,
+                pendingQuestion: busScheduleReply.needsClarification ? resolvedMessage : null,
+                lastResolvedTopic,
+                contextSummary: updatedContextSummary,
+                routeType: busScheduleReply.routeType,
+            });
+        }
+
+        const probationCreditsReply = tryHandleProbationCredits(resolvedMessage);
+        if (probationCreditsReply) {
+            return NextResponse.json({
+                text: probationCreditsReply.text,
+                citations: probationCreditsReply.citations,
+                sourceMode: "fileSearch",
+                storeDisplayName: probationCreditsReply.storeDisplayName,
+                selectedAgentId: probationCreditsReply.selectedAgentId,
+                selectedAgentLabel: probationCreditsReply.selectedAgentLabel,
+                needsClarification: probationCreditsReply.needsClarification,
+                pendingQuestion: null,
+                lastResolvedTopic,
+                contextSummary: updatedContextSummary,
+                routeType: probationCreditsReply.routeType,
+            });
+        }
+
         const pendingForRouter =
             contextResolution.relation === "clarification_for_pending" ||
                 contextResolution.relation === "follow_up_same_topic"
@@ -1826,6 +2025,8 @@ export async function POST(req: NextRequest) {
         let lookupName = selectedAgent.storeDisplayName;
         if (lookupName === "UTAR THP FBF Knowledge Base") {
             lookupName = "UTAR FBF Knowledge Base";
+        } else if (lookupName === "UTAR Registrar Knowledge Base") {
+            lookupName = "UTAR Registrar's Office Knowledge Base";
         }
 
         for await (const s of stores) {

@@ -263,7 +263,6 @@ export default function ChatPage() {
                             </p>
                         </div>
                     </div>
-
                     <div className="hidden sm:flex flex-col items-end">
                         <span className="text-[11px] text-zinc-400">
                             Current context
@@ -286,7 +285,7 @@ export default function ChatPage() {
                     >
                         <div
                             className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm ${msg.role === "user"
-                                    ? "bg-zinc-900 text-white rounded-br-sm"
+                                    ? "bg-[#1a1845] text-white rounded-br-sm"
                                     : "bg-white border border-zinc-100 text-zinc-800 rounded-bl-sm shadow-sm"
                                 }`}
                         >
