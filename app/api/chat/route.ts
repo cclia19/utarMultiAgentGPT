@@ -1981,8 +1981,8 @@ LANGUAGE RULE:
                         systemInstruction: { parts: [{ text: fileSearchSystemInstruction }] },
                         tools: [
                             {
-                                file_search: {
-                                    file_search_store_names: [storeName],
+                                fileSearch: {
+                                    fileSearchStoreNames: [storeName],
                                 },
                             } as any,
                         ],
