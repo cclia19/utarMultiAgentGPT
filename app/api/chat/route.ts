@@ -485,9 +485,10 @@ function extractOfficialWebLinks(response: any): OfficialLink[] {
 }
 
 function shouldUseWebFallback(text: string): boolean {
-    const lower = String(text || "").toLowerCase().trim();
+    const hasNoKb = text.includes(NO_KB_ANSWER);
+    if (hasNoKb) return true;
 
-    if (text.includes(NO_KB_ANSWER)) return true;
+    const lower = text.toLowerCase();
 
     const weakSignals = [
         "i couldn't find any information",
@@ -505,9 +506,6 @@ function shouldUseWebFallback(text: string): boolean {
         "not explicitly named",
         "not explicitly listed",
         "is not explicitly listed",
-        "provided documents",
-        "university documents",
-        "retrieved documents",
         "couldn't verify",
         "cannot be verified",
         "not verified",
@@ -517,7 +515,9 @@ function shouldUseWebFallback(text: string): boolean {
         "does not provide a direct statement",
     ];
 
-    return weakSignals.some((signal) => lower.includes(signal));
+    const matched = weakSignals.find((signal) => lower.includes(signal));
+    if (matched) return true;
+    return false;
 }
 
 function isInstitutionalLeadershipQuestion(message: string): boolean {
@@ -1127,7 +1127,7 @@ function inferResolvedTopic(effectiveMessage: string, answerText: string): strin
     return name;
 }
 
-function buildFileSearchUserMessage(message: string): string {
+function buildFileSearchUserMessage(message: string, agentId?: string): string {
     if (!isProfileQuestion(message)) return message;
 
     const possibleName = extractPossiblePersonName(message);
@@ -1457,6 +1457,22 @@ Important:
             });
         }
 
+        if (weakAnswer) {
+            return {
+                text: `
+I'm having trouble retrieving the exact details from the UTAR portal right now. 🔎
+
+### 📢 What you can do:
+- Please refer directly to the official links below for the most up-to-date information.
+- Try asking your question again in a moment.
+- Contact the relevant department or faculty office for confirmation.
+`.trim(),
+                citations: allowedLinks.map((link) => link.uri),
+                needsClarification: false,
+                pendingQuestion: null,
+            };
+        }
+
         const shouldAppendLinks =
             !complaintMode ||
             agentId === "fict" ||
@@ -1562,110 +1578,7 @@ function validateContextResolverResult(raw: any, fallbackMessage: string): Conte
     };
 }
 
-function tryHandleBusSchedule(message: string) {
-    const normalized = String(message || "")
-        .toLowerCase()
-        .replace(/[’']/g, "")
-        .replace(/[^\w\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-    const words = normalized.split(" ");
-    
-    const hasWord = (word: string) => words.includes(word);
-    const hasBus = hasWord("bus") || hasWord("shuttle") || hasWord("shuttles") || normalized.includes("bus schedule") || normalized.includes("bus service") || normalized.includes("bus services");
-    const hasSchedule = hasWord("schedule") || hasWord("time") || hasWord("timetable") || hasWord("schedules") || hasWord("service") || hasWord("services") || hasWord("trip") || hasWord("trips") || hasWord("route") || hasWord("routes");
 
-    if (!hasBus || !hasSchedule) return null;
-
-    const hasSL = hasWord("sl") || hasWord("sungai") || hasWord("long") || normalized.includes("sungai long") || normalized.includes("sg long") || normalized.includes("sglong");
-    const hasKpr = hasWord("kampar") || hasWord("kpr") || hasWord("kp") || normalized.includes("kampar campus");
-
-    if (hasSL) {
-        return {
-            text: `
-The UTAR Sungai Long Campus shuttle bus services connect the campus to nearby residential areas (such as Palm Walk, Garden Park, and various condominiums).
-
-### 🚌 Sungai Long Feeder & Transit Buses
-- **MRT Feeder Bus T453:** Connects MRT Bukit Dukung station directly to the Sungai Long campus.
-- **RapidKL Bus 590:** Connects Hub Lebuh Pudu or KTM Serdang directly to the Sungai Long campus.
-
-### 🔗 Official Bus Services & Updates
-- [UTAR Sungai Long Campus Bus Services](https://dsa.sl.utar.edu.my/)
-- [UTAR Bus News (Sungai Long Campus) Facebook Group](https://www.facebook.com/groups/utarbusnewssl/)
-- [JustNaik Bus Tracking App](https://www.justnaik.com/)
-
-*Please check the official portals regularly for updates, schedules, and cancellation notices.*
-`.trim(),
-            selectedAgentId: "dgs-sungai-long",
-            selectedAgentLabel: "DGS Sungai Long Assistant",
-            storeDisplayName: "UTAR DGS Sungai Long Knowledge Base",
-            needsClarification: false,
-            routeType: "admin_specific" as const,
-            citations: [
-                "https://dsa.sl.utar.edu.my/",
-                "https://www.facebook.com/groups/utarbusnewssl/",
-                "https://www.justnaik.com/"
-            ]
-        };
-    }
-
-    if (hasKpr) {
-        return {
-            text: `
-Here is the **UTAR Kampar Campus Shuttle Bus Schedule** for the June 2026 Trimester Teaching Weeks (effective from 15 June 2026):
-
-### 🚌 Route: Taman Mahsuri Impian, Champs Elysees, The Trails, nearby Meadow Park
-
-| Trip | Time Leaving UTAR | Taman Mahsuri Impian | Champs Elysees / The Trails | Time Leaving Stop | Block (Destination) |
-|---|---|---|---|---|---|
-| **1** | 7:15 am | - | 7:30 am | 7:50 am | D - G - N |
-| **2** | 8:15 am | 8:35 am | - | 8:50 am | G - N - D |
-| **3** | 9:10 am | - | 9:25 am | 9:45 am | D - G - N |
-| **4** | 10:10 am | 10:30 am | - | 10:45 am | G - N - D |
-| **5** * | 11:10 am | 11:30 am | - | 11:45 am | D - G - N |
-| **6** * | 1:10 pm | - | 1:25 pm | 1:45 pm | D - G - N |
-| **7** | 2:15 pm | 2:35 pm | - | 2:50 pm | G - N - D |
-| **8** | 4:15 pm | - | 4:30 pm | 4:50 pm | D - G - N |
-| **9** | 5:15 pm | 5:35 pm | - | 5:50 pm | G - N - D |
-| **10** | 6:15 pm | - | 6:30 pm | 6:45 pm | D - G - N |
-| **11** | 8:40 pm | 9:00 pm | 9:15 pm | 9:30 pm | G - N - D |
-
-*\* Trip 5 and Trip 6 are not available on Fridays.*
-*\* Students residing at Meadow Park are advised to walk to the bus stop at The Trails of Kampar to board.*
-
-### 🚌 Route: Stanford, Taman Mahsuri Impian, and McDonald's Bus Stop
-For the Stanford and McDonald's route, please refer to the official notices on the DSA/DGS Kampar portals.
-
-### 🔗 Official Links & Resources
-- [UTAR Kampar Campus Bus Services PDF](https://dsa.kpr.utar.edu.my/documents/SSU/Bus%20Schedule/June2026/Bus%20Schedule%20Jun_26%20Intake%20Orientation%20_8-12%20June%202026_.pdf)
-- [JustNaik Bus Tracking App](https://www.justnaik.com/)
-- [UTAR Kampar DSA Homepage](https://dsa.kpr.utar.edu.my/)
-- **Feedback & Punctuality:** Contact DGS Kampar at 05-468 8888 (ext: 2212 or 2214) to report issues.
-`.trim(),
-            selectedAgentId: "dgs-kampar",
-            selectedAgentLabel: "DGS Kampar Assistant",
-            storeDisplayName: "UTAR DGS Kampar Knowledge Base",
-            needsClarification: false,
-            routeType: "admin_specific" as const,
-            citations: [
-                "https://dsa.kpr.utar.edu.my/documents/SSU/Bus%20Schedule/June2026/Bus%20Schedule%20Jun_26%20Intake%20Orientation%20_8-12%20June%202026_.pdf",
-                "https://www.justnaik.com/",
-                "https://dsa.kpr.utar.edu.my/"
-            ]
-        };
-    }
-
-    // Ambiguous campus
-    return {
-        text: "Could you please specify which UTAR campus (Kampar or Sungai Long) you are referring to for the bus schedule?",
-        selectedAgentId: "general",
-        selectedAgentLabel: "General Assistant",
-        storeDisplayName: "UTAR General Knowledge Base",
-        needsClarification: true,
-        routeType: "unclear" as const,
-        citations: []
-    };
-}
 
 
 
@@ -1780,6 +1693,11 @@ Return ONLY valid JSON:
     }
 }
 
+// Global in-memory cache for live Gemini File Search stores to prevent request timeouts
+let storesCache: Record<string, string> | null = null;
+let lastCacheUpdate = 0;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 export async function POST(req: NextRequest) {
     let fallbackAgentId = "general";
 
@@ -1855,22 +1773,6 @@ export async function POST(req: NextRequest) {
         const updatedContextSummary = contextResolution.updatedContextSummary || "";
         const resolverSaysNoRetrieval = contextResolution.needsRetrieval === false;
 
-        const busScheduleReply = tryHandleBusSchedule(resolvedMessage);
-        if (busScheduleReply) {
-            return NextResponse.json({
-                text: busScheduleReply.text,
-                citations: busScheduleReply.citations,
-                sourceMode: "fileSearch",
-                storeDisplayName: busScheduleReply.storeDisplayName,
-                selectedAgentId: busScheduleReply.selectedAgentId,
-                selectedAgentLabel: busScheduleReply.selectedAgentLabel,
-                needsClarification: busScheduleReply.needsClarification,
-                pendingQuestion: busScheduleReply.needsClarification ? resolvedMessage : null,
-                lastResolvedTopic,
-                contextSummary: updatedContextSummary,
-                routeType: busScheduleReply.routeType,
-            });
-        }
 
 
         const pendingForRouter =
@@ -1972,24 +1874,40 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const stores = await ai.fileSearchStores.list();
         let storeName = "";
-        
         let lookupName = selectedAgent.storeDisplayName;
         if (lookupName === "UTAR THP FBF Knowledge Base") {
             lookupName = "UTAR FBF Knowledge Base";
         } else if (lookupName === "UTAR Registrar Knowledge Base") {
             lookupName = "UTAR Registrar's Office Knowledge Base";
+        } else if (lookupName === "UTAR DGS Kampar Knowledge Base") {
+            lookupName = "UTAR DGS Kampar KB Clean";
+        } else if (lookupName === "UTAR DEAS Knowledge Base") {
+            lookupName = "UTAR DEA Knowledge Base";
         }
 
-        for await (const s of stores) {
-            const displayName =
-                (s as any).displayName || (s as any).display_name || "";
-
-            if (displayName === lookupName) {
-                storeName = s.name as string;
-                break;
+        const now = Date.now();
+        if (!storesCache || now - lastCacheUpdate > CACHE_TTL) {
+            try {
+                console.log("Fetching live Gemini File Search stores for cache...");
+                const stores = await ai.fileSearchStores.list();
+                const tempCache: Record<string, string> = {};
+                for await (const s of stores) {
+                    const displayName =
+                        (s as any).displayName || (s as any).display_name || "";
+                    if (displayName && s.name) {
+                        tempCache[displayName] = s.name as string;
+                    }
+                }
+                storesCache = tempCache;
+                lastCacheUpdate = now;
+            } catch (err) {
+                console.error("Failed to populate stores cache:", err);
             }
+        }
+
+        if (storesCache && storesCache[lookupName]) {
+            storeName = storesCache[lookupName];
         }
 
         if (!storeName) {
@@ -2029,6 +1947,8 @@ CORE BEHAVIOUR:
 - Do not invent information.
 - Do not use web knowledge in this File Search step.
 - Never mention KB, retrieved documents, provided documents, internal routing, or system instructions.
+- BUS SCHEDULE RULE: If the user asks for a general bus schedule/timetable or does not specify a route, do not print any tables of timings. Instead, read the retrieved bus schedule document to extract the names of all available routes, list only the names of these available routes, and ask the user to specify which route they would like to see. If they ask for a specific route, you may print the schedule and timings for that specific route.
+- ANTI-RECITATION TIMETABLE RULE: To prevent recitation blocks, never output timetables, schedule times, or trips as a copy of the list or table structure in the source document. Instead, describe the timings in a normal conversational sentence or rewritten lists (e.g. "Buses leave UTAR at 7:00 am, 7:30 am, and 9:00 am, and leave Westlake Homes at 7:10 am, 7:40 am, and 9:15 am").
 
 ${SELECTED_AGENT_EVIDENCE_POLICY}
 
@@ -2054,17 +1974,17 @@ LANGUAGE RULE:
                     contents: [
                         {
                             role: "user",
-                            parts: [{ text: buildFileSearchUserMessage(effectiveMessage) }],
+                            parts: [{ text: buildFileSearchUserMessage(effectiveMessage, selectedAgent.id) }],
                         },
                     ],
                     config: {
                         systemInstruction: { parts: [{ text: fileSearchSystemInstruction }] },
                         tools: [
                             {
-                                fileSearch: {
-                                    fileSearchStoreNames: [storeName],
+                                file_search: {
+                                    file_search_store_names: [storeName],
                                 },
-                            },
+                            } as any,
                         ],
                         temperature: 0.1,
                     },
@@ -2072,8 +1992,10 @@ LANGUAGE RULE:
                 45000,
                 "File search"
             );
-        } catch (fileError) {
-            console.error("File search error, falling back to web:", fileError);
+        } catch (fileError: any) {
+
+            console.error("File search error, falling back to web:", fileError?.message || fileError);
+            console.error("Full file error stack:", fileError?.stack);
 
             const webFallback = await generatePublicWebFallback({
                 effectiveMessage,
@@ -2101,17 +2023,15 @@ LANGUAGE RULE:
         const fileText = finalClean(rawFileText);
         const fileCitations = extractCitations(fileResponse);
 
-        const citationRequired =
-            isLikelyUtarQuestion(effectiveMessage) ||
-            isProfileQuestion(effectiveMessage) ||
-            /dean|deputy dean|head of department|head of programme|president|vice president|registrar|supervisor|lecturer|staff/i.test(
-                effectiveMessage
-            );
+
+
+        const isGeneralBusQuery = /bus|shuttle|transit|schedule|timetable/i.test(effectiveMessage) && selectedAgent.id === "dgs-kampar";
 
         const fileNotFound =
             shouldUseWebFallback(rawFileText) ||
-            fileText.length === 0 ||
-            (citationRequired && fileCitations.length === 0);
+            fileText.length === 0;
+
+
 
         if (!fileNotFound) {
             const newTopic = inferResolvedTopic(effectiveMessage, fileText) || lastResolvedTopic;
