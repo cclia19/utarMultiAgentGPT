@@ -409,14 +409,16 @@ function fallbackRoute(params: {
 
 export async function routeWithLLM(params: {
     message: string;
+    rawMessage?: string;
     currentAgentId?: string;
     pendingQuestion?: string | null;
 }): Promise<IntentRouteResult> {
     const message = String(params.message || "").trim();
+    const rawMessage = String(params.rawMessage || message).trim();
     const currentAgentId = params.currentAgentId || "general";
     const pendingQuestion = params.pendingQuestion || null;
 
-    const acronymResult = resolveControlledAcronym(message);
+    const acronymResult = resolveControlledAcronym(rawMessage) || resolveControlledAcronym(message);
     if (acronymResult) {
         const selectedUnit = getOrgUnitById(acronymResult.agentId);
         return {
@@ -508,6 +510,10 @@ Routing principles:
     - Academic probation credit limits (governed by Regulation II) are university-wide and NOT faculty-specific. If the user asks about credit limits or study load limits under academic probation, route them directly to the General Assistant (retrievalNeeded = true) to consult Regulation II from the General Knowledge Base. Do NOT ask for clarification or faculty context for academic probation limits.
     - If the user is already in a faculty context (e.g., FCS), keep them in that faculty context.
     - If the user is in the General context and asks about Add/Drop or manual registration without specifying their faculty/centre, you MUST set "needsClarification" to true and ask them which faculty/centre they belong to (e.g. "Could you please specify which faculty or centre you belong to so I can provide the correct add/drop procedures?").
+17. Student Representative Council (SRC) & Regulation XIII:
+    - Questions about SRC, election rules, Regulation XIII, or student council Constitution belong to the Department of Student Affairs (DSA). Route to "dsa-kampar" or "dsa-sungai-long". Do NOT route to "vp-student-alumni" (OVP SDAR).
+18. CGPA Calculation & Grading System (Rule IV):
+    - Questions asking HOW CGPA is calculated, Grade Point Average formulas, grade point mappings, or passing grade rules (Rule IV) belong to the Division of Examination and Awards (DEAS). Route to "deas".
 
 Conversation relation:
 - If there is a pendingPreviousQuestion, decide if the latest message is:

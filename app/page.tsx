@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, MessageSquare, Send } from "lucide-react";
+import { Loader2, MessageSquare, Send, ThumbsUp, ThumbsDown } from "lucide-react";
+import html2canvas from "html2canvas";
+import DisclaimerModal from "@/components/DisclaimerModal";
+import FeedbackModal from "@/components/FeedbackModal";
 
 type Role = "user" | "model";
 type AgentId = string;
@@ -115,6 +118,92 @@ export default function ChatPage() {
     const [lastResolvedTopic, setLastResolvedTopic] = useState<string | null>(
         null
     );
+
+    const [feedbackModal, setFeedbackModal] = useState<{
+        isOpen: boolean;
+        rating: "like" | "dislike";
+        userQuery: string;
+        responseText: string;
+        selectedAgentId?: string;
+        selectedAgentLabel?: string;
+        storeDisplayName?: string;
+        sourceMode?: string;
+        citations?: string[];
+        screenshotBase64?: string;
+        msgIndex?: number;
+    }>({
+        isOpen: false,
+        rating: "like",
+        userQuery: "",
+        responseText: "",
+    });
+    const [feedbackGiven, setFeedbackGiven] = useState<Record<number, "like" | "dislike">>({});
+
+    const handleOpenFeedback = async (
+        index: number,
+        msg: Message,
+        rating: "like" | "dislike"
+    ) => {
+        const userMsg = messages[index - 1];
+        const userQuery = userMsg?.role === "user" ? userMsg.text : "";
+        let screenshotBase64 = "";
+
+        try {
+            const userElem = document.getElementById(`msg-container-${index - 1}`);
+            const modelElem = document.getElementById(`msg-container-${index}`);
+
+            if (modelElem) {
+                const wrapper = document.createElement("div");
+                wrapper.style.position = "absolute";
+                wrapper.style.left = "-9999px";
+                wrapper.style.top = "-9999px";
+                wrapper.style.width = "680px";
+                wrapper.style.backgroundColor = "#ffffff";
+                wrapper.style.padding = "24px";
+                wrapper.style.borderRadius = "20px";
+                wrapper.style.display = "flex";
+                wrapper.style.flexDirection = "column";
+                wrapper.style.gap = "16px";
+                wrapper.style.fontFamily = "sans-serif";
+
+                if (userElem) {
+                    const clonedUser = userElem.cloneNode(true) as HTMLElement;
+                    clonedUser.style.transform = "none";
+                    wrapper.appendChild(clonedUser);
+                }
+                const clonedModel = modelElem.cloneNode(true) as HTMLElement;
+                clonedModel.style.transform = "none";
+                wrapper.appendChild(clonedModel);
+
+                document.body.appendChild(wrapper);
+
+                const canvas = await html2canvas(wrapper, {
+                    scale: 1.5,
+                    useCORS: true,
+                    backgroundColor: "#ffffff",
+                    logging: false,
+                });
+                screenshotBase64 = canvas.toDataURL("image/png");
+                document.body.removeChild(wrapper);
+            }
+        } catch (err) {
+            console.error("Screenshot capture error:", err);
+        }
+
+        setFeedbackModal({
+            isOpen: true,
+            rating,
+            userQuery,
+            responseText: msg.text,
+            selectedAgentId: msg.selectedAgentId,
+            selectedAgentLabel: msg.selectedAgentLabel,
+            storeDisplayName: msg.storeDisplayName,
+            sourceMode: msg.sourceMode,
+            citations: msg.citations,
+            screenshotBase64,
+            msgIndex: index,
+        });
+    };
 
     // Generic memory summary returned by route.ts.
     // This is intentionally not hardcoded into fixed fields like currentFaculty/currentProgramme/currentPerson.
@@ -278,7 +367,8 @@ export default function ChatPage() {
                 {messages.map((msg, i) => (
                     <div
                         key={i}
-                        className={`flex ${msg.role === "user"
+                        id={`msg-container-${i}`}
+                        className={`flex p-1 rounded-xl transition-colors ${msg.role === "user"
                                 ? "justify-end"
                                 : "justify-start"
                             }`}
@@ -351,24 +441,52 @@ export default function ChatPage() {
                             {msg.role === "model" &&
                                 i !== 0 &&
                                 msg.selectedAgentLabel && (
-                                    <div className="mt-3 pt-2 border-t border-zinc-100 flex flex-wrap gap-1.5">
-                                        <span className="inline-flex items-center text-xs text-zinc-500 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-full">
-                                            Answered by {msg.selectedAgentLabel}
-                                        </span>
-
-                                        <span
-                                            className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full ${sourceBadgeClass(
-                                                msg.sourceMode
-                                            )}`}
-                                        >
-                                            Source: {sourceLabel(msg.sourceMode)}
-                                        </span>
-
-                                        {msg.storeDisplayName && (
+                                    <div className="mt-3 pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-1.5">
+                                        <div className="flex flex-wrap gap-1.5 items-center">
                                             <span className="inline-flex items-center text-xs text-zinc-500 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-full">
-                                                Store: {msg.storeDisplayName}
+                                                Answered by {msg.selectedAgentLabel}
                                             </span>
-                                        )}
+
+                                            <span
+                                                className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full ${sourceBadgeClass(
+                                                    msg.sourceMode
+                                                )}`}
+                                            >
+                                                Source: {sourceLabel(msg.sourceMode)}
+                                            </span>
+
+                                            {msg.storeDisplayName && (
+                                                <span className="inline-flex items-center text-xs text-zinc-500 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-full">
+                                                    Store: {msg.storeDisplayName}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Feedback Thumbs Buttons */}
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => handleOpenFeedback(i, msg, "like")}
+                                                className={`p-1.5 rounded-lg border transition-colors ${
+                                                    feedbackGiven[i] === "like"
+                                                        ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                                        : "bg-zinc-50 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 border-zinc-200"
+                                                }`}
+                                                title="Helpful Response"
+                                            >
+                                                <ThumbsUp className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenFeedback(i, msg, "dislike")}
+                                                className={`p-1.5 rounded-lg border transition-colors ${
+                                                    feedbackGiven[i] === "dislike"
+                                                        ? "bg-amber-100 text-amber-700 border-amber-300"
+                                                        : "bg-zinc-50 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 border-zinc-200"
+                                                }`}
+                                                title="Report Issue / Inaccurate Response"
+                                            >
+                                                <ThumbsDown className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                         </div>
@@ -431,6 +549,30 @@ export default function ChatPage() {
                     TARo can make mistake. Check important info
                 </div>
             </footer>
+            <DisclaimerModal />
+            <FeedbackModal
+                isOpen={feedbackModal.isOpen}
+                onClose={() =>
+                    setFeedbackModal((prev) => ({ ...prev, isOpen: false }))
+                }
+                rating={feedbackModal.rating}
+                userQuery={feedbackModal.userQuery}
+                responseText={feedbackModal.responseText}
+                selectedAgentId={feedbackModal.selectedAgentId}
+                selectedAgentLabel={feedbackModal.selectedAgentLabel}
+                storeDisplayName={feedbackModal.storeDisplayName}
+                sourceMode={feedbackModal.sourceMode}
+                citations={feedbackModal.citations}
+                screenshotBase64={feedbackModal.screenshotBase64}
+                onSubmitSuccess={() => {
+                    if (feedbackModal.msgIndex !== undefined) {
+                        setFeedbackGiven((prev) => ({
+                            ...prev,
+                            [feedbackModal.msgIndex!]: feedbackModal.rating,
+                        }));
+                    }
+                }}
+            />
         </div>
     );
 }

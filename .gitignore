@@ -6,3 +6,5 @@ package-lock.json
 .understand-anything
 .agent
 ../.agent
+data/
+test_direct_rag.mjs

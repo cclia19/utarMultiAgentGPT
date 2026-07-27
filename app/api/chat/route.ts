@@ -488,6 +488,11 @@ function shouldUseWebFallback(text: string): boolean {
     const hasNoKb = text.includes(NO_KB_ANSWER);
     if (hasNoKb) return true;
 
+    // Detailed substantive answers (>350 chars) should not be forced into web fallback
+    if (text.trim().length > 350) {
+        return false;
+    }
+
     const lower = text.toLowerCase();
 
     const weakSignals = [
@@ -500,19 +505,9 @@ function shouldUseWebFallback(text: string): boolean {
         "no relevant information",
         "no specific information",
         "no response generated",
-        "not explicitly states",
-        "does not explicitly state",
-        "doesn't explicitly state",
-        "not explicitly named",
-        "not explicitly listed",
-        "is not explicitly listed",
         "couldn't verify",
         "cannot be verified",
         "not verified",
-        "the search results don't provide",
-        "the search results do not provide",
-        "doesn't provide a direct statement",
-        "does not provide a direct statement",
     ];
 
     const matched = weakSignals.find((signal) => lower.includes(signal));
@@ -643,12 +638,8 @@ function isSensitiveOrInternalQuestion(message: string): boolean {
         "student id",
         "ic number",
         "nric",
-        "disciplinary",
+        "disciplinary record",
         "medical record",
-        "result",
-        "grade",
-        "cgpa",
-        "gpa",
         "fee outstanding",
         "payment record",
         "salary",
@@ -659,8 +650,16 @@ function isSensitiveOrInternalQuestion(message: string): boolean {
         "my refund status",
         "my payment record",
         "my result",
+        "my results",
+        "my grade",
+        "my grades",
         "my cgpa",
         "my gpa",
+        "my disciplinary",
+        "check my result",
+        "check my grade",
+        "check my cgpa",
+        "check my gpa",
     ];
 
     return sensitiveSignals.some((signal) => lower.includes(signal));
@@ -828,7 +827,7 @@ You know, I know. 😌
 
 ### 🥑 Hidden lore
 
-- Built with UTARGPT energy.
+- Built with TARo energy.
 - Powered by knowledge, caffeine, and slightly too many debugging sessions.
 - **AVO YYDS 🥑**
 `.trim();
@@ -1595,7 +1594,7 @@ async function resolveConversationContext(params: {
     const compactHistory = compactHistoryForResolver(history);
 
     const resolverPrompt = `
-You are the conversation context resolver for UTARGPT.
+You are the conversation context resolver for TARo.
 
 You DO NOT answer the user.
 You only decide how the latest user message relates to the previous conversation.
@@ -1753,7 +1752,7 @@ export async function POST(req: NextRequest) {
         const detectedAgentFromReply = detectAgentFromText(rawMessage);
         const wasClarificationReply =
             (Boolean(detectedAgentFromReply) ||
-             /kampar|sungai\s*long|sungai|long|kpr|sl|both/i.test(rawMessage)) &&
+                /kampar|sungai\s*long|sungai|long|kpr|sl|both/i.test(rawMessage)) &&
             lastAssistantAskedForScope(history);
 
         const pendingQuestion = frontendPendingQuestion
@@ -1762,12 +1761,21 @@ export async function POST(req: NextRequest) {
                 ? getPreviousUserQuestion(history, rawMessage)
                 : null;
 
-        const contextResolution = await resolveConversationContext({
-            latestMessage: rawMessage,
-            contextSummary: String(incomingContextSummary || ""),
-            pendingQuestion,
-            history,
-        });
+        const contextResolution =
+            history.length === 0 && !pendingQuestion
+                ? {
+                    relation: "new_standalone_question" as const,
+                    resolvedQuestion: rawMessage,
+                    updatedContextSummary: "",
+                    needsRetrieval: true,
+                    clearPendingQuestion: false,
+                }
+                : await resolveConversationContext({
+                    latestMessage: rawMessage,
+                    contextSummary: String(incomingContextSummary || ""),
+                    pendingQuestion,
+                    history,
+                });
 
         const resolvedMessage = contextResolution.resolvedQuestion || rawMessage;
         const updatedContextSummary = contextResolution.updatedContextSummary || "";
@@ -1783,6 +1791,7 @@ export async function POST(req: NextRequest) {
 
         const routerResult = await routeWithLLM({
             message: resolvedMessage,
+            rawMessage: rawMessage,
             currentAgentId: fallbackAgentId,
             pendingQuestion: pendingForRouter,
         });
@@ -1882,8 +1891,8 @@ export async function POST(req: NextRequest) {
             lookupName = "UTAR Registrar's Office Knowledge Base";
         } else if (lookupName === "UTAR DGS Kampar Knowledge Base") {
             lookupName = "UTAR DGS Kampar KB Clean";
-        } else if (lookupName === "UTAR DEAS Knowledge Base") {
-            lookupName = "UTAR DEA Knowledge Base";
+        } else if (lookupName === "UTAR Scholarships Knowledge Base" || lookupName === "UTAR DSFA Knowledge Base") {
+            storeName = "fileSearchStores/utar-scholarships-knowledge-5fytwaxg9hdh";
         }
 
         const now = Date.now();
@@ -1906,7 +1915,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        if (storesCache && storesCache[lookupName]) {
+        if (!storeName && storesCache && storesCache[lookupName]) {
             storeName = storesCache[lookupName];
         }
 
@@ -1989,7 +1998,7 @@ LANGUAGE RULE:
                         temperature: 0.1,
                     },
                 }),
-                45000,
+                120000,
                 "File search"
             );
         } catch (fileError: any) {
@@ -2027,9 +2036,12 @@ LANGUAGE RULE:
 
         const isGeneralBusQuery = /bus|shuttle|transit|schedule|timetable/i.test(effectiveMessage) && selectedAgent.id === "dgs-kampar";
 
+        console.log("DEBUG FILE SEARCH:", { storeName, rawFileTextSnippet: rawFileText.slice(0, 200), len: fileText.length, shouldWeb: shouldUseWebFallback(rawFileText) });
+
         const fileNotFound =
+            fileText.length === 0 ||
             shouldUseWebFallback(rawFileText) ||
-            fileText.length === 0;
+            (fileCitations.length === 0 && fileText.length < 50);
 
 
 
