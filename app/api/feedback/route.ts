@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
         };
 
         // 1. Forward to Google Sheets Webhook (Primary Persistent Database)
-        const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+        const webhookUrl =
+            process.env.GOOGLE_SHEETS_WEBHOOK_URL ||
+            "https://script.google.com/macros/s/AKfycbwdhB0g2hJ5nz8YamUr9VGZLGPbVRueEM8ak8EQOrlqavmWU5s21A_xuzhEf5jpM_4u/exec";
         let googleSheetsStatus = "skipped";
         let googleDriveImageUrl = "";
 
