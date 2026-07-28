@@ -8,3 +8,6 @@ package-lock.json
 ../.agent
 data/
 test_direct_rag.mjs
+list_stores.mjs
+test_*.mjs
+test_*.py
