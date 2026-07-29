@@ -1,0 +1,455 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta name="robots" content="noindex" /> <meta name="googlebot" content="index" />
+<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+<style>
+.tblstaffdirectory{
+	padding-left : 25px;
+
+}
+h1{
+	padding-left : 25px;
+	font-family:Arial;
+}
+table{border-radius: 10px;}
+</style>
+<!-- Header -->
+<div style="background-color:#0a296a;height: 91px;" align="center" >
+  <img src="https://www2.utar.edu.my/images/DirUTARlogo.png" width="530" height="69" vspace="10"/>
+</div>
+<body style="
+    background-color: #FFFFFF;
+"><div><img src="https://www2.utar.edu.my/images/banner5.jpg" width="100%" height="auto" vspace="">
+ 
+</div>
+<div class="content-container">
+	<div id="fullcontent">
+		<!--<img src="../main2014/bannerStaffDirectory.jpg">-->
+        <br />
+		<h1>Staff Directory</h1>
+        <br />
+		<DIV style="padding: 10px 5px 20px 5px ">
+			 
+			 <!-- Content Start -->
+			
+					
+					
+					<script language="javascript">
+					function showStaff(){
+						document.form1.searchResult.value = "N";
+						
+						var searchCategory  ="";
+					/*	if(document.form1.searchCategory[0].checked==true)
+							searchCategory = "?searchCategory="+document.form1.searchCategory[0].value;
+						if(document.form1.searchCategory[1].checked==true)
+							searchCategory = "?searchCategory="+document.form1.searchCategory[1].value;
+						*/
+						var searchDept = "?searchDept="+document.form1.searchDept.value;
+						var searchDiv = "&searchDiv="+document.form1.searchDiv.value;
+						var searchName = "&searchName="+document.form1.searchName.value;
+						var searchExpertise = "&searchName="+document.form1.searchExpertise.value;
+						location.href = "staffListSearchV2.jsp"+searchCategory+searchDept+searchDiv+searchName+searchExpertise;
+					}
+					function searchStaff(){
+					//	var searchCategory = document.form1.searchCategory.value;
+						var searchDept = document.form1.searchDept.value;
+						var searchName = document.form1.searchName.value;
+						
+						if(searchDept==""){
+							document.form1.searchResult.value = "Y";
+							/*if(searchName.length<3){
+								alert("Please key in at least 3 characters.");
+								return false;
+							}else{
+								document.form1.searchResult.value = "Y";
+								return true;	
+							}*/
+						}
+						else{
+							document.form1.searchResult.value = "Y";
+							return true;	
+						}	
+					}
+					</script>
+					
+					
+					
+					<form name="form1" action="staffListSearchV2.jsp" onSubmit="return searchStaff();" >
+ 					<table  width="100%" class="tblstaffdirectory" >
+						  <tr>
+							<td width="302"><span style="font-size: 15px;font-family: 'Roboto';"><strong >Faculty/Institute/Centre/Division</strong></span></td>
+							<td width="8 "><strong>:</strong></td>
+							<td width="982" ><select name="searchDept" onChange="showStaff()">
+								<option value="ALL" selected>All Faculties, Departments & Institute</option>
+								
+								<option value="ACSF" >ASEAN Research Centre for A Community with Shared Future</option>
+								
+								<option value="BRSRC" >Belt and Road Strategic Research Centre</option>
+								
+								<option value="CABF" >Centre for Accounting, Banking and Finance</option>
+								
+								<option value="CASMR" >Centre for Advanced and Sustainable Materials Research</option>
+								
+								<option value="CAFR" >Centre for Agriculture and Food Research</option>
+								
+								<option value="CAPCN" >Centre for Applied Psychology and Cognitive Neuroscience</option>
+								
+								<option value="CAICA" >Centre for Artificial Intelligence and Computing Applications</option>
+								
+								<option value="CFAR" >Centre for Artistic Research</option>
+								
+								<option value="CBNR" >Centre for Biomedical and Nutrition Research</option>
+								
+								<option value="CBM" >Centre for Business and Management</option>
+								
+								<option value="CCR" >Centre for Cancer Research</option>
+								
+								<option value="3CDRR" >Centre for Climate Change and Disaster Risk Reduction</option>
+								
+								<option value="CCSN" >Centre for Communicaton Systems and Networks</option>
+								
+								<option value="CCCD" >Centre for Corporate and Community Development</option>
+								
+								<option value="CCDI" >Centre for Curriculum Development and Innovation</option>
+								
+								<option value="CCS" >Centre for Cyber Security</option>
+								
+								<option value="CES" >Centre for Economic Studies</option>
+								
+								<option value="CESD" >Centre for Electronics Systems Design</option>
+								
+								<option value="CENTS" >Centre for Entrepreneurial Sustainability</option>
+								
+								<option value="CEGT" >Centre for Environment and Green Technology</option>
+								
+								<option value="CFS-KPR" >Centre for Foundation Studies (Kampar Campus)</option>
+								
+								<option value="CFS-SL" >Centre for Foundation Studies (Sungai Long Campus)</option>
+								
+								<option value="CHST" >Centre for Healthcare Science and Technology</option>
+								
+								<option value="CITC" >Centre for Immersive Technology and Creativity</option>
+								
+								<option value="CIoTBD" >Centre for IoT and Big Data</option>
+								
+								<option value="CLT" >Centre for Learning and Teaching</option>
+								
+								<option value="CMS" >Centre for Mathematical Sciences</option>
+								
+								<option value="CMCR" >Centre for Media and Communication Research</option>
+								
+								<option value="CMLL" >Centre for Modern Languages and Literature</option>
+								
+								<option value="CMPS" >Centre for Multimedia Production and Services</option>
+								
+								<option value="CPSE" >Centre for Power Systems and Electricity</option>
+								
+								<option value="CRIE" >Centre for Railway Infrastructure and Engineering</option>
+								
+								<option value="CRTCM" >Centre for Research in Traditional Chinese Medicine</option>
+								
+								<option value="CRND" >Centre for Research on Non-Communicable Diseases</option>
+								
+								<option value="CSPS" >Centre for Social and Policy Studies</option>
+								
+								<option value="CSDS" >Centre for Software Development and Support</option>
+								
+								<option value="CSCR" >Centre for Stem Cell Research</option>
+								
+								<option value="COSBE" >Centre for Sustainable Design and Built Environment</option>
+								
+								<option value="CSMT" >Centre for Sustainable Mobility Technologies</option>
+								
+								<option value="Chancellery" >Chancellery</option>
+								
+								<option value="Confucius Institute" >Confucius Institute</option>
+								
+								<option value="DARP" >Department of Alumni Relations and Placement</option>
+								
+								<option value="DEF-KPR" >Department of Estates and Facilities (Kampar Campus)</option>
+								
+								<option value="DEF-SL" >Department of Estates and Facilities (Sungai Long Campus)</option>
+								
+								<option value="DGS-KPR" >Department of General Services (Kampar Campus)</option>
+								
+								<option value="DGS-SL" >Department of General Services (Sungai Long Campus)</option>
+								
+								<option value="DISS-KPR" >Department of International Student Services (Kampar Campus)</option>
+								
+								<option value="DISS-SL" >Department of International Student Services (Sungai Long Campus)</option>
+								
+								<option value="DSS-KPR" >Department of Safety and Security (Kampar Campus)</option>
+								
+								<option value="DSS-SL" >Department of Safety and Security (Sungai Long Campus)</option>
+								
+								<option value="DSFA" >Department of Scholarships and Financial Aid</option>
+								
+								<option value="DSSC-KPR" >Department of Soft Skills Competency (Kampar Campus)</option>
+								
+								<option value="DSSC-SL" >Department of Soft Skills Competency (Sungai Long Campus)</option>
+								
+								<option value="DSA-KPR" >Department of Student Affairs (Kampar Campus)</option>
+								
+								<option value="DSA-SL" >Department of Student Affairs (Sungai Long Campus)</option>
+								
+								<option value="DACE" >Division of Admissions and Credit Evaluation</option>
+								
+								<option value="DCCPR" >Division of Corporate Communication and Public Relations</option>
+								
+								<option value="DEAS" >Division of Examination and Awards</option>
+								
+								<option value="DFN" >Division of Finance</option>
+								
+								<option value="DHR" >Division of Human Resource</option>
+								
+								<option value="DICE" >Division of Innovation, Commercialisation and Entrepreneurship</option>
+								
+								<option value="DPP" >Division of Programme Promotion</option>
+								
+								<option value="DQAA" >Division of Quality Assurance and Audit</option>
+								
+								<option value="DSSM" >Division of Sustainability and Strategic Management</option>
+								
+								<option value="WLTCRCD" >Dr Wu Lien-Teh Centre for Research in Communicable Diseases</option>
+								
+								<option value="FAM" >Faculty of Accountancy and Management</option>
+								
+								<option value="FAS" >Faculty of Arts and Social Science</option>
+								
+								<option value="FCS" >Faculty of Chinese Studies</option>
+								
+								<option value="FCI" >Faculty of Creative Industries</option>
+								
+								<option value="FEd" >Faculty of Education</option>
+								
+								<option value="FEGT" >Faculty of Engineering and Green Technology</option>
+								
+								<option value="FICT" >Faculty of Information and Communication Technology</option>
+								
+								<option value="FSc" >Faculty of Science</option>
+								
+								<option value="IADS" >Institute of AI and Data Science</option>
+								
+								<option value="IBHS" >Institute of Bioscience and Health Sciences</option>
+								
+								<option value="IIE" >Institute of International Education</option>
+								
+								<option value="IMLD" >Institute of Management and Leadership Development</option>
+								
+								<option value="IPSR" >Institute of Postgraduate Studies & Research</option>
+								
+								<option value="IIM" >International Institute of Media</option>
+								
+								<option value="ITISC" >IT Infrastructure and Support Centre</option>
+								
+								<option value="LKC FES" >Lee Kong Chian Faculty of Engineering and Science</option>
+								
+								<option value="LIB" >Library</option>
+								
+								<option value="MK FMHS" >M. Kandiah Faculty of Medicine and Health Sciences</option>
+								
+								<option value="Mencius Institute" >Mencius Institute</option>
+								
+								<option value="OIA" >Office of International Affairs</option>
+								
+								<option value="IAD" >Office of VP (Internationalisation and Academic Development)</option>
+								
+								<option value="RDC" >Office of VP (R&D and Commercialisation)</option>
+								
+								<option value="SDAR" >Office of VP (Student Development and Alumni Relations)</option>
+								
+								<option value="ODL" >Open and Distance Learning Centre</option>
+								
+								<option value="PRES" >President's Office</option>
+								
+								<option value="RGO" >Registrar's Office</option>
+								
+								<option value="CAD" >Sg Long Campus Administration Director</option>
+								
+								<option value="STEAM" >STEAM Outreach</option>
+								
+								<option value="THP FBF" >Teh Hong Piow Faculty of Business and Finance</option>
+								
+								<option value="TCLI" >Tun Tan Cheng Lock Institute of Social Studies</option>
+								
+								<option value="UBRC" >UTAR Buddhist Research Centre</option>
+								
+								<option value="XDU-UTAR ISTI" >XDU-UTAR Institute of Science, Technology and Innovation</option>
+								
+								<option value="XI" >Xinwei Institute</option>
+								
+								<option value="YCF CChS" >Yu Cai Foundation Centre for Chinese Studies</option>
+								
+							</select></td>
+						  </tr>
+						  <tr>
+							<td><span style="font-size: 15px;font-family: 'Roboto';"><strong>Department/Unit</strong></span></td>
+							<td><strong>:</strong></td>
+		
+							<td><select class="iform" name="searchDiv" >
+						  
+								<option value="All" Selected>All</option>
+								
+							</select></td>
+						  </tr>
+						  <tr>
+							<td><span style="font-size: 15px;font-family: 'Roboto';"><strong>Name</strong></span></td>
+							<td><strong>:</strong></td>
+							<td>
+							  <input name="searchName" class="iform" type="text" size="50" maxlength="50" value="Loh Siaw Yien">
+							</td>
+						  </tr>
+						  <tr>
+						    <td><span style="font-size: 15px;font-family: 'Roboto';"><strong>Areas of Expertise <span style="font-size: 12px; font-style: italic; color: #000;">(Academic staff only)</span></strong></span></td>
+						    <td><strong>:</strong></td>
+						    <td><input name="searchExpertise" class="iform" type="text" size="50" maxlength="50" value=""></td>
+			          </tr>
+						  <tr>
+							<td colspan="2">&nbsp;</td>
+							<td><input name="submit" class="iform" type="submit" value="Search" style="color:#fff;border:1px solid;background-color:#0a296a;height: 30px;width: 65px;/* font-style: inherit; */font-family: 'Roboto';border-radius: 10px;"></td>
+						  </tr>
+						  <input type="hidden" name="searchResult" value="N">
+					  </table>
+		  </form>
+					
+					
+<table width="100%"  border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="top" height="400"><br>
+                
+                <table width="100%">
+                  <tr>
+                    <td valign="top" align="center"><hr style="border: 1px solid #0a296a;" size="1" width="100%">
+                        <div align="left">
+                          <strong style="font-weight:700;font-size:13px;font-family: 'Roboto';  ">Name By Alphabetical Order</strong> :
+                          <span style="font-size:14px;font-family: 'Roboto';color:#FF0000;">All&nbsp;</span><a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=ALL&searchDiv=All&searchSurname=L&searchName=Loh Siaw Yien&searchOrder=name&searchResult=Y">L</a>&nbsp;
+                        </div>
+                        <hr style="border: 1px solid #0a296a;" size="1" width="100%">
+                    </td>
+                  </tr>
+                </table>
+                <table width="100%" cellpadding="3" border="0" cellspacing="0" style="border-collapse:collapse" >
+                  <tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=03151';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=03151" alt="Loh Siaw Yien" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ms Loh Siaw Yien</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Registrar  <br></b>
+					
+                      	
+                      	<i>Assistant General Manager<br><br  style="line-height: 50%;" ></span></i>
+					  Registrar's Office<br>
+                      <br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      05-468 8888   &nbsp;ext: 2517<br>
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      03-90860288 ext: 386<br> 
+                      <span  style="color:#333399">lohsy@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr id="notDisplay"><TD colspan="3"><span style="font-size:11px;font-family: 'Roboto';font-weight=bold">Page <span style="font-size:12px;color:#FF0000; font-family: 'Roboto'; line-height:145%; font-weight:bold">1</span>&nbsp;|</span></TD></TR>
+                </table>
+				<BR>
+                <div> <span style="background-color: rgb(255 231 213);border: 1px solid #000000;font-family: 'Roboto';border-radius: 5px;">&nbsp; &nbsp; &nbsp;</span><span style="font-family: 'Roboto';font-size:14px;"> indicates staff with Administrative Position </span></div>
+				<BR>
+                
+
+		    </td>
+          </tr>
+      </table>
+		
+ <!-- End Content -->
+			 
+		</DIV>
+	</div>
+</div>
+
+<!-- Footer -->
+  </div>
+<div align="center" style="background-color: #0a296a;"> 
+  <p><font style="font-family: 'Roboto';" color="#FFFFFF"><br>
+    &copy; 2026  UNIVERSITI TUNKU ABDUL RAHMAN <small><i>DU012(A).</i></small><br>Wholly owned by UTAR Education Foundation <small><i>(200201010564(578227-M))</i></small>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<small><a href="http://www.utar.edu.my/legalStatement.jsp" target="_blank" style="text-decoration:none" ><font color="#FFFFFF">LEGAL STATEMENT</font></a>&nbsp;&nbsp;&nbsp;<a href="http://www.utar.edu.my/termsOfUse.jsp" style="text-decoration:none" target="_blank"><font color="#FFFFFF">TERM OF USAGE</font></a>&nbsp;&nbsp;&nbsp;<a href="https://www.utar.edu.my/PrivacyNotice_English.jsp" target="_blank" style="text-decoration:none"><font color="#FFFFFF">PRIVACY NOTICE</font></a></small></font><font  style="font-family:Arial, Helvetica, sans-serif"color="#FFFFFF"><small><a href="https://www.utar.edu.my/PrivacyNotice_English.jsp" target=""><font color="#FFFFFF">
+    </font></a></small></font><br  />
+    
+  <br></p>
+</div>
+
+ 
+    

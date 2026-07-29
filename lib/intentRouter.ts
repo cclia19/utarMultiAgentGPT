@@ -282,10 +282,11 @@ function validateSemanticRouterJson(params: {
 function applySafetyGuards(params: {
     result: IntentRouteResult;
     message: string;
+    rawMessage?: string;
     currentAgentId: string;
     pendingQuestion: string | null;
 }): IntentRouteResult {
-    const { result, message, currentAgentId, pendingQuestion } = params;
+    const { result, message, rawMessage, currentAgentId, pendingQuestion } = params;
 
     const currentUnit = getOrgUnitById(currentAgentId);
     const selectedUnit = getOrgUnitById(result.agentId);
@@ -334,20 +335,42 @@ function applySafetyGuards(params: {
         };
     }
 
-    if (
-        isAcademicContext(currentUnit) &&
-        result.agentId === "general" &&
-        result.routeType === "unclear" &&
-        result.needsClarification === false
-    ) {
-        return {
-            ...result,
-            agentId: currentUnit.id,
-            rewrittenQuestion: `For ${currentUnit.shortLabel} context, ${message}`,
-            routeType: "faculty_specific",
-            allowWebFallback: false,
-            confidence: Math.max(result.confidence, 0.75),
-        };
+    const rawMsg = String(rawMessage || message || "").trim();
+    const isRouteOrScheduleQuery =
+        /^(route\s*\d+|schedule\s*[ivx\d]+|westlake.*|option\s*\d+|\d+)$/i.test(message.trim()) ||
+        /^(route\s*\d+|schedule\s*[ivx\d]+|westlake.*|option\s*\d+|\d+)$/i.test(rawMsg) ||
+        (/route\s*\d+/i.test(message) && (currentAgentId === "dgs-kampar" || currentAgentId === "dgs-sungai-long" || result.agentId === "dgs-kampar" || result.agentId === "dgs-sungai-long")) ||
+        (/bus\s*schedule/i.test(message) && (/route\s*\d+/i.test(message) || /^\d+$/.test(rawMsg) || /option\s*\d+/i.test(rawMsg))) ||
+        (/bus\s*schedule/i.test(pendingQuestion || "") && (/route\s*\d+/i.test(message) || /route\s*\d+/i.test(rawMsg) || /^\d+$/.test(rawMsg) || /option\s*\d+/i.test(rawMsg)));
+
+    if (isRouteOrScheduleQuery) {
+        let targetAgentId: string | null = currentAgentId !== "general" ? currentAgentId : (result.agentId !== "general" ? result.agentId : null);
+        if (!targetAgentId || targetAgentId === "general") {
+            if (/sungai\s*long|sl/i.test(message) || /sungai\s*long|sl/i.test(pendingQuestion || "")) {
+                targetAgentId = "dgs-sungai-long";
+            } else if (/kampar/i.test(message) || /kampar/i.test(pendingQuestion || "")) {
+                targetAgentId = "dgs-kampar";
+            }
+        }
+        if (targetAgentId) {
+            const targetUnit = getOrgUnitById(targetAgentId);
+            const routeTerm = rawMsg && rawMsg.length < 30 ? (rawMsg.match(/^\d+$/) ? `Route ${rawMsg}` : rawMsg) : message;
+            const resolvedQuery = /timetable|trip|departure/i.test(message)
+                ? message
+                : `Show me the specific trip timetable and departure times for ${routeTerm} of the UTAR bus schedule.`;
+
+            return {
+                ...result,
+                agentId: targetAgentId,
+                retrievalNeeded: true,
+                needsClarification: false,
+                rewrittenQuestion: resolvedQuery,
+                usePendingQuestion: Boolean(pendingQuestion),
+                conversationRelation: pendingQuestion ? "clarification_for_pending" : "follow_up_same_topic",
+                routeType: isAcademicContext(targetUnit) ? "faculty_specific" : "admin_specific",
+                confidence: Math.max(result.confidence, 0.95),
+            };
+        }
     }
 
     return result;
@@ -563,6 +586,7 @@ JSON schema:
         return applySafetyGuards({
             result: validated,
             message,
+            rawMessage,
             currentAgentId,
             pendingQuestion,
         });
