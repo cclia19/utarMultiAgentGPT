@@ -34,9 +34,10 @@ const QUICK_UNIT_MAP: Record<string, string> = {
     dace: "dace",
     oia: "oia",
     library: "library",
-    dgs: "dgs-kampar",
     rgo: "registrar",
     registrar: "registrar",
+    registra: "registrar",
+    registar: "registrar",
     dsfa: "scholarships",
     darp: "darp",
     dice: "dice",
@@ -98,7 +99,7 @@ export function resolveControlledAcronym(text: string): {
             agentId: "general",
             needsClarification: true,
             clarificationMessage:
-                "Could you please specify which campus you are referring to (Kampar or Sungai Long) for DSS?",
+                "Could you please specify which campus you are referring to (Kampar Campus or Sungai Long Campus) for DSS?",
         };
     }
 
@@ -117,9 +118,17 @@ export function resolveControlledAcronym(text: string): {
                 needsClarification: false,
             };
         }
+        if (hasCampusKampar() || hasWord("dsakpr")) {
+            return {
+                agentId: "dsa-kampar",
+                needsClarification: false,
+            };
+        }
         return {
-            agentId: "dsa-kampar",
-            needsClarification: false,
+            agentId: "general",
+            needsClarification: true,
+            clarificationMessage:
+                "Could you please specify which campus you are referring to (Kampar Campus or Sungai Long Campus) for DSA?",
         };
     }
 
@@ -139,8 +148,18 @@ export function resolveControlledAcronym(text: string): {
         };
     }
 
-    // 5. DGS (Department of General Services)
-    if (hasWord("dgs")) {
+    // 5. DGS (Department of General Services & Campus Bus / Shuttle Services)
+    if (
+        hasWord("dgs") ||
+        normalized.includes("bus schedule") ||
+        normalized.includes("bus route") ||
+        normalized.includes("shuttle bus") ||
+        normalized.includes("bus timetable") ||
+        normalized.includes("bus service") ||
+        normalized.includes("bus services") ||
+        hasWord("bus") ||
+        hasWord("shuttle")
+    ) {
         if (hasCampusSL()) {
             return {
                 agentId: "dgs-sungai-long",
@@ -157,7 +176,7 @@ export function resolveControlledAcronym(text: string): {
             agentId: "general",
             needsClarification: true,
             clarificationMessage:
-                "Could you please specify which campus you are referring to (Kampar or Sungai Long) for the Department of General Services (DGS)?",
+                "Could you please specify which campus you are referring to (Kampar Campus or Sungai Long Campus) for the bus schedule?",
         };
     }
 
@@ -184,7 +203,7 @@ export function resolveControlledAcronym(text: string): {
     }
 
     // 9. RGO / Registrar
-    if (hasWord("rgo") || hasWord("registrar")) {
+    if (hasWord("rgo") || hasWord("registrar") || hasWord("registra") || hasWord("registar")) {
         return { agentId: "registrar", needsClarification: false };
     }
 
