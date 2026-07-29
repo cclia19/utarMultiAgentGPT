@@ -7,52 +7,76 @@
  */
 const ASKS_WHO = /\b(who\s+is|who's|who\s+are|whos)\b/i;
 
-const ROLE_TERMS = [
-    "vice president",
-    "vice-president",
-    "deputy president",
-    "president",
-    "registrar",
-    "registra",
-    "registar",
-    "deputy dean",
-    "dean",
-    "head of department",
-    "head of programme",
-    "head of program",
-    "hod",
-    "hop",
-    "director",
-    "chairperson",
-    "chairman",
-];
+/**
+ * Negative guard for rule, policy, eligibility, or authorization questions.
+ * Questions asking about eligibility, permissions, or requirements ask about
+ * rules rather than who currently holds a specific post.
+ */
+const IS_RULE_QUESTION =
+    /\b(eligible|eligibility|allowed|permitted|qualify|qualifies|qualified|entitled|can\s+apply|required\s+to|supposed\s+to|responsible\s+for)\b/i;
 
-const ROLE_ABBREVIATIONS: Array<{ pattern: RegExp; phrase: string }> = [
-    { pattern: /\bvp\b/i, phrase: "vice president" },
-    { pattern: /\brgo\b/i, phrase: "registrar" },
-    { pattern: /\bhod\b/i, phrase: "head of department" },
+interface RolePattern {
+    pattern: RegExp;
+    phrase: string;
+}
+
+const ROLE_PATTERNS: RolePattern[] = [
+    // Role abbreviations
+    { pattern: /\bvps?\b/i, phrase: "vice president" },
+    { pattern: /\brgos?\b/i, phrase: "registrar" },
+    { pattern: /\bhods?\b/i, phrase: "head of department" },
+    { pattern: /\bhops?\b/i, phrase: "head of programme" },
+
+    // Multi-word roles (explicit terms & plurals)
+    { pattern: /\bvice[- ]presidents?\b/i, phrase: "vice president" },
+    { pattern: /\bdeputy\s+presidents?\b/i, phrase: "deputy president" },
+    { pattern: /\bdeputy\s+deans?\b/i, phrase: "deputy dean" },
+    { pattern: /\bheads?\s+of\s+departments?\b/i, phrase: "head of department" },
+    { pattern: /\bheads?\s+of\s+programmes?\b/i, phrase: "head of programme" },
+    { pattern: /\bheads?\s+of\s+programs?\b/i, phrase: "head of program" },
+
+    // Single-word roles & common misspellings (explicit terms & plurals)
+    { pattern: /\bpresidents?\b/i, phrase: "president" },
+    { pattern: /\bregistrars?\b/i, phrase: "registrar" },
+    { pattern: /\bregistras?\b/i, phrase: "registra" },
+    { pattern: /\bregistars?\b/i, phrase: "registar" },
+    { pattern: /\bdeans?\b/i, phrase: "dean" },
+    { pattern: /\bdirectors?\b/i, phrase: "director" },
+    { pattern: /\bchairpersons?\b/i, phrase: "chairperson" },
+    { pattern: /\bchairm[an]n?s?\b/i, phrase: "chairman" },
 ];
 
 export function isPersonRoleQuestion(message: string): {
     isRoleQuestion: boolean;
     rolePhrase: string;
 } {
-    const text = String(message || "").toLowerCase();
+    // Normalize smart quotes and curly apostrophes to standard ASCII apostrophe
+    const text = String(message || "")
+        .replace(/[\u2018\u2019\u201B\u2032`´]/g, "'")
+        .toLowerCase();
 
     if (!ASKS_WHO.test(text)) return { isRoleQuestion: false, rolePhrase: "" };
 
-    for (const abbreviation of ROLE_ABBREVIATIONS) {
-        if (abbreviation.pattern.test(text)) {
-            return { isRoleQuestion: true, rolePhrase: abbreviation.phrase };
+    if (IS_RULE_QUESTION.test(text)) return { isRoleQuestion: false, rolePhrase: "" };
+
+    // Collect candidates from all role patterns (abbreviations and explicit terms)
+    const candidates: Array<{ phrase: string; matchedLength: number }> = [];
+
+    for (const item of ROLE_PATTERNS) {
+        const match = text.match(item.pattern);
+        if (match) {
+            candidates.push({
+                phrase: item.phrase,
+                matchedLength: match[0].length,
+            });
         }
     }
 
-    // Longest match first, so "deputy dean" beats "dean".
-    const matches = ROLE_TERMS
-        .filter((term) => text.includes(term))
-        .sort((a, b) => b.length - a.length);
+    if (!candidates.length) return { isRoleQuestion: false, rolePhrase: "" };
 
-    if (!matches.length) return { isRoleQuestion: false, rolePhrase: "" };
+    // Longest match in the input text wins (e.g. "deputy dean" beats "dean" or "hod")
+    candidates.sort((a, b) => b.matchedLength - a.matchedLength);
 
-    return { isRoleQuestion: true, rolePhrase: matches[0] };
+    return { isRoleQuestion: true, rolePhrase: candidates[0].phrase };
 }
+
