@@ -14,6 +14,15 @@ import {
 import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
 
+/**
+ * Vercel's default function timeout is 10s, which this route can exceed on a
+ * cold cache: a position question measured 17.4s end to end (catalog fetch +
+ * one fetch per matching department office + the routing LLM calls), against
+ * 4.6s once the 24h catalog cache is warm. Being killed mid-flight would make
+ * the first request after an idle period look broken.
+ */
+export const maxDuration = 60;
+
 type OfficialLink = {
     title: string;
     uri: string;
