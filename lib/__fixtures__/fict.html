@@ -1,0 +1,1748 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta name="robots" content="noindex" /> <meta name="googlebot" content="index" />
+<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+<style>
+.tblstaffdirectory{
+	padding-left : 25px;
+
+}
+h1{
+	padding-left : 25px;
+	font-family:Arial;
+}
+table{border-radius: 10px;}
+</style>
+<!-- Header -->
+<div style="background-color:#0a296a;height: 91px;" align="center" >
+  <img src="https://www2.utar.edu.my/images/DirUTARlogo.png" width="530" height="69" vspace="10"/>
+</div>
+<body style="
+    background-color: #FFFFFF;
+"><div><img src="https://www2.utar.edu.my/images/banner5.jpg" width="100%" height="auto" vspace="">
+ 
+</div>
+<div class="content-container">
+	<div id="fullcontent">
+		<!--<img src="../main2014/bannerStaffDirectory.jpg">-->
+        <br />
+		<h1>Staff Directory</h1>
+        <br />
+		<DIV style="padding: 10px 5px 20px 5px ">
+			 
+			 <!-- Content Start -->
+			
+					
+					
+					<script language="javascript">
+					function showStaff(){
+						document.form1.searchResult.value = "N";
+						
+						var searchCategory  ="";
+					/*	if(document.form1.searchCategory[0].checked==true)
+							searchCategory = "?searchCategory="+document.form1.searchCategory[0].value;
+						if(document.form1.searchCategory[1].checked==true)
+							searchCategory = "?searchCategory="+document.form1.searchCategory[1].value;
+						*/
+						var searchDept = "?searchDept="+document.form1.searchDept.value;
+						var searchDiv = "&searchDiv="+document.form1.searchDiv.value;
+						var searchName = "&searchName="+document.form1.searchName.value;
+						var searchExpertise = "&searchName="+document.form1.searchExpertise.value;
+						location.href = "staffListSearchV2.jsp"+searchCategory+searchDept+searchDiv+searchName+searchExpertise;
+					}
+					function searchStaff(){
+					//	var searchCategory = document.form1.searchCategory.value;
+						var searchDept = document.form1.searchDept.value;
+						var searchName = document.form1.searchName.value;
+						
+						if(searchDept==""){
+							document.form1.searchResult.value = "Y";
+							/*if(searchName.length<3){
+								alert("Please key in at least 3 characters.");
+								return false;
+							}else{
+								document.form1.searchResult.value = "Y";
+								return true;	
+							}*/
+						}
+						else{
+							document.form1.searchResult.value = "Y";
+							return true;	
+						}	
+					}
+					</script>
+					
+					
+					
+					<form name="form1" action="staffListSearchV2.jsp" onSubmit="return searchStaff();" >
+ 					<table  width="100%" class="tblstaffdirectory" >
+						  <tr>
+							<td width="302"><span style="font-size: 15px;font-family: 'Roboto';"><strong >Faculty/Institute/Centre/Division</strong></span></td>
+							<td width="8 "><strong>:</strong></td>
+							<td width="982" ><select name="searchDept" onChange="showStaff()">
+								<option value="ALL" >All Faculties, Departments & Institute</option>
+								
+								<option value="ACSF" >ASEAN Research Centre for A Community with Shared Future</option>
+								
+								<option value="BRSRC" >Belt and Road Strategic Research Centre</option>
+								
+								<option value="CABF" >Centre for Accounting, Banking and Finance</option>
+								
+								<option value="CASMR" >Centre for Advanced and Sustainable Materials Research</option>
+								
+								<option value="CAFR" >Centre for Agriculture and Food Research</option>
+								
+								<option value="CAPCN" >Centre for Applied Psychology and Cognitive Neuroscience</option>
+								
+								<option value="CAICA" >Centre for Artificial Intelligence and Computing Applications</option>
+								
+								<option value="CFAR" >Centre for Artistic Research</option>
+								
+								<option value="CBNR" >Centre for Biomedical and Nutrition Research</option>
+								
+								<option value="CBM" >Centre for Business and Management</option>
+								
+								<option value="CCR" >Centre for Cancer Research</option>
+								
+								<option value="3CDRR" >Centre for Climate Change and Disaster Risk Reduction</option>
+								
+								<option value="CCSN" >Centre for Communicaton Systems and Networks</option>
+								
+								<option value="CCCD" >Centre for Corporate and Community Development</option>
+								
+								<option value="CCDI" >Centre for Curriculum Development and Innovation</option>
+								
+								<option value="CCS" >Centre for Cyber Security</option>
+								
+								<option value="CES" >Centre for Economic Studies</option>
+								
+								<option value="CESD" >Centre for Electronics Systems Design</option>
+								
+								<option value="CENTS" >Centre for Entrepreneurial Sustainability</option>
+								
+								<option value="CEGT" >Centre for Environment and Green Technology</option>
+								
+								<option value="CFS-KPR" >Centre for Foundation Studies (Kampar Campus)</option>
+								
+								<option value="CFS-SL" >Centre for Foundation Studies (Sungai Long Campus)</option>
+								
+								<option value="CHST" >Centre for Healthcare Science and Technology</option>
+								
+								<option value="CITC" >Centre for Immersive Technology and Creativity</option>
+								
+								<option value="CIoTBD" >Centre for IoT and Big Data</option>
+								
+								<option value="CLT" >Centre for Learning and Teaching</option>
+								
+								<option value="CMS" >Centre for Mathematical Sciences</option>
+								
+								<option value="CMCR" >Centre for Media and Communication Research</option>
+								
+								<option value="CMLL" >Centre for Modern Languages and Literature</option>
+								
+								<option value="CMPS" >Centre for Multimedia Production and Services</option>
+								
+								<option value="CPSE" >Centre for Power Systems and Electricity</option>
+								
+								<option value="CRIE" >Centre for Railway Infrastructure and Engineering</option>
+								
+								<option value="CRTCM" >Centre for Research in Traditional Chinese Medicine</option>
+								
+								<option value="CRND" >Centre for Research on Non-Communicable Diseases</option>
+								
+								<option value="CSPS" >Centre for Social and Policy Studies</option>
+								
+								<option value="CSDS" >Centre for Software Development and Support</option>
+								
+								<option value="CSCR" >Centre for Stem Cell Research</option>
+								
+								<option value="COSBE" >Centre for Sustainable Design and Built Environment</option>
+								
+								<option value="CSMT" >Centre for Sustainable Mobility Technologies</option>
+								
+								<option value="Chancellery" >Chancellery</option>
+								
+								<option value="Confucius Institute" >Confucius Institute</option>
+								
+								<option value="DARP" >Department of Alumni Relations and Placement</option>
+								
+								<option value="DEF-KPR" >Department of Estates and Facilities (Kampar Campus)</option>
+								
+								<option value="DEF-SL" >Department of Estates and Facilities (Sungai Long Campus)</option>
+								
+								<option value="DGS-KPR" >Department of General Services (Kampar Campus)</option>
+								
+								<option value="DGS-SL" >Department of General Services (Sungai Long Campus)</option>
+								
+								<option value="DISS-KPR" >Department of International Student Services (Kampar Campus)</option>
+								
+								<option value="DISS-SL" >Department of International Student Services (Sungai Long Campus)</option>
+								
+								<option value="DSS-KPR" >Department of Safety and Security (Kampar Campus)</option>
+								
+								<option value="DSS-SL" >Department of Safety and Security (Sungai Long Campus)</option>
+								
+								<option value="DSFA" >Department of Scholarships and Financial Aid</option>
+								
+								<option value="DSSC-KPR" >Department of Soft Skills Competency (Kampar Campus)</option>
+								
+								<option value="DSSC-SL" >Department of Soft Skills Competency (Sungai Long Campus)</option>
+								
+								<option value="DSA-KPR" >Department of Student Affairs (Kampar Campus)</option>
+								
+								<option value="DSA-SL" >Department of Student Affairs (Sungai Long Campus)</option>
+								
+								<option value="DACE" >Division of Admissions and Credit Evaluation</option>
+								
+								<option value="DCCPR" >Division of Corporate Communication and Public Relations</option>
+								
+								<option value="DEAS" >Division of Examination and Awards</option>
+								
+								<option value="DFN" >Division of Finance</option>
+								
+								<option value="DHR" >Division of Human Resource</option>
+								
+								<option value="DICE" >Division of Innovation, Commercialisation and Entrepreneurship</option>
+								
+								<option value="DPP" >Division of Programme Promotion</option>
+								
+								<option value="DQAA" >Division of Quality Assurance and Audit</option>
+								
+								<option value="DSSM" >Division of Sustainability and Strategic Management</option>
+								
+								<option value="WLTCRCD" >Dr Wu Lien-Teh Centre for Research in Communicable Diseases</option>
+								
+								<option value="FAM" >Faculty of Accountancy and Management</option>
+								
+								<option value="FAS" >Faculty of Arts and Social Science</option>
+								
+								<option value="FCS" >Faculty of Chinese Studies</option>
+								
+								<option value="FCI" >Faculty of Creative Industries</option>
+								
+								<option value="FEd" >Faculty of Education</option>
+								
+								<option value="FEGT" >Faculty of Engineering and Green Technology</option>
+								
+								<option value="FICT" selected>Faculty of Information and Communication Technology</option>
+								
+								<option value="FSc" >Faculty of Science</option>
+								
+								<option value="IADS" >Institute of AI and Data Science</option>
+								
+								<option value="IBHS" >Institute of Bioscience and Health Sciences</option>
+								
+								<option value="IIE" >Institute of International Education</option>
+								
+								<option value="IMLD" >Institute of Management and Leadership Development</option>
+								
+								<option value="IPSR" >Institute of Postgraduate Studies & Research</option>
+								
+								<option value="IIM" >International Institute of Media</option>
+								
+								<option value="ITISC" >IT Infrastructure and Support Centre</option>
+								
+								<option value="LKC FES" >Lee Kong Chian Faculty of Engineering and Science</option>
+								
+								<option value="LIB" >Library</option>
+								
+								<option value="MK FMHS" >M. Kandiah Faculty of Medicine and Health Sciences</option>
+								
+								<option value="Mencius Institute" >Mencius Institute</option>
+								
+								<option value="OIA" >Office of International Affairs</option>
+								
+								<option value="IAD" >Office of VP (Internationalisation and Academic Development)</option>
+								
+								<option value="RDC" >Office of VP (R&D and Commercialisation)</option>
+								
+								<option value="SDAR" >Office of VP (Student Development and Alumni Relations)</option>
+								
+								<option value="ODL" >Open and Distance Learning Centre</option>
+								
+								<option value="PRES" >President's Office</option>
+								
+								<option value="RGO" >Registrar's Office</option>
+								
+								<option value="CAD" >Sg Long Campus Administration Director</option>
+								
+								<option value="STEAM" >STEAM Outreach</option>
+								
+								<option value="THP FBF" >Teh Hong Piow Faculty of Business and Finance</option>
+								
+								<option value="TCLI" >Tun Tan Cheng Lock Institute of Social Studies</option>
+								
+								<option value="UBRC" >UTAR Buddhist Research Centre</option>
+								
+								<option value="XDU-UTAR ISTI" >XDU-UTAR Institute of Science, Technology and Innovation</option>
+								
+								<option value="XI" >Xinwei Institute</option>
+								
+								<option value="YCF CChS" >Yu Cai Foundation Centre for Chinese Studies</option>
+								
+							</select></td>
+						  </tr>
+						  <tr>
+							<td><span style="font-size: 15px;font-family: 'Roboto';"><strong>Department/Unit</strong></span></td>
+							<td><strong>:</strong></td>
+		
+							<td><select class="iform" name="searchDiv" >
+						  
+								<option value="All" Selected>All</option>
+								
+								<option value="186" >Department of Computer and Communication Technology</option>
+								
+								<option value="55" >Department of Computer Science</option>
+								
+								<option value="2317" >Department of Digital Economy Technology</option>
+								
+								<option value="252" >Department of Information Systems</option>
+								
+								<option value="86" >Faculty General Office</option>
+								
+							</select></td>
+						  </tr>
+						  <tr>
+							<td><span style="font-size: 15px;font-family: 'Roboto';"><strong>Name</strong></span></td>
+							<td><strong>:</strong></td>
+							<td>
+							  <input name="searchName" class="iform" type="text" size="50" maxlength="50" value="">
+							</td>
+						  </tr>
+						  <tr>
+						    <td><span style="font-size: 15px;font-family: 'Roboto';"><strong>Areas of Expertise <span style="font-size: 12px; font-style: italic; color: #000;">(Academic staff only)</span></strong></span></td>
+						    <td><strong>:</strong></td>
+						    <td><input name="searchExpertise" class="iform" type="text" size="50" maxlength="50" value=""></td>
+			          </tr>
+						  <tr>
+							<td colspan="2">&nbsp;</td>
+							<td><input name="submit" class="iform" type="submit" value="Search" style="color:#fff;border:1px solid;background-color:#0a296a;height: 30px;width: 65px;/* font-style: inherit; */font-family: 'Roboto';border-radius: 10px;"></td>
+						  </tr>
+						  <input type="hidden" name="searchResult" value="N">
+					  </table>
+		  </form>
+					
+					
+<table width="100%"  border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td valign="top" height="400"><br>
+                
+                <table width="100%">
+                  <tr>
+                    <td valign="top" align="center"><hr style="border: 1px solid #0a296a;" size="1" width="100%">
+                        <div align="left">
+                          <strong style="font-weight:700;font-size:13px;font-family: 'Roboto';  ">Name By Alphabetical Order</strong> :
+                          <span style="font-size:14px;font-family: 'Roboto';color:#FF0000;">All&nbsp;</span><a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=A&searchName=&searchOrder=name&searchResult=Y">A</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=C&searchName=&searchOrder=name&searchResult=Y">C</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=D&searchName=&searchOrder=name&searchResult=Y">D</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=F&searchName=&searchOrder=name&searchResult=Y">F</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=G&searchName=&searchOrder=name&searchResult=Y">G</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=I&searchName=&searchOrder=name&searchResult=Y">I</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=J&searchName=&searchOrder=name&searchResult=Y">J</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=K&searchName=&searchOrder=name&searchResult=Y">K</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=L&searchName=&searchOrder=name&searchResult=Y">L</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=M&searchName=&searchOrder=name&searchResult=Y">M</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=N&searchName=&searchOrder=name&searchResult=Y">N</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=O&searchName=&searchOrder=name&searchResult=Y">O</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=P&searchName=&searchOrder=name&searchResult=Y">P</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=R&searchName=&searchOrder=name&searchResult=Y">R</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=S&searchName=&searchOrder=name&searchResult=Y">S</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=T&searchName=&searchOrder=name&searchResult=Y">T</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=V&searchName=&searchOrder=name&searchResult=Y">V</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=W&searchName=&searchOrder=name&searchResult=Y">W</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=Y&searchName=&searchOrder=name&searchResult=Y">Y</a>&nbsp;<a style="font-size:14px;font-family: 'Roboto';"class="" href="staffListSearchV2.jsp?searchDept=FICT&searchDiv=All&searchSurname=Z&searchName=&searchOrder=name&searchResult=Y">Z</a>&nbsp;
+                        </div>
+                        <hr style="border: 1px solid #0a296a;" size="1" width="100%">
+                    </td>
+                  </tr>
+                </table>
+                <table width="100%" cellpadding="3" border="0" cellspacing="0" style="border-collapse:collapse" >
+                  <tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=03130';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=03130" alt="Liew Soung Yue" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Prof Ts Dr Liew Soung Yue</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Dean  <br></b>
+					
+                      	
+                      	<i>Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2239<br> 
+                      <span  style="color:#333399">syliew@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=05295';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=05295" alt="Choo Peng Yin" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Dr Choo Peng Yin</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Deputy Dean  (Student Development and Industrial Training)<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Digital Economy Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 1029<br> 
+                      <span  style="color:#333399">choopy@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=10086';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=10086" alt="Goh Hock Guan" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Goh Hock Guan</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Deputy Dean  (R&D and Postgraduate Programmes)<br></b>
+					
+                      	
+                      	<i>Associate Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 1028<br> 
+                      <span  style="color:#333399">gohhg@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=03058';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=03058" alt="Tan Teik Boon" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Tan Teik Boon</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Deputy Dean  (Academic Development and Undergraduate Programmes)<br></b>
+					
+                      	
+                      	<i>Lecturer<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer Science<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2245<br> 
+                      <span  style="color:#333399">tantb@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=09145';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=09145" alt="Lim Jit Theam" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Lim Jit Theam</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Department  (Department of Digital Economy Technology)<br></b>
+					
+                      	
+                      	<i>Senior Lecturer<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Digital Economy Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4131<br> 
+                      <span  style="color:#333399">limjt@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=17059';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=17059" alt="Lim Seng Poh" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Lim Seng Poh</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Department  (Department of Computer Science)<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer Science<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2502<br> 
+                      <span  style="color:#333399">limsp@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=21007';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=21007" alt="Suthashini a/p Subramaniam" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Suthashini a/p Subramaniam</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Department  (Department of Information Systems)<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2249<br> 
+                      <span  style="color:#333399">suthashini@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=22092';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=22092" alt="Vikneswary a/p Jayapal" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Vikneswary a/p Jayapal</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Department  (Department of Computer and Communication Technology)<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2248<br> 
+                      <span  style="color:#333399">vikneswaryj@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=17057';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=17057" alt="Aun Yichiet" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Aun Yichiet</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Programme  (Master in Data Science & Postgraduate Diploma in Data Science)<br></b>
+					
+                      	
+                      	<i>Associate Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4656<br> 
+                      <span  style="color:#333399">aunyc@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=07299';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=07299" alt="Khor Siak Wang" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Khor Siak Wang</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Programme  (PhD (CS))<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2285<br> 
+                      <span  style="color:#333399">khorsw@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=E22003';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=E22003" alt="Kiran Adnan" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Dr Kiran Adnan</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Programme  (MSc (CS))<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Digital Economy Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4470<br> 
+                      <span  style="color:#333399">kiranadnan@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=23095';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=23095" alt="Lim Ean Heng" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Lim Ean Heng</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Programme  (BCS (Hons))<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer Science<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4624<br> 
+                      <span  style="color:#333399">ehlim@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=09203';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFE7D5'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  bgcolor="#FFE7D5" >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=09203" alt="Teoh Shen Khang" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Teoh Shen Khang</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                    
+					<b>Head of Programme  (Information Technology Programmes)<br></b>
+					
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4471<br> 
+                      <span  style="color:#333399">teohsk@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=11048';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=11048" alt="Abdul Rahman Bin Rashid" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Encik Abdul Rahman Bin Rashid</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Administrative Assistant III<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Faculty General Office<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2266<br> 
+                      <span  style="color:#333399">rahmanr@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=E21002';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=E21002" alt="Abdulkarim Kanaan Jebna" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Abdulkarim Kanaan Jebna</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4601<br> 
+                      <span  style="color:#333399">abdulkarim@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=E23003';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=E23003" alt="Abdulrahman Aminu Ghali" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Abdulrahman Aminu Ghali</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4531<br> 
+                      <span  style="color:#333399">aminu@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=E23006';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=E23006" alt="Adeb Ali Mohammed Ahmed Al-Samet" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Dr Adeb Ali Mohammed Ahmed Al-Samet</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4232<br> 
+                      <span  style="color:#333399">adebali@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=24088';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=24088" alt="Adilah Binti Abu Samah" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Puan Adilah Binti Abu Samah</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Laboratory Manager<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer Science<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 1006<br> 
+                      <span  style="color:#333399">adilah@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=E24011';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=E24011" alt="Altahir Abdalla Altahir Mohammed" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Dr Altahir Abdalla Altahir Mohammed</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4165<br> 
+                      <span  style="color:#333399">altahir@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=23100';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=23100" alt="Ammar Bin Azlan" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Encik Ammar Bin Azlan</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Lecturer<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Digital Economy Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4539<br> 
+                      <span  style="color:#333399">ammar@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=22067';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=22067" alt="Ana Nabilah Binti Sa'uadi" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Cik Ana Nabilah Binti Sa'uadi</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Lecturer<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4239<br> 
+                      <span  style="color:#333399">ananabilah@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=25065';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=25065" alt="Ashikin binti Ali" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Cik Ashikin binti Ali</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Lecturer<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer Science<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4432<br> 
+                      <span  style="color:#333399">ashikin@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=25035';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=25035" alt="Athirah binti Rosli" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Athirah binti Rosli</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4587<br> 
+                      <span  style="color:#333399">athirahr@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=24084';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=24084" alt="Ayu Norafida Binti Ayob" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Puan Ayu Norafida Binti Ayob</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Lecturer<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4129<br> 
+                      <span  style="color:#333399">norafida@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=05006';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=05006" alt="Azlinda Binti Abdullah" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Puan Azlinda Binti Abdullah</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Senior Office Assistant I<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Faculty General Office<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2503<br> 
+                      <span  style="color:#333399">azlinda@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=19095';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=19095" alt="Chai Meei Tyng" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Chai Meei Tyng</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer Science<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4353<br> 
+                      <span  style="color:#333399">chaimt@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=18078';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=18078" alt="Chai Xue Fen" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ms Chai Xue Fen</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Manager<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Faculty General Office<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 2567<br> 
+                      <span  style="color:#333399">chaixf@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr></tr>
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=08134';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=08134" alt="Chan Lee Kwun" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Chan Lee Kwun</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Information Systems<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4413<br> 
+                      <span  style="color:#333399">chanlk@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=16100';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=16100" alt="Chang Jing Jing" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ts Dr Chang Jing Jing</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Assistant Professor<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Computer and Communication Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4417<br> 
+                      <span  style="color:#333399">changjj@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            
+                <td valign="top" width="29%">
+		<div style="width:99%; vertical-align:top;  margin-top:4px; margin-left:0.5px;  margin-right:0.5px;" >
+           <table width="100%"  
+									 onClick="javascript:location='staffListDetailV2.jsp?searchId=J21001';" onMouseOver="this.style.backgroundColor = '#E8F2FD'" onMouseOut="this.style.backgroundColor = '#FFFFFF'" style="border-collapse:collapse; min-height:130px;"
+									 title=" Click to view staff's information in details "  >
+              <tr style="box-shadow: 1px 2px 5px 0px #afafaf;">
+                <td width="90" valign="top "><div style=" margin-top:5px; margin-bottom:5px; padding:0px 5px 0px 5px;  min-height:130px"><img style="width : 134px; height : 200px" align="top" src="/getPicV2.jsp?fkey=J21001" alt="Cheah Hew Mee" width="80" height="97" ></div></td>
+                <td valign="top" >
+				<div style="margin:0.2em 0.3em 0.2em 0.3em ; font-family:Helvetica, sans-serif; font-size:13px;  
+                padding:3px; line-height:140%; min-height:130px; text-align:left">
+						<b>Ms Cheah Hew Mee</b><br><br  style="line-height: 50%;" >
+                        
+					<span style=" color:#993300"> 
+					  
+                      	
+                      	<i>Specialist I<br><br  style="line-height: 50%;" ></span></i>
+					  Faculty of Information and Communication Technology<br>
+                      Department of Digital Economy Technology<br><br  style="line-height: 50%;" >
+					 
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      
+                      05-4688888 ext: 4475<br> 
+                      <span  style="color:#333399">cheahhm@utar.edu.my</span></div>
+                 </td>
+              </tr>
+          </table>
+</div>
+</td>
+
+            <tr id="notDisplay"><TD colspan="3"><span style="font-size:11px;font-family: 'Roboto';font-weight=bold">Page <span style="font-size:12px;color:#FF0000; font-family: 'Roboto'; line-height:145%; font-weight:bold">1</span>&nbsp;| <a  href=staffListSearchV2.jsp?iPage=2&searchDept=FICT&searchSurname=All&searchName=&searchOrder=name&searchResult=Y&searchDiv=All>2</a>&nbsp;|  <a  href=staffListSearchV2.jsp?iPage=3&searchDept=FICT&searchSurname=All&searchName=&searchOrder=name&searchResult=Y&searchDiv=All>3</a>&nbsp;|  <a  href=staffListSearchV2.jsp?iPage=4&searchDept=FICT&searchSurname=All&searchName=&searchOrder=name&searchResult=Y&searchDiv=All>4</a>&nbsp;| </span></TD></TR>
+                </table>
+				<BR>
+                <div> <span style="background-color: rgb(255 231 213);border: 1px solid #000000;font-family: 'Roboto';border-radius: 5px;">&nbsp; &nbsp; &nbsp;</span><span style="font-family: 'Roboto';font-size:14px;"> indicates staff with Administrative Position </span></div>
+				<BR>
+                
+
+		    </td>
+          </tr>
+      </table>
+		
+ <!-- End Content -->
+			 
+		</DIV>
+	</div>
+</div>
+
+<!-- Footer -->
+  </div>
+<div align="center" style="background-color: #0a296a;"> 
+  <p><font style="font-family: 'Roboto';" color="#FFFFFF"><br>
+    &copy; 2026  UNIVERSITI TUNKU ABDUL RAHMAN <small><i>DU012(A).</i></small><br>Wholly owned by UTAR Education Foundation <small><i>(200201010564(578227-M))</i></small>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<small><a href="http://www.utar.edu.my/legalStatement.jsp" target="_blank" style="text-decoration:none" ><font color="#FFFFFF">LEGAL STATEMENT</font></a>&nbsp;&nbsp;&nbsp;<a href="http://www.utar.edu.my/termsOfUse.jsp" style="text-decoration:none" target="_blank"><font color="#FFFFFF">TERM OF USAGE</font></a>&nbsp;&nbsp;&nbsp;<a href="https://www.utar.edu.my/PrivacyNotice_English.jsp" target="_blank" style="text-decoration:none"><font color="#FFFFFF">PRIVACY NOTICE</font></a></small></font><font  style="font-family:Arial, Helvetica, sans-serif"color="#FFFFFF"><small><a href="https://www.utar.edu.my/PrivacyNotice_English.jsp" target=""><font color="#FFFFFF">
+    </font></a></small></font><br  />
+    
+  <br></p>
+</div>
+
+ 
+    
