@@ -159,3 +159,42 @@ test("resolves every org unit except General UTAR", () => {
     assert.deepEqual(unresolved, [], `unresolved units: ${unresolved.join(", ")}`);
 });
 
+import { matchRole, findDeptCodesForRole } from "./staffDirectory.ts";
+
+test("filters records down to the holders of the asked-about role", () => {
+    const records = parseStaffCards(fixture("fict.html"));
+
+    const deans = matchRole(records, "dean");
+    assert.ok(deans.length >= 1);
+    assert.ok(deans.every((r) => r.adminPosition), "role matches must have an admin position");
+    assert.ok(deans.some((r) => r.name === "Prof Ts Dr Liew Soung Yue"));
+});
+
+test("does not let 'dean' swallow 'deputy dean' when the exact role exists", () => {
+    const records = parseStaffCards(fixture("fict.html"));
+    const deans = matchRole(records, "dean");
+
+    assert.equal(deans.length, 1, "exact 'Dean' should win over the Deputy Deans");
+    assert.equal(deans[0].adminPosition, "Dean");
+});
+
+test("returns nothing when no one holds the role", () => {
+    const records = parseStaffCards(fixture("fict.html"));
+    assert.deepEqual(matchRole(records, "chancellor"), []);
+});
+
+test("derives the three VP office codes from the catalog rather than a hardcoded list", () => {
+    const codes = findDeptCodesForRole("vice president", catalog());
+
+    assert.equal(codes.length, 3, `expected three VP offices, got ${JSON.stringify(codes)}`);
+    assert.ok(codes.includes("IAD"));
+    assert.ok(codes.includes("RDC"));
+    assert.ok(codes.includes("SDAR"));
+});
+
+test("derives the registrar and president office codes from the catalog", () => {
+    assert.deepEqual(findDeptCodesForRole("registrar", catalog()), ["RGO"]);
+    assert.deepEqual(findDeptCodesForRole("president", catalog()), ["PRES"]);
+});
+
+

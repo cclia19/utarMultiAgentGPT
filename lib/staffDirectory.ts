@@ -191,3 +191,139 @@ export function resolveDeptCodes(unit: OrgUnit, catalog: DeptOption[]): string[]
     return scored.filter((s) => s.score === best).map((s) => s.code);
 }
 
+/**
+ * Role vocabulary. This is the one place a role phrase is written down, and it
+ * maps to a SEARCH FRAGMENT matched against live catalog labels — never to a
+ * department code. Adding a role is a one-line data edit; renaming a UTAR
+ * department needs no edit at all.
+ */
+const ROLE_LABEL_HINTS: Array<{ role: RegExp; labelFragment: RegExp }> = [
+    { role: /\bvice\s*president|\bvp\b|\bdeputy\s*president\b/i, labelFragment: /^office of vp\b/i },
+    { role: /\bregistrar\b|\bregistra\b|\bregistar\b|\brgo\b/i, labelFragment: /^registrar/i },
+    { role: /\bpresident\b|\bceo\b|\bchief executive\b/i, labelFragment: /^president/i },
+];
+
+export function findDeptCodesForRole(rolePhrase: string, catalog: DeptOption[]): string[] {
+    for (const hint of ROLE_LABEL_HINTS) {
+        if (!hint.role.test(rolePhrase)) continue;
+
+        const codes = catalog
+            .filter((o) => hint.labelFragment.test(o.label))
+            .map((o) => o.code);
+
+        if (codes.length) return codes;
+    }
+
+    return [];
+}
+
+/**
+ * Narrows records to those whose administrative position matches the phrase the
+ * user asked about. Matching runs against whatever `adminPosition` strings the
+ * directory returned, so new or renamed positions work with no code change.
+ *
+ * Exact matches win outright: asking for the "dean" must not also return the
+ * three Deputy Deans.
+ */
+export function matchRole(records: StaffRecord[], rolePhrase: string): StaffRecord[] {
+    const wanted = normalizeLabel(rolePhrase);
+    if (!wanted) return [];
+
+    const held = records.filter((r) => r.adminPosition);
+
+    const exact = held.filter((r) => normalizeLabel(r.adminPosition!) === wanted);
+    if (exact.length) return exact;
+
+    const leading = held.filter((r) => normalizeLabel(r.adminPosition!).startsWith(wanted));
+    if (leading.length) return leading;
+
+    return held.filter((r) => normalizeLabel(r.adminPosition!).includes(wanted));
+}
+
+const SEARCH_URL = `${DIRECTORY_ORIGIN}/staffListSearchV2.jsp`;
+const FETCH_TIMEOUT_MS = 8000;
+const STAFF_CACHE_TTL = 6 * 60 * 60 * 1000;
+const CATALOG_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+const staffCache = new Map<string, { at: number; records: StaffRecord[] }>();
+let catalogCache: { at: number; options: DeptOption[] } | null = null;
+
+async function fetchDirectoryHtml(params: { dept: string; name: string }): Promise<string> {
+    const query = new URLSearchParams({
+        searchDept: params.dept,
+        searchDiv: "All",
+        searchName: params.name,
+        searchExpertise: "",
+        submit: "Search",
+        searchResult: "Y",
+    });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(`${SEARCH_URL}?${query}`, {
+            headers: { "User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9" },
+            signal: controller.signal,
+        });
+
+        if (!response.ok) return "";
+
+        // The page is latin-1; decoding it as UTF-8 corrupts phone extensions.
+        const buffer = await response.arrayBuffer();
+        return new TextDecoder("latin1").decode(buffer);
+    } catch (error) {
+        console.error("staffDirectory fetch failed:", error);
+        return "";
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+export async function getDeptCatalog(): Promise<DeptOption[]> {
+    if (catalogCache && Date.now() - catalogCache.at < CATALOG_CACHE_TTL) {
+        return catalogCache.options;
+    }
+
+    const html = await fetchDirectoryHtml({ dept: "ALL", name: " nobody " });
+    const options = parseDeptCatalog(html);
+
+    // Keep serving a stale catalog rather than none if the directory is down.
+    if (!options.length) return catalogCache?.options ?? [];
+
+    catalogCache = { at: Date.now(), options };
+    return options;
+}
+
+export async function lookupStaff(q: {
+    deptCodes?: string[];
+    name?: string;
+}): Promise<StaffRecord[]> {
+    const deptCodes = q.deptCodes?.length ? q.deptCodes : ["ALL"];
+    const name = q.name ?? "";
+    const key = `${deptCodes.join(",")}|${name}`;
+
+    const cached = staffCache.get(key);
+    if (cached && Date.now() - cached.at < STAFF_CACHE_TTL) return cached.records;
+
+    const pages = await Promise.all(
+        deptCodes.map((dept) => fetchDirectoryHtml({ dept, name }))
+    );
+
+    const seen = new Set<string>();
+    const records: StaffRecord[] = [];
+
+    for (const html of pages) {
+        for (const record of parseStaffCards(html)) {
+            if (seen.has(record.profileUrl)) continue;
+            seen.add(record.profileUrl);
+            records.push(record);
+        }
+    }
+
+    if (records.length) staffCache.set(key, { at: Date.now(), records });
+    return records;
+}
+
+
+
