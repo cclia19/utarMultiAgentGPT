@@ -15,7 +15,7 @@ interface Message {
     role: Role;
     text: string;
     citations?: string[];
-    sourceMode?: "fileSearch" | "webFallback" | "none";
+    sourceMode?: "fileSearch" | "webFallback" | "staffDirectory" | "none";
     storeDisplayName?: string;
     selectedAgentId?: AgentId;
     selectedAgentLabel?: string;
@@ -89,6 +89,7 @@ function detectAgentFromMessage(text: string): AgentId | null {
 function sourceLabel(sourceMode?: string): string {
     if (sourceMode === "fileSearch") return "KB";
     if (sourceMode === "webFallback") return "Web";
+    if (sourceMode === "staffDirectory") return "Staff Directory";
     return "None";
 }
 
@@ -99,6 +100,10 @@ function sourceBadgeClass(sourceMode?: string): string {
 
     if (sourceMode === "webFallback") {
         return "bg-blue-50 text-blue-700 border border-blue-100";
+    }
+
+    if (sourceMode === "staffDirectory") {
+        return "bg-amber-50 text-amber-700 border border-amber-100";
     }
 
     return "bg-zinc-50 text-zinc-500 border border-zinc-100";

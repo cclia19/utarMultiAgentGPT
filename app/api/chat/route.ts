@@ -3,6 +3,16 @@ import { ai, MODEL_NAME } from "@/lib/gemini";
 import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
 import { routeWithLLM } from "@/lib/intentRouter";
+import {
+    getDeptCatalog,
+    lookupStaff,
+    matchRole,
+    resolveDeptCodes,
+    findDeptCodesForRole,
+    type StaffRecord,
+} from "@/lib/staffDirectory";
+import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
+import { getOrgUnitById } from "@/lib/orgUnits";
 
 type OfficialLink = {
     title: string;
@@ -1375,6 +1385,137 @@ async function fetchLiveUtarSearchSnippets(userQuery: string): Promise<{ text: s
     }
 }
 
+function formatStaffRecords(records: StaffRecord[]): string {
+    const blocks = records.map((r) => {
+        const lines = [`**${r.name}**`];
+
+        if (r.adminPosition) lines.push(`- **Position:** ${r.adminPosition}`);
+        if (r.jobTitle) lines.push(`- **Title:** ${r.jobTitle}`);
+
+        lines.push(`- **Department:** ${r.department}`);
+
+        if (r.division) lines.push(`- **Unit:** ${r.division}`);
+        if (r.email) lines.push(`- **Email:** ${r.email}`);
+        if (r.phone) lines.push(`- **Phone:** ${r.phone}`);
+
+        return lines.join("\n");
+    });
+
+    return blocks.join("\n\n");
+}
+
+/**
+ * Answers "who holds position X" from the live UTAR staff directory.
+ *
+ * Every fact in the response comes from a parsed directory record. Returns null
+ * only when this is not a role question at all; a lookup that finds nobody
+ * returns a refusal rather than falling through to web search, because the web
+ * path is what produced the stale-name bug this exists to fix.
+ */
+async function answerFromStaffDirectory(params: {
+    effectiveMessage: string;
+    selectedAgent: any;
+}): Promise<WebFallbackResult | null> {
+    const { effectiveMessage, selectedAgent } = params;
+    const { isRoleQuestion, rolePhrase } = isPersonRoleQuestion(effectiveMessage);
+
+    if (!isRoleQuestion) return null;
+
+    const directoryLink = {
+        title: "UTAR Staff Directory",
+        uri: "https://www2.utar.edu.my/staffListSearchV2.jsp",
+    };
+
+    const refusal: WebFallbackResult = {
+        text: `
+I can't confirm who currently holds that position from UTAR's official staff directory, so I'd rather not name anyone than risk giving you an outdated name. 🔎
+
+### 📢 What you can do
+- Search the official UTAR Staff Directory directly using the link below.
+- Contact the relevant UTAR office to confirm.
+`.trim(),
+        citations: [directoryLink.uri],
+        needsClarification: false,
+        pendingQuestion: null,
+    };
+
+    try {
+        const catalog = await getDeptCatalog();
+        if (!catalog.length) return refusal;
+
+        // A role like "vice president" names its own offices; anything else is
+        // scoped to the unit routing already selected.
+        let deptCodes = findDeptCodesForRole(rolePhrase, catalog);
+
+        if (!deptCodes.length) {
+            const unit = getOrgUnitById(selectedAgent.id);
+            deptCodes = resolveDeptCodes(unit, catalog);
+        }
+
+        if (!deptCodes.length) return refusal;
+
+        const records = await lookupStaff({ deptCodes });
+        const matched = matchRole(records, rolePhrase);
+
+        if (!matched.length) return refusal;
+
+        const text = [
+            "### 📌 Summary",
+            "",
+            formatStaffRecords(matched),
+            "",
+            "_Details are read live from UTAR's official staff directory._",
+        ].join("\n");
+
+        return {
+            text: appendOfficialLinks(text, [directoryLink]),
+            citations: [directoryLink.uri],
+            needsClarification: false,
+            pendingQuestion: null,
+        };
+    } catch (error) {
+        console.error("answerFromStaffDirectory failed:", error);
+        return refusal;
+    }
+}
+
+async function tryStaffDirectoryFallback(params: {
+    effectiveMessage: string;
+    selectedAgent: any;
+    lastResolvedTopic: string | null;
+    updatedContextSummary: string;
+    routeType: string;
+}): Promise<NextResponse | null> {
+    const {
+        effectiveMessage,
+        selectedAgent,
+        lastResolvedTopic,
+        updatedContextSummary,
+        routeType,
+    } = params;
+
+    const directoryAnswer = await answerFromStaffDirectory({
+        effectiveMessage,
+        selectedAgent,
+    });
+
+    if (!directoryAnswer) return null;
+
+    return NextResponse.json({
+        text: directoryAnswer.text,
+        citations: directoryAnswer.citations,
+        sourceMode: "staffDirectory",
+        storeDisplayName: selectedAgent.storeDisplayName || "",
+        selectedAgentId: selectedAgent.id,
+        selectedAgentLabel: selectedAgent.label,
+        needsClarification: false,
+        pendingQuestion: null,
+        lastResolvedTopic,
+        contextSummary: updatedContextSummary,
+        routeType,
+    });
+}
+
 async function generatePublicWebFallback(params: {
     effectiveMessage: string;
     selectedAgent: any;
@@ -1424,6 +1565,7 @@ SOURCE RULES:
 - Do not invent emails, phone numbers, office locations, portals, supervisors, or links.
 - Do not mention internal limitations, search snippets, filtering, grounding API, or source rejection.
 - If exact official wording is unavailable for misconduct/complaint questions, still give safe, practical guidance without claiming exact policy text.
+- Do not name the holder of any UTAR position (President, Vice President, Registrar, Dean, Deputy Dean, HOD, Director). Position holders are resolved from the official staff directory elsewhere. If asked, say the detail should be confirmed via the official UTAR Staff Directory.
 
 ${SELECTED_AGENT_EVIDENCE_POLICY}
 
@@ -1457,25 +1599,6 @@ For staff, dean, HOD, DD, HoP, president, VP, supervisor, lecturer, or office co
   ### 🔗 Official Links
 - Include email, office, phone, extension, profile link when available.
 - Omit unavailable sections rather than saying every field is unavailable.
-
-SENIOR MANAGEMENT & LEADERSHIP SEARCH RULE:
-- For queries asking about UTAR Vice Presidents, UTAR President, Registrar, Deans, HODs, or senior leadership, perform live web search grounding across official UTAR news portals (news.utar.edu.my), staff directories (www2.utar.edu.my), and official announcements.
-- LEADERSHIP SUCCESSION VERIFICATION: For UTAR Vice Presidents, verify current active post-holders across all portfolios (Internationalisation & Academic Development, R&D & Commercialisation, Student Development & Alumni Relations). For Registrar, verify active Head of Registrar. Disambiguate active vs former post-holders based on retrieved official sources.
-- Always verify latest active post-holders and list all active Vice Presidents across all portfolios.
-
-GROUNDING QUERY GENERATION RULE:
-- For leadership and staff position queries (Registrar, Vice President, President, Dean, HOD), generate search queries targeting news announcements and staff directories (e.g. "UTAR Vice President news.utar.edu.my appointment", "UTAR Registrar active staff directory", or "UTAR Head of Registrar news.utar.edu.my appointment").
-- This forces Google Search Grounding to index news.utar.edu.my and www2.utar.edu.my, bypassing un-updated static HTML pages.
-
-CHAIN-OF-THOUGHT SEARCH & VERIFICATION RULE:
-Follow a structured 2-step process for search and extraction:
-1. Keyword Identification:
-   - Identify target institution (Universiti Tunku Abdul Rahman / UTAR).
-   - Identify target role or position (e.g., Head of Registrar / Registrar vs. Vice President vs. President vs. Dean vs. Department Director).
-2. Information Retrieval & Role Disambiguation:
-   - Search official UTAR Management organizational chart, RGO portal (rgo.utar.edu.my), and official staff directory.
-   - Disambiguate roles carefully: ensure the extracted person holds the exact requested title (e.g., verify the exact university Registrar; do not confuse faculty Deans, Professors, or Directors with the university Registrar).
-   - Exclude former post-holders who have stepped down or retired based on search evidence.
 
 STYLE AND FORMAT:
 - Use rich but professional student-friendly Markdown.
@@ -2126,6 +2249,15 @@ export async function POST(req: NextRequest) {
         }
 
         if (!storeName) {
+            const staffDirResponse = await tryStaffDirectoryFallback({
+                effectiveMessage,
+                selectedAgent,
+                lastResolvedTopic,
+                updatedContextSummary,
+                routeType: routerResult.routeType,
+            });
+            if (staffDirResponse) return staffDirResponse;
+
             const webFallback = await generatePublicWebFallback({
                 effectiveMessage,
                 selectedAgent,
@@ -2212,6 +2344,15 @@ LANGUAGE RULE:
             console.error("File search error, falling back to web:", fileError?.message || fileError);
             console.error("Full file error stack:", fileError?.stack);
 
+            const staffDirResponse = await tryStaffDirectoryFallback({
+                effectiveMessage,
+                selectedAgent,
+                lastResolvedTopic,
+                updatedContextSummary,
+                routeType: routerResult.routeType,
+            });
+            if (staffDirResponse) return staffDirResponse;
+
             const webFallback = await generatePublicWebFallback({
                 effectiveMessage,
                 selectedAgent,
@@ -2268,6 +2409,15 @@ LANGUAGE RULE:
                 routeType: routerResult.routeType,
             });
         }
+
+        const staffDirResponse = await tryStaffDirectoryFallback({
+            effectiveMessage,
+            selectedAgent,
+            lastResolvedTopic,
+            updatedContextSummary,
+            routeType: routerResult.routeType,
+        });
+        if (staffDirResponse) return staffDirResponse;
 
         const webFallback = await generatePublicWebFallback({
             effectiveMessage,
