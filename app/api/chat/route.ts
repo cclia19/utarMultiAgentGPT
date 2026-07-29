@@ -1389,7 +1389,10 @@ function formatStaffRecords(records: StaffRecord[]): string {
     const blocks = records.map((r) => {
         const lines = [`**${r.name}**`];
 
-        if (r.adminPosition) lines.push(`- **Position:** ${r.adminPosition}`);
+        // A person can hold several appointments; show every one the directory lists.
+        if (r.adminPositions.length) {
+            lines.push(`- **Position:** ${r.adminPositions.join(" · ")}`);
+        }
         if (r.jobTitle) lines.push(`- **Title:** ${r.jobTitle}`);
 
         lines.push(`- **Department:** ${r.department}`);

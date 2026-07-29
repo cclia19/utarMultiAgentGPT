@@ -4,7 +4,14 @@ const DIRECTORY_ORIGIN = "https://www2.utar.edu.my";
 
 export interface StaffRecord {
     name: string;
-    adminPosition?: string;
+    /**
+     * Every administrative appointment the person holds, in page order. A person
+     * can hold more than one — UTAR's VP (Internationalisation and Academic
+     * Development) is also the Sungai Long Campus Administration Director — and
+     * the directory renders each as its own <b> element. Keeping only the first
+     * loses the appointment the user asked about, so this is always a list.
+     */
+    adminPositions: string[];
     jobTitle?: string;
     department: string;
     division?: string;
@@ -60,7 +67,7 @@ export function parseStaffCards(html: string): StaffRecord[] {
         const name = bolds[0] || "";
         if (!name) continue;
 
-        const adminPosition = bolds[1] || undefined;
+        const adminPositions = bolds.slice(1).filter(Boolean);
         const jobTitle = sanitize((body.match(/<i>([\s\S]*?)<\/i>/) || [])[1] || "") || undefined;
         const email = (body.match(/[\w.+-]+@[\w.-]*utar\.edu\.my/) || [])[0];
 
@@ -84,7 +91,7 @@ export function parseStaffCards(html: string): StaffRecord[] {
 
         records.push({
             name,
-            adminPosition,
+            adminPositions,
             jobTitle,
             department: orgLines[0] || "",
             division: orgLines[1] || undefined,
@@ -221,8 +228,11 @@ export function findDeptCodesForRole(rolePhrase: string, catalog: DeptOption[]):
 
 /**
  * Narrows records to those whose administrative position matches the phrase the
- * user asked about. Matching runs against whatever `adminPosition` strings the
+ * user asked about. Matching runs against whatever `adminPositions` strings the
  * directory returned, so new or renamed positions work with no code change.
+ *
+ * A record matches if ANY of its positions matches: a person who is both a
+ * campus director and a Vice President must be found by either title.
  *
  * Exact matches win outright: asking for the "dean" must not also return the
  * three Deputy Deans.
@@ -231,15 +241,16 @@ export function matchRole(records: StaffRecord[], rolePhrase: string): StaffReco
     const wanted = normalizeLabel(rolePhrase);
     if (!wanted) return [];
 
-    const held = records.filter((r) => r.adminPosition);
+    const held = records.filter((r) => r.adminPositions.length);
+    const positions = (r: StaffRecord) => r.adminPositions.map(normalizeLabel);
 
-    const exact = held.filter((r) => normalizeLabel(r.adminPosition!) === wanted);
+    const exact = held.filter((r) => positions(r).some((p) => p === wanted));
     if (exact.length) return exact;
 
-    const leading = held.filter((r) => normalizeLabel(r.adminPosition!).startsWith(wanted));
+    const leading = held.filter((r) => positions(r).some((p) => p.startsWith(wanted)));
     if (leading.length) return leading;
 
-    return held.filter((r) => normalizeLabel(r.adminPosition!).includes(wanted));
+    return held.filter((r) => positions(r).some((p) => p.includes(wanted)));
 }
 
 const SEARCH_URL = `${DIRECTORY_ORIGIN}/staffListSearchV2.jsp`;
@@ -413,7 +424,7 @@ const STAFF_SCHEMA = {
                 type: "object",
                 properties: {
                     name: { type: "string" },
-                    adminPosition: { type: "string" },
+                    adminPositions: { type: "array", items: { type: "string" } },
                     jobTitle: { type: "string" },
                     department: { type: "string" },
                     division: { type: "string" },
@@ -446,7 +457,7 @@ export async function extractStaffWithLlm(html: string): Promise<StaffRecord[]> 
                             text: `Extract every staff member listed in this UTAR staff directory page text.
 
 Rules:
-- adminPosition is an administrative appointment (Dean, Registrar, Vice President, Head of Department). Omit it entirely if the person has none.
+- adminPositions lists every administrative appointment the person holds (Dean, Registrar, Vice President, Head of Department). Use an empty array if the person has none, and include ALL of them when a person holds more than one.
 - jobTitle is the academic or employment grade (Professor, Manager, Assistant Professor).
 - Copy every value verbatim from the text. Never infer, correct, or invent a value.
 - Include every person listed, including those without an administrative position.
@@ -474,7 +485,9 @@ ${text}
             .filter((s: any) => s?.name && s?.department)
             .map((s: any) => ({
                 name: String(s.name),
-                adminPosition: s.adminPosition ? String(s.adminPosition) : undefined,
+                adminPositions: Array.isArray(s.adminPositions)
+                    ? s.adminPositions.filter(Boolean).map(String)
+                    : [],
                 jobTitle: s.jobTitle ? String(s.jobTitle) : undefined,
                 department: String(s.department),
                 division: s.division ? String(s.division) : undefined,

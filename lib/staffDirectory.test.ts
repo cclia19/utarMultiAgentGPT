@@ -58,11 +58,11 @@ test("parses a card that has an administrative position", () => {
     const records = parseStaffCards(html);
     assert.equal(records.length, countExpectedRecords(html));
 
-    const vp = records.find((r) => r.adminPosition?.includes("Vice President"));
+    const vp = records.find((r) => r.adminPositions.some((p) => p.includes("Vice President")));
 
     assert.ok(vp, "expected a Vice President record in the RDC fixture");
     assert.equal(vp.name, "Prof. Dr Zuraidah Binti Abd Manaf");
-    assert.equal(vp.adminPosition, "Vice President (R&D and Commercialisation)");
+    assert.deepEqual(vp.adminPositions, ["Vice President (R&D and Commercialisation)"]);
     assert.equal(vp.jobTitle, "Professor");
     assert.equal(vp.department, "Faculty of Accountancy and Management");
     assert.equal(vp.email, "zuraidahm@utar.edu.my");
@@ -77,7 +77,7 @@ test("parses a card that has no administrative position", () => {
     const staff = records.find((r) => r.name.includes("Aswini"));
 
     assert.ok(staff, "expected the Aswini record");
-    assert.equal(staff.adminPosition, undefined);
+    assert.deepEqual(staff.adminPositions, []);
     assert.equal(staff.jobTitle, "Senior Assistant Manager");
     assert.equal(staff.department, "Office of VP (R&D and Commercialisation)");
 });
@@ -89,7 +89,7 @@ test("joins multiple phone numbers and does not mistake one for a division", () 
 
     const loh = records[0];
     assert.equal(loh.name, "Ms Loh Siaw Yien");
-    assert.equal(loh.adminPosition, "Registrar");
+    assert.deepEqual(loh.adminPositions, ["Registrar"]);
     assert.equal(loh.department, "Registrar's Office");
     assert.equal(loh.email, "lohsy@utar.edu.my");
     assert.equal(loh.division, undefined, "the 05-468 8888 phone must not land in division");
@@ -103,14 +103,38 @@ test("parses division when present and finds faculty leadership", () => {
     assert.equal(records.length, countExpectedRecords(html));
     assert.ok(records.length > 10, "FICT fixture should hold many staff");
 
-    const dean = records.find((r) => r.adminPosition === "Dean");
+    const dean = records.find((r) => r.adminPositions.includes("Dean"));
     assert.ok(dean, "expected a Dean record");
     assert.equal(dean.name, "Prof Ts Dr Liew Soung Yue");
     assert.equal(dean.department, "Faculty of Information and Communication Technology");
     assert.equal(dean.division, "Department of Computer and Communication Technology");
 
-    const deputies = records.filter((r) => r.adminPosition?.startsWith("Deputy Dean"));
+    const deputies = records.filter((r) => r.adminPositions.some((p) => p.startsWith("Deputy Dean")));
     assert.ok(deputies.length >= 3, "expected at least three Deputy Deans");
+});
+
+test("keeps EVERY administrative position when a person holds more than one", () => {
+    // Goi Bok Min is both Sungai Long Campus Administration Director AND Vice
+    // President (Internationalisation and Academic Development). The directory
+    // renders each as its own <b>. Keeping only the first hid him from the VP
+    // lookup entirely, which is the bug this fixture pins.
+    const html = fixture("iad.html");
+    const records = parseStaffCards(html);
+    assert.equal(records.length, countExpectedRecords(html));
+
+    const goi = records.find((r) => r.name.includes("Goi Bok Min"));
+    assert.ok(goi, "expected the Goi Bok Min record in the IAD fixture");
+    assert.deepEqual(goi.adminPositions, [
+        "Sungai Long Campus Administration Director",
+        "Vice President (Internationalisation and Academic Development)",
+    ]);
+
+    // and he must be reachable by the secondary title, not just the first
+    const vps = matchRole(records, "vice president");
+    assert.ok(
+        vps.some((r) => r.name.includes("Goi Bok Min")),
+        "a person's non-first appointment must still match"
+    );
 });
 
 test("strips the page's non-UTF8 padding bytes out of parsed text", () => {
@@ -119,7 +143,7 @@ test("strips the page's non-UTF8 padding bytes out of parsed text", () => {
     assert.equal(records.length, countExpectedRecords(html));
 
     for (const r of records) {
-        const all = [r.name, r.adminPosition, r.jobTitle, r.department, r.phone, r.email]
+        const all = [r.name, ...r.adminPositions, r.jobTitle, r.department, r.phone, r.email]
             .filter(Boolean)
             .join(" ");
         assert.ok(!all.includes("\u00A0"), "no raw non-breaking space should survive");
@@ -181,7 +205,7 @@ test("filters records down to the holders of the asked-about role", () => {
 
     const deans = matchRole(records, "dean");
     assert.ok(deans.length >= 1);
-    assert.ok(deans.every((r) => r.adminPosition), "role matches must have an admin position");
+    assert.ok(deans.every((r) => r.adminPositions.length), "role matches must have an admin position");
     assert.ok(deans.some((r) => r.name === "Prof Ts Dr Liew Soung Yue"));
 });
 
@@ -190,7 +214,7 @@ test("does not let 'dean' swallow 'deputy dean' when the exact role exists", () 
     const deans = matchRole(records, "dean");
 
     assert.equal(deans.length, 1, "exact 'Dean' should win over the Deputy Deans");
-    assert.equal(deans[0].adminPosition, "Dean");
+    assert.deepEqual(deans[0].adminPositions, ["Dean"]);
 });
 
 test("returns nothing when no one holds the role", () => {
