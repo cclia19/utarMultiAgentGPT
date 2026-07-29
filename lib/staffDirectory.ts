@@ -62,10 +62,11 @@ export function parseStaffCards(html: string): StaffRecord[] {
         const jobTitle = sanitize((body.match(/<i>([\s\S]*?)<\/i>/) || [])[1] || "") || undefined;
         const email = (body.match(/[\w.+-]+@[\w.-]*utar\.edu\.my/) || [])[0];
 
-        // searchId, when present, sits in the enclosing table just before the card.
-        const preceding = html.slice(Math.max(0, (match.index ?? 0) - 1200), match.index);
-        const ids = [...preceding.matchAll(/searchId=(\d+)/g)];
-        const searchId = ids.length ? ids[ids.length - 1][1] : null;
+        // searchId, when present, sits in the enclosing table tag just before the card body.
+        const cardStart = html.lastIndexOf("<table", match.index ?? 0);
+        const preceding = html.slice(cardStart >= 0 ? cardStart : Math.max(0, (match.index ?? 0) - 1200), match.index);
+        const searchIdMatch = preceding.match(/searchId=([\w-]+)/);
+        const searchId = searchIdMatch ? searchIdMatch[1] : undefined;
 
         // Remove the fields already captured, then read whatever text is left.
         const rest = body
