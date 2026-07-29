@@ -49,7 +49,7 @@ const ROLE_PATTERNS: RolePattern[] = [
     { pattern: /\bdeans?\b/i, phrase: "dean" },
     { pattern: /\bdirectors?\b/i, phrase: "director" },
     { pattern: /\bchairpersons?\b/i, phrase: "chairperson" },
-    { pattern: /\bchairm[an]n?s?\b/i, phrase: "chairman" },
+    { pattern: /\bchairm[ae]ns?\b/i, phrase: "chairman" },
 ];
 
 export function isPersonRoleQuestion(message: string): {

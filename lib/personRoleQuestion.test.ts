@@ -79,3 +79,8 @@ test("supports plural role phrasing", () => {
     assert.match(res.rolePhrase, /deputy dean/i);
 });
 
+test("supports plural chairman phrasing", () => {
+    const res = isPersonRoleQuestion("who are the chairmen");
+    assert.equal(res.isRoleQuestion, true);
+    assert.equal(res.rolePhrase, "chairman");
+});
