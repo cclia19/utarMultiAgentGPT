@@ -107,3 +107,55 @@ test("strips the page's non-UTF8 padding bytes out of parsed text", () => {
         assert.equal(all, all.replace(/\s{2,}/g, " "), "no doubled whitespace should survive");
     }
 });
+
+import { parseDeptCatalog, resolveDeptCodes } from "./staffDirectory.ts";
+import { ORG_UNITS, getOrgUnitById } from "./orgUnits.ts";
+
+const catalog = () => parseDeptCatalog(fixture("rdc.html"));
+
+test("scrapes the department catalog out of the page's own select element", () => {
+    const options = catalog();
+
+    assert.ok(options.length > 90, `expected ~101 departments, got ${options.length}`);
+    assert.ok(options.some((o) => o.code === "RGO" && o.label === "Registrar's Office"));
+    assert.ok(options.some((o) => o.code === "RDC" && o.label.startsWith("Office of VP")));
+    assert.ok(!options.some((o) => o.code === "ALL"), "the 'All' sentinel is not a department");
+});
+
+test("resolves a unit whose shortLabel matches the directory code", () => {
+    assert.deepEqual(resolveDeptCodes(getOrgUnitById("fict"), catalog()), ["FICT"]);
+});
+
+test("resolves a unit by full name when its code does not match", () => {
+    assert.deepEqual(resolveDeptCodes(getOrgUnitById("registrar"), catalog()), ["RGO"]);
+    assert.deepEqual(resolveDeptCodes(getOrgUnitById("fbf"), catalog()), ["THP FBF"]);
+});
+
+test("prefers the code match over a misleading substring match", () => {
+    // "innovation" appears in BOTH "Division of Innovation, Commercialisation and
+    // Entrepreneurship" (DICE, correct) and "Centre for Curriculum Development and
+    // Innovation" (CCDI, wrong). Code-match-first is what disambiguates.
+    assert.deepEqual(resolveDeptCodes(getOrgUnitById("dice"), catalog()), ["DICE"]);
+});
+
+test("returns both campus codes for a unit the directory splits by campus", () => {
+    const codes = resolveDeptCodes(getOrgUnitById("diss"), catalog());
+    assert.ok(codes.length === 2, `expected two campus codes, got ${JSON.stringify(codes)}`);
+    assert.ok(codes.some((c) => c.includes("KPR")));
+    assert.ok(codes.some((c) => c.includes("SL")));
+});
+
+test("returns nothing for General UTAR, which is not a department", () => {
+    assert.deepEqual(resolveDeptCodes(getOrgUnitById("general"), catalog()), []);
+});
+
+test("resolves every org unit except General UTAR", () => {
+    const options = catalog();
+    const unresolved = ORG_UNITS
+        .filter((u) => u.id !== "general")
+        .filter((u) => resolveDeptCodes(u, options).length === 0)
+        .map((u) => u.id);
+
+    assert.deepEqual(unresolved, [], `unresolved units: ${unresolved.join(", ")}`);
+});
+
