@@ -254,7 +254,18 @@ export function matchRole(records: StaffRecord[], rolePhrase: string): StaffReco
 }
 
 const SEARCH_URL = `${DIRECTORY_ORIGIN}/staffListSearchV2.jsp`;
-const FETCH_TIMEOUT_MS = 8000;
+
+/**
+ * 8s was chosen against a development machine sitting a few hundred ms from
+ * UTAR. Production runs from a Vercel region that may be a continent away,
+ * talking to a slow JSP application, and there the budget was tight enough
+ * that position questions refused in production while succeeding locally.
+ *
+ * getDeptCatalog() and lookupStaff() run in sequence, so the worst case is
+ * two of these back to back plus the routing LLM calls. At 15s that stays
+ * inside the route's 60s maxDuration with room to spare.
+ */
+const FETCH_TIMEOUT_MS = 15000;
 const STAFF_CACHE_TTL = 6 * 60 * 60 * 1000;
 const CATALOG_CACHE_TTL = 24 * 60 * 60 * 1000;
 
