@@ -245,6 +245,9 @@ const FETCH_TIMEOUT_MS = 8000;
 const STAFF_CACHE_TTL = 6 * 60 * 60 * 1000;
 const CATALOG_CACHE_TTL = 24 * 60 * 60 * 1000;
 
+// Maximum cached staff lookup queries to prevent unbounded Map memory growth over process lifetime.
+const MAX_STAFF_CACHE_ENTRIES = 100;
+
 const staffCache = new Map<string, { at: number; records: StaffRecord[] }>();
 let catalogCache: { at: number; options: DeptOption[] } | null = null;
 
@@ -301,7 +304,9 @@ export async function lookupStaff(q: {
 }): Promise<StaffRecord[]> {
     const deptCodes = q.deptCodes?.length ? q.deptCodes : ["ALL"];
     const name = q.name ?? "";
-    const key = `${deptCodes.join(",")}|${name}`;
+    const sortedDepts = [...deptCodes].sort();
+    const normalizedName = name.trim().toLowerCase();
+    const key = `${sortedDepts.join(",")}|${normalizedName}`;
 
     const cached = staffCache.get(key);
     if (cached && Date.now() - cached.at < STAFF_CACHE_TTL) return cached.records;
@@ -315,13 +320,31 @@ export async function lookupStaff(q: {
 
     for (const html of pages) {
         for (const record of parseStaffCards(html)) {
-            if (seen.has(record.profileUrl)) continue;
-            seen.add(record.profileUrl);
+            const dedupeKey = record.profileUrl ?? record.email ?? record.name;
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
             records.push(record);
         }
     }
 
-    if (records.length) staffCache.set(key, { at: Date.now(), records });
+    if (records.length) {
+        const now = Date.now();
+        for (const [k, v] of staffCache.entries()) {
+            if (now - v.at >= STAFF_CACHE_TTL) {
+                staffCache.delete(k);
+            }
+        }
+        while (staffCache.size >= MAX_STAFF_CACHE_ENTRIES) {
+            const oldestKey = staffCache.keys().next().value;
+            if (oldestKey !== undefined) {
+                staffCache.delete(oldestKey);
+            } else {
+                break;
+            }
+        }
+        staffCache.set(key, { at: now, records });
+    }
+
     return records;
 }
 
