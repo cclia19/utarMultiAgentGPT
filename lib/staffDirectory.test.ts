@@ -1,8 +1,28 @@
+try {
+    process.loadEnvFile(".env.local");
+} catch {
+    try {
+        process.loadEnvFile(".env");
+    } catch {
+        process.env.GEMINI_API_KEY ||= "test-key";
+    }
+}
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { parseStaffCards, countExpectedRecords } from "./staffDirectory.ts";
+
+const {
+    parseStaffCards,
+    countExpectedRecords,
+    parseDeptCatalog,
+    resolveDeptCodes,
+    matchRole,
+    findDeptCodesForRole,
+    htmlToVisibleText,
+} = await import("./staffDirectory.ts");
+const { ORG_UNITS, getOrgUnitById } = await import("./orgUnits.ts");
 
 const fixture = (name: string) =>
     fs.readFileSync(path.join(import.meta.dirname, "__fixtures__", name), "latin1");
@@ -108,9 +128,6 @@ test("strips the page's non-UTF8 padding bytes out of parsed text", () => {
     }
 });
 
-import { parseDeptCatalog, resolveDeptCodes } from "./staffDirectory.ts";
-import { ORG_UNITS, getOrgUnitById } from "./orgUnits.ts";
-
 const catalog = () => parseDeptCatalog(fixture("rdc.html"));
 
 test("scrapes the department catalog out of the page's own select element", () => {
@@ -159,8 +176,6 @@ test("resolves every org unit except General UTAR", () => {
     assert.deepEqual(unresolved, [], `unresolved units: ${unresolved.join(", ")}`);
 });
 
-import { matchRole, findDeptCodesForRole } from "./staffDirectory.ts";
-
 test("filters records down to the holders of the asked-about role", () => {
     const records = parseStaffCards(fixture("fict.html"));
 
@@ -196,8 +211,6 @@ test("derives the registrar and president office codes from the catalog", () => 
     assert.deepEqual(findDeptCodesForRole("registrar", catalog()), ["RGO"]);
     assert.deepEqual(findDeptCodesForRole("president", catalog()), ["PRES"]);
 });
-
-import { htmlToVisibleText } from "./staffDirectory.ts";
 
 test("reduces a directory page to visible text with no markup", () => {
     const text = htmlToVisibleText(fixture("rdc.html"));

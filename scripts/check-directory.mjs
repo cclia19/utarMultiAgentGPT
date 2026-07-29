@@ -1,5 +1,13 @@
-import { getDeptCatalog, lookupStaff, resolveDeptCodes, matchRole, findDeptCodesForRole } from "../lib/staffDirectory.ts";
-import { getOrgUnitById } from "../lib/orgUnits.ts";
+try {
+    process.loadEnvFile(".env.local");
+} catch {
+    try {
+        process.loadEnvFile(".env");
+    } catch {}
+}
+
+const { getDeptCatalog, lookupStaff, resolveDeptCodes, matchRole, findDeptCodesForRole } = await import("../lib/staffDirectory.ts");
+const { getOrgUnitById } = await import("../lib/orgUnits.ts");
 
 const catalog = await getDeptCatalog();
 console.log("catalog entries:", catalog.length);

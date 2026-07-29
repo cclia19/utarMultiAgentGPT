@@ -1,3 +1,5 @@
+import { ai, MODEL_NAME } from "./gemini.ts";
+
 const DIRECTORY_ORIGIN = "https://www2.utar.edu.my";
 
 export interface StaffRecord {
@@ -315,25 +317,38 @@ export async function lookupStaff(q: {
         deptCodes.map((dept) => fetchDirectoryHtml({ dept, name }))
     );
 
+    const pageRecords = await Promise.all(
+        pages.map(async (html) => {
+            if (!html) return [];
+
+            let parsed = parseStaffCards(html);
+            const expected = countExpectedRecords(html);
+
+            if (parsed.length !== expected) {
+                console.error(
+                    `staffDirectory: parser drift — parsed ${parsed.length} of ${expected} records. ` +
+                    `Falling back to LLM extraction. Regenerate lib/__fixtures__ and fix parseStaffCards.`
+                );
+
+                const recovered = await extractStaffWithLlm(html);
+                if (recovered.length > 0) {
+                    const parsedDist = Math.abs(parsed.length - expected);
+                    const recoveredDist = Math.abs(recovered.length - expected);
+                    // On detected drift, choose whichever candidate is closer to expected count, preferring recovered on tie.
+                    if (recoveredDist <= parsedDist) {
+                        parsed = recovered;
+                    }
+                }
+            }
+
+            return parsed;
+        })
+    );
+
     const seen = new Set<string>();
     const records: StaffRecord[] = [];
 
-    for (const html of pages) {
-        if (!html) continue;
-
-        let parsed = parseStaffCards(html);
-        const expected = countExpectedRecords(html);
-
-        if (parsed.length < expected) {
-            console.error(
-                `staffDirectory: parser drift — parsed ${parsed.length} of ${expected} records. ` +
-                `Falling back to LLM extraction. Regenerate lib/__fixtures__ and fix parseStaffCards.`
-            );
-
-            const recovered = await extractStaffWithLlm(html);
-            if (recovered.length > parsed.length) parsed = recovered;
-        }
-
+    for (const parsed of pageRecords) {
         for (const record of parsed) {
             const dedupeKey = record.profileUrl ?? record.email ?? record.name;
             if (seen.has(dedupeKey)) continue;
@@ -420,25 +435,7 @@ export async function extractStaffWithLlm(html: string): Promise<StaffRecord[]> 
     const text = htmlToVisibleText(html);
     if (!text) return [];
 
-    if (!process.env.GEMINI_API_KEY) {
-        try {
-            const fs = await import("node:fs");
-            const path = await import("node:path");
-            const envPath = path.join(process.cwd(), ".env.local");
-            if (fs.existsSync(envPath)) {
-                const envText = fs.readFileSync(envPath, "utf8");
-                for (const line of envText.split("\n")) {
-                    const match = line.match(/^\s*([\w_]+)\s*=\s*["']?([^"'\r\n]+)["']?/);
-                    if (match) process.env[match[1]] = match[2];
-                }
-            }
-        } catch {
-            // ignore env loading error if any
-        }
-    }
-
     try {
-        const { ai, MODEL_NAME } = await import("./gemini.ts");
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
             contents: [
