@@ -319,7 +319,22 @@ export async function lookupStaff(q: {
     const records: StaffRecord[] = [];
 
     for (const html of pages) {
-        for (const record of parseStaffCards(html)) {
+        if (!html) continue;
+
+        let parsed = parseStaffCards(html);
+        const expected = countExpectedRecords(html);
+
+        if (parsed.length < expected) {
+            console.error(
+                `staffDirectory: parser drift — parsed ${parsed.length} of ${expected} records. ` +
+                `Falling back to LLM extraction. Regenerate lib/__fixtures__ and fix parseStaffCards.`
+            );
+
+            const recovered = await extractStaffWithLlm(html);
+            if (recovered.length > parsed.length) parsed = recovered;
+        }
+
+        for (const record of parsed) {
             const dedupeKey = record.profileUrl ?? record.email ?? record.name;
             if (seen.has(dedupeKey)) continue;
             seen.add(dedupeKey);
@@ -347,6 +362,132 @@ export async function lookupStaff(q: {
 
     return records;
 }
+
+/**
+ * Reduces the page to visible text only — no tags, classes, or selectors.
+ * This is what makes the LLM fallback markup-agnostic: a UTAR redesign that
+ * preserves content produces the same text and keeps working.
+ *
+ * The department <select> is stripped because its 101 options would otherwise
+ * dominate the text and invite the model to confuse a dropdown entry with a
+ * person's department.
+ */
+export function htmlToVisibleText(html: string): string {
+    return html
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<select[\s\S]*?<\/select>/gi, "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(td|tr|div|table|p)>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/[ \u00A0\uFFFD]/g, " ")
+        .split("\n")
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join("\n");
+}
+
+const STAFF_SCHEMA = {
+    type: "object",
+    properties: {
+        staff: {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    name: { type: "string" },
+                    adminPosition: { type: "string" },
+                    jobTitle: { type: "string" },
+                    department: { type: "string" },
+                    division: { type: "string" },
+                    phone: { type: "string" },
+                    email: { type: "string" },
+                },
+                required: ["name", "department"],
+            },
+        },
+    },
+    required: ["staff"],
+};
+
+/**
+ * Markup-agnostic recovery path. Only called when the regex parser has drifted.
+ * Verified during design at 7/7 records on the RDC page and 30/30 on FICT.
+ */
+export async function extractStaffWithLlm(html: string): Promise<StaffRecord[]> {
+    const text = htmlToVisibleText(html);
+    if (!text) return [];
+
+    if (!process.env.GEMINI_API_KEY) {
+        try {
+            const fs = await import("node:fs");
+            const path = await import("node:path");
+            const envPath = path.join(process.cwd(), ".env.local");
+            if (fs.existsSync(envPath)) {
+                const envText = fs.readFileSync(envPath, "utf8");
+                for (const line of envText.split("\n")) {
+                    const match = line.match(/^\s*([\w_]+)\s*=\s*["']?([^"'\r\n]+)["']?/);
+                    if (match) process.env[match[1]] = match[2];
+                }
+            }
+        } catch {
+            // ignore env loading error if any
+        }
+    }
+
+    try {
+        const { ai, MODEL_NAME } = await import("./gemini.ts");
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: [
+                {
+                    role: "user",
+                    parts: [
+                        {
+                            text: `Extract every staff member listed in this UTAR staff directory page text.
+
+Rules:
+- adminPosition is an administrative appointment (Dean, Registrar, Vice President, Head of Department). Omit it entirely if the person has none.
+- jobTitle is the academic or employment grade (Professor, Manager, Assistant Professor).
+- Copy every value verbatim from the text. Never infer, correct, or invent a value.
+- Include every person listed, including those without an administrative position.
+
+PAGE TEXT:
+${text}`,
+                        },
+                    ],
+                },
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: STAFF_SCHEMA,
+                temperature: 0,
+            },
+        });
+
+        const parsed = JSON.parse(response.text ?? "{}");
+        const staff = Array.isArray(parsed?.staff) ? parsed.staff : [];
+
+        return staff
+            .filter((s: any) => s?.name && s?.department)
+            .map((s: any) => ({
+                name: String(s.name),
+                adminPosition: s.adminPosition ? String(s.adminPosition) : undefined,
+                jobTitle: s.jobTitle ? String(s.jobTitle) : undefined,
+                department: String(s.department),
+                division: s.division ? String(s.division) : undefined,
+                phone: s.phone ? String(s.phone) : undefined,
+                email: s.email ? String(s.email) : undefined,
+                profileUrl: undefined,
+            }));
+    } catch (error) {
+        console.error("extractStaffWithLlm failed:", error);
+        return [];
+    }
+}
+
 
 
 

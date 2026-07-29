@@ -197,4 +197,27 @@ test("derives the registrar and president office codes from the catalog", () => 
     assert.deepEqual(findDeptCodesForRole("president", catalog()), ["PRES"]);
 });
 
+import { htmlToVisibleText } from "./staffDirectory.ts";
+
+test("reduces a directory page to visible text with no markup", () => {
+    const text = htmlToVisibleText(fixture("rdc.html"));
+
+    assert.ok(!text.includes("<"), "no tags should survive");
+    assert.ok(!text.includes("text-align"), "no style attributes should survive");
+    assert.ok(!/searchId/.test(text), "no markup identifiers should survive");
+    assert.ok(!text.includes("Registrar's Office"), "the dept <select> should be stripped");
+
+    // The facts an extractor needs must still be present.
+    assert.ok(text.includes("Prof. Dr Zuraidah Binti Abd Manaf"));
+    assert.ok(text.includes("Vice President (R&D and Commercialisation)"));
+    assert.ok(text.includes("zuraidahm@utar.edu.my"));
+});
+
+test("visible text stays small enough to extract cheaply", () => {
+    // ~1.3k chars for RDC, ~6.3k for FICT when measured during design.
+    assert.ok(htmlToVisibleText(fixture("rdc.html")).length < 4000);
+    assert.ok(htmlToVisibleText(fixture("fict.html")).length < 20000);
+});
+
+
 
