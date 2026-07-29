@@ -51,9 +51,20 @@ test("does not fire on eligibility, permission, or rule questions", () => {
     for (const q of [
         "who is eligible for the dean list",
         "who is allowed to sign the HOD form",
+        "who is the person allowed to approve this",
     ]) {
         assert.equal(isPersonRoleQuestion(q).isRoleQuestion, false, `should not fire on rule question: ${q}`);
     }
+});
+
+test("fires on post-holder questions even if they contain responsible-for phrasing", () => {
+    const res1 = isPersonRoleQuestion("who is the dean responsible for postgraduate studies");
+    assert.equal(res1.isRoleQuestion, true, "who is the dean responsible for postgraduate studies should be true");
+    assert.match(res1.rolePhrase, /dean/i);
+
+    const res2 = isPersonRoleQuestion("who is responsible for the FICT dean role");
+    assert.equal(res2.isRoleQuestion, true, "who is responsible for the FICT dean role should be true");
+    assert.match(res2.rolePhrase, /dean/i);
 });
 
 test("applies longest match rule across combined abbreviations and explicit terms", () => {

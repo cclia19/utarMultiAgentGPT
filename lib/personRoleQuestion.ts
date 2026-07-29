@@ -11,9 +11,15 @@ const ASKS_WHO = /\b(who\s+is|who's|who\s+are|whos)\b/i;
  * Negative guard for rule, policy, eligibility, or authorization questions.
  * Questions asking about eligibility, permissions, or requirements ask about
  * rules rather than who currently holds a specific post.
+ *
+ * Position matters: rule words (eligible, allowed, etc.) must follow the who-is
+ * prefix in the subject slot (optionally preceded by 'the' or 'person').
+ * A post-holder question puts a role noun in the subject slot (e.g.
+ * "who is the dean responsible for..."), so the guard must NOT fire when a rule
+ * or qualification term appears later after a role noun.
  */
 const IS_RULE_QUESTION =
-    /\b(eligible|eligibility|allowed|permitted|qualify|qualifies|qualified|entitled|can\s+apply|required\s+to|supposed\s+to|responsible\s+for)\b/i;
+    /\b(?:who\s+is|who's|who\s+are|whos)\s+(?:the\s+)?(?:person\s+)?(?:eligible|eligibility|allowed|permitted|qualify|qualifies|qualified|entitled|can\s+apply|required\s+to)\b/i;
 
 interface RolePattern {
     pattern: RegExp;
