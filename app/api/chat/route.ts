@@ -23,6 +23,19 @@ import { getOrgUnitById } from "@/lib/orgUnits";
  */
 export const maxDuration = 60;
 
+/**
+ * The staff directory (www2.utar.edu.my) is hosted in Malaysia. Left to its own
+ * devices this function executed in iad1 (US-East), and from there the fetch
+ * failed in ~3.4s — far below the 15s budget, so the failure was a refused or
+ * reset connection rather than a timeout. The same request succeeds from other
+ * datacenters, which points at the egress path rather than the directory.
+ *
+ * Pinning execution to Singapore puts egress ~10ms from UTAR and on an APAC
+ * address. If the directory still refuses from here the cause is not distance,
+ * and the snapshot approach is the answer rather than another budget increase.
+ */
+export const preferredRegion = "sin1";
+
 type OfficialLink = {
     title: string;
     uri: string;
