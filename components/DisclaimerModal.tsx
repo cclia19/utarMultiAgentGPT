@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ShieldAlert, Check, FileText, Lock, AlertCircle } from "lucide-react";
 
-const STORAGE_KEY = "taro_disclaimer_accepted_v1";
+const STORAGE_KEY = "utarchat_disclaimer_accepted_v1";
 
 interface DisclaimerModalProps {
     onAccept?: () => void;
@@ -41,10 +41,10 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                     </div>
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight text-white">
-                            Welcome to TARo AI Assistant
+                            UTARCHAT Disclaimer
                         </h2>
                         <p className="text-xs text-zinc-400 mt-0.5">
-                            Important Disclaimer & Terms of Use
+                            Please read and accept the following before using UTARCHAT
                         </p>
                     </div>
                 </div>
@@ -53,22 +53,22 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                 <div className="p-6 overflow-y-auto space-y-4 text-xs leading-relaxed text-zinc-600">
                     <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3.5 flex gap-3 text-amber-900">
                         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                        <p className="text-[11px] leading-snug">
-                            Please review and accept the following guidelines before using TARo to query UTAR academic handbook guidelines, procedures, and campus information.
+                        <p className="text-[11px] leading-snug font-medium">
+                            Please read and accept the following before using UTARCHAT:
                         </p>
                     </div>
 
-                    <div className="space-y-3 pt-1">
+                    <div className="space-y-4 pt-1">
                         <div className="flex gap-3">
                             <div className="p-1.5 bg-zinc-100 rounded-lg text-zinc-700 h-fit shrink-0 mt-0.5">
                                 <FileText className="w-4 h-4" />
                             </div>
                             <div>
                                 <h4 className="font-semibold text-zinc-900 text-xs mb-0.5">
-                                    1. AI Reference Tool Only
+                                    AI Reference Tool
                                 </h4>
                                 <p className="text-zinc-600">
-                                    TARo uses generative AI to index official UTAR knowledge bases. Answers are for reference purposes and do not replace official announcements or Senate decisions.
+                                    UTARCHAT is an AI-powered reference tool that provides information based on official UTAR knowledge sources. Responses are for general guidance only and do not replace official UTAR policies, announcements or decisions.
                                 </p>
                             </div>
                         </div>
@@ -79,10 +79,10 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                             </div>
                             <div>
                                 <h4 className="font-semibold text-zinc-900 text-xs mb-0.5">
-                                    2. Privacy & Data Protection
+                                    Privacy
                                 </h4>
                                 <p className="text-zinc-600">
-                                    Do not submit private personal data such as passwords, NRIC/Passport numbers, bank accounts, or confidential grade records into the chat.
+                                    Do not enter confidential or sensitive information, including passwords, NRIC/Passport numbers, bank account details or other personal data.
                                 </p>
                             </div>
                         </div>
@@ -93,10 +93,10 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                             </div>
                             <div>
                                 <h4 className="font-semibold text-zinc-900 text-xs mb-0.5">
-                                    3. Official Department Verification
+                                    Official Verification
                                 </h4>
                                 <p className="text-zinc-600">
-                                    For official applications, credit transfers, fees, or exam appeals, always confirm procedures directly with the relevant division (DACE, DEAS, DFN, DSA, Registrar, etc.).
+                                    For official matters such as admissions, examinations, fees, scholarships, credit transfers, appeals or graduation, please verify the information with the relevant UTAR department.
                                 </p>
                             </div>
                         </div>
@@ -117,7 +117,7 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                             <Check className="w-3 h-3 text-white absolute opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none stroke-[3]" />
                         </div>
                         <span className="text-[11px] text-zinc-600 group-hover:text-zinc-900 transition-colors leading-snug">
-                            I have read, understood, and agree to the TARo AI Assistant Disclaimer and Terms of Use.
+                            By using UTARCHAT, you acknowledge that AI-generated responses may contain errors or be incomplete and agree to verify important information through official UTAR channels.
                         </span>
                     </label>
 
@@ -133,3 +133,4 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
         </div>
     );
 }
+

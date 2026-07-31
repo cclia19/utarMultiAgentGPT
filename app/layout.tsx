@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-    title: "TARo: UTAR Official Chatbot",
+    title: "UTARCHAT: UTAR Official Chatbot",
     description: "University Knowledge Base",
 };
 
