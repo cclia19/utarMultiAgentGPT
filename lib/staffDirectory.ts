@@ -1,4 +1,7 @@
 import { ai, MODEL_NAME } from "./gemini.ts";
+import type { Agent } from "undici";
+import { getDirectoryDispatcher } from "./directoryTls.ts";
+
 
 const DIRECTORY_ORIGIN = "https://www2.utar.edu.my";
 
@@ -292,7 +295,8 @@ async function fetchDirectoryHtml(params: { dept: string; name: string }): Promi
         const response = await fetch(`${SEARCH_URL}?${query}`, {
             headers: { "User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9" },
             signal: controller.signal,
-        });
+            dispatcher: getDirectoryDispatcher(),
+        } as RequestInit & { dispatcher: Agent });
 
         if (!response.ok) return "";
 
