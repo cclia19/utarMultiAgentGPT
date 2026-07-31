@@ -1,5 +1,5 @@
 import { ai, MODEL_NAME } from "./gemini.ts";
-import type { Agent } from "undici";
+import { fetch as undiciFetch } from "undici";
 import { getDirectoryDispatcher } from "./directoryTls.ts";
 
 
@@ -292,11 +292,14 @@ async function fetchDirectoryHtml(params: { dept: string; name: string }): Promi
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
-        const response = await fetch(`${SEARCH_URL}?${query}`, {
+        // undici's own fetch, not the global one: Next.js replaces global fetch
+        // with a caching wrapper that drops the `dispatcher` option, which would
+        // silently discard the CA chain and put us back to a failed handshake.
+        const response = await undiciFetch(`${SEARCH_URL}?${query}`, {
             headers: { "User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9" },
             signal: controller.signal,
             dispatcher: getDirectoryDispatcher(),
-        } as RequestInit & { dispatcher: Agent });
+        });
 
         if (!response.ok) return "";
 

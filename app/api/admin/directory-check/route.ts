@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetch as undiciFetch } from "undici";
 import { getDeptCatalog, lookupStaff, matchRole, findDeptCodesForRole } from "@/lib/staffDirectory";
+import { getDirectoryDispatcher } from "@/lib/directoryTls";
 
 /**
  * TEMPORARY diagnostic. Reports what actually happens when this deployment
@@ -32,9 +34,12 @@ async function probe(label: string, url: string, timeoutMs: number) {
     const startedAt = Date.now();
 
     try {
-        const response = await fetch(url, {
+        // Same transport the real code uses, so this probe actually exercises
+        // the CA chain rather than a bare global fetch.
+        const response = await undiciFetch(url, {
             headers: { "User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9" },
             signal: controller.signal,
+            dispatcher: getDirectoryDispatcher(),
         });
 
         const bytes = (await response.arrayBuffer()).byteLength;
