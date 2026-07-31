@@ -1488,8 +1488,6 @@ I can't confirm who currently holds that position from UTAR's official staff dir
             "### 📌 Summary",
             "",
             formatStaffRecords(matched),
-            "",
-            "_Details are read live from UTAR's official staff directory._",
         ].join("\n");
 
         return {
