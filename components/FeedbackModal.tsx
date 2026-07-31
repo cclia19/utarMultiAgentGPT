@@ -102,7 +102,7 @@ export default function FeedbackModal({
                                     : "Report Issue / Feedback"}
                             </h3>
                             <p className="text-[11px] text-zinc-400">
-                                Help us improve TARo AI Assistant
+                                Help us improve UTARCHAT AI Assistant
                             </p>
                         </div>
                     </div>
@@ -177,7 +177,7 @@ export default function FeedbackModal({
                                     onChange={(e) => setComment(e.target.value)}
                                     placeholder={
                                         rating === "like"
-                                            ? "What did TARo do well?"
+                                            ? "What did UTARCHAT do well?"
                                             : "What was inaccurate or missing?"
                                     }
                                     rows={3}

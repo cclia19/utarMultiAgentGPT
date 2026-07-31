@@ -884,7 +884,7 @@ You know, I know. 😌
 
 ### 🥑 Hidden lore
 
-- Built with TARo energy.
+- Built with UTARCHAT energy.
 - Powered by knowledge, caffeine, and slightly too many debugging sessions.
 - **AVO YYDS 🥑**
 `.trim();
@@ -1947,7 +1947,7 @@ async function resolveConversationContext(params: {
     const compactHistory = compactHistoryForResolver(history);
 
     const resolverPrompt = `
-You are the conversation context resolver for TARo.
+You are the conversation context resolver for UTARCHAT.
 
 You DO NOT answer the user.
 You only decide how the latest user message relates to the previous conversation.

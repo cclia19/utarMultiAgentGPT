@@ -29,7 +29,7 @@ interface HistoryEntry {
 
 const WELCOME: Message = {
     role: "model",
-    text: "Hi! I'm TARo, your friendly UTAR buddy! Ask me anything about UTAR—courses, admissions, fees, contacts, student support, and more 😊",
+    text: "Hi! I'm UTARCHAT, your friendly UTAR buddy! Ask me anything about UTAR—courses, admissions, fees, contacts, student support, and more 😊",
     citations: [],
     sourceMode: "none",
     storeDisplayName: "",
@@ -340,13 +340,13 @@ export default function ChatPage() {
                     <div className="flex items-center gap-3">
                         <img
                             src="/TARo.png"
-                            alt="TARo Logo"
+                            alt="UTARCHAT Logo"
                             className="w-12 h-12 object-contain"
                         />
 
                         <div>
                             <p className="text-sm font-semibold text-zinc-900">
-                                TARo
+                                UTARCHAT
                             </p>
                             <p className="text-xs text-zinc-400">
                                 Ask naturally. I’ll route your question to the right place.
@@ -559,7 +559,7 @@ export default function ChatPage() {
                     </button>
                 </div>
                 <div className="mt-2 text-center text-[11px] text-zinc-400">
-                    TARo can make mistake. Check important info
+                    UTARCHAT can make mistake. Check important info
                 </div>
             </div>
             <DisclaimerModal />
