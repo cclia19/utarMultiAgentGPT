@@ -40,8 +40,8 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                         <ShieldAlert className="w-6 h-6" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-semibold tracking-tight text-white">
-                            UTARCHAT Disclaimer
+                        <h2 className="text-lg font-semibold tracking-tight text-white flex items-center gap-2">
+                            UTARCHAT <span className="px-2 py-0.5 text-[10px] font-semibold text-amber-300 bg-amber-950/60 border border-amber-500/40 rounded-full uppercase tracking-wider">Limited Beta</span> Disclaimer
                         </h2>
                         <p className="text-xs text-zinc-400 mt-0.5">
                             Please read and accept the following before using UTARCHAT

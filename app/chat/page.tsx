@@ -335,7 +335,7 @@ export default function ChatPage() {
 
     return (
         <div className="flex flex-col min-h-[100dvh] bg-[#FDFDFD]">
-            <header className="border-b border-zinc-100 px-4 py-3 bg-white">
+            <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-zinc-100/80 shadow-xs px-4 py-3">
                 <div className="max-w-2xl mx-auto w-full flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <img
@@ -345,9 +345,15 @@ export default function ChatPage() {
                         />
 
                         <div>
-                            <p className="text-sm font-semibold text-zinc-900">
-                                UTARCHAT
-                            </p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-zinc-900">
+                                    UTARCHAT
+                                </p>
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 rounded-full uppercase tracking-wider">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                    Limited Beta
+                                </span>
+                            </div>
                             <p className="text-xs text-zinc-400">
                                 Ask naturally. I’ll route your question to the right place.
                             </p>
@@ -559,7 +565,7 @@ export default function ChatPage() {
                     </button>
                 </div>
                 <div className="mt-2 text-center text-[11px] text-zinc-400">
-                    UTARCHAT can make mistake. Check important info
+                    UTARCHAT (Limited Beta) can make mistake. Check important info
                 </div>
             </div>
             <DisclaimerModal />
