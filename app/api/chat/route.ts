@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ai, MODEL_NAME } from "@/lib/gemini";
 import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
+import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
@@ -2049,11 +2050,169 @@ let storesCache: Record<string, string> | null = null;
 let lastCacheUpdate = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
+/**
+ * Streaming support.
+ *
+ * Protocol: NDJSON (application/x-ndjson), one JSON object per line.
+ *   {"type":"text","delta":"..."}   incremental, provisional preview text
+ *   {"type":"replace","text":"..."} replace the whole provisional preview
+ *   {"type":"reset"}                discard the provisional preview entirely
+ *   {"type":"done", ...payload}     authoritative final payload (same shape as the JSON response)
+ *   {"type":"error","message":"..."}
+ *
+ * The `done` frame always carries the full, final `text` plus every metadata field
+ * the non-streaming JSON response carries, so the client can treat streamed deltas
+ * as a preview only and adopt `done.text` as the truth.
+ *
+ * Only the File Search (KB) generation streams. Every other path (web fallback,
+ * staff directory, pre-handlers) is produced in full, sanitised as today, and then
+ * delivered as a single `done` frame.
+ */
+type StreamSink = {
+    status: (stage: string, text: string) => void;
+    thought: (delta: string) => void;
+    text: (delta: string) => void;
+    replace: (fullText: string) => void;
+    reset: () => void;
+    done: (payload: unknown) => void;
+    error: (message: string) => void;
+};
+
+function createStreamSink(
+    controller: ReadableStreamDefaultController<Uint8Array>
+): StreamSink {
+    const encoder = new TextEncoder();
+    let closed = false;
+
+    const write = (frame: Record<string, unknown>) => {
+        if (closed) return;
+        try {
+            controller.enqueue(encoder.encode(JSON.stringify(frame) + "\n"));
+        } catch {
+            closed = true;
+        }
+    };
+
+    return {
+        status: (stage: string, text: string) => {
+            write({ type: "status", stage, text });
+        },
+        thought: (delta: string) => {
+            if (delta) write({ type: "thought", delta });
+        },
+        text: (delta: string) => {
+            if (delta) write({ type: "text", delta });
+        },
+        replace: (fullText: string) => write({ type: "replace", text: fullText }),
+        reset: () => write({ type: "reset" }),
+        done: (payload: unknown) =>
+            write({ type: "done", ...(payload as Record<string, unknown>) }),
+        error: (message: string) => write({ type: "error", message }),
+    };
+}
+
+/** Extract model reasoning / thought text from a streaming chunk if present. */
+function extractChunkThoughts(chunk: any): string {
+    const parts = chunk?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return "";
+
+    return parts
+        .filter((p: any) => p?.thought === true && typeof p?.text === "string")
+        .map((p: any) => p.text as string)
+        .join("");
+}
+
+/** Text of a single streaming chunk (excluding thought parts). Deliberately not
+ *  extractResponseText(): that substitutes "No response generated." for empty output,
+ *  which would corrupt the accumulator. */
+function extractChunkText(chunk: any): string {
+    const parts = chunk?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) {
+        if (typeof chunk?.text === "string" && chunk.text) return chunk.text;
+        return "";
+    }
+
+    return parts
+        .filter((p: any) => !p?.thought && typeof p?.text === "string")
+        .map((p: any) => p.text as string)
+        .join("");
+}
+
+
+/** Race each iteration step against an absolute deadline so a stalled stream cannot
+ *  hold the response open (withTimeout only guards the promise for the iterator). */
+async function* iterateWithDeadline<T>(
+    iterable: AsyncIterable<T>,
+    deadline: number,
+    label: string
+): AsyncGenerator<T> {
+    const it = iterable[Symbol.asyncIterator]();
+    try {
+        for (;;) {
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) throw new Error(`${label} timed out`);
+            const step = await withTimeout(it.next(), remaining, label);
+            if (step.done) return;
+            yield step.value;
+        }
+    } finally {
+        await it.return?.(undefined as any).catch?.(() => { });
+    }
+}
+
+/** Minimum characters buffered before any KB text may be emitted. Must comfortably
+ *  exceed the NO_KB_ANSWER sentinel and the longest weak-signal phrase that
+ *  shouldUseWebFallback matches on, so we never emit text we would then retract. */
+const STREAM_GATE_CHARS = 80;
+
 export async function POST(req: NextRequest) {
+    let body: any;
+
+    try {
+        body = await req.json();
+    } catch (err) {
+        // Preserve the previous behaviour: an unparseable body produced the friendly
+        // error payload from the catch-all, not a pipeline run on an empty message.
+        return handleChat(null, null, err);
+    }
+
+    if (body?.stream !== true) {
+        return handleChat(body);
+    }
+
+    const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+            const sink = createStreamSink(controller);
+            try {
+                const res = await handleChat(body, sink);
+                sink.done(await res.json());
+            } catch (err: any) {
+                console.error("Chat stream error:", err);
+                sink.error(err?.message || "Stream failed");
+            } finally {
+                controller.close();
+            }
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    });
+}
+
+async function handleChat(
+    body: any,
+    sink: StreamSink | null = null,
+    parseError: unknown = null
+) {
     let fallbackAgentId = "general";
 
     try {
-        const body = await req.json();
+        if (parseError) throw parseError;
 
         const {
             message,
@@ -2066,6 +2225,7 @@ export async function POST(req: NextRequest) {
 
         fallbackAgentId = selectedAgentId || "general";
         const rawMessage = String(message || "").trim();
+        sink?.status("analyzing", "Analyzing your question...");
 
         const enrichedMessage = enrichWithLastResolvedTopic(
             rawMessage,
@@ -2141,6 +2301,8 @@ export async function POST(req: NextRequest) {
                 ? pendingQuestion
                 : null;
 
+        sink?.status("routing", "Identifying relevant UTAR department...");
+
         const routerResult = await routeWithLLM({
             message: resolvedMessage,
             rawMessage: rawMessage,
@@ -2149,8 +2311,30 @@ export async function POST(req: NextRequest) {
         });
 
         const selectedAgent = getAgentById(routerResult.agentId);
+        sink?.status("agent_selected", `Routing to ${selectedAgent.label}...`);
 
-        if (!routerResult.needsClarification && (resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false)) {
+        const modelSaysNoRetrieval =
+            resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false;
+
+        // Never let a factual-looking question reach the ungrounded path on the
+        // strength of one boolean. Failing towards the store costs seconds;
+        // failing away from it costs correctness.
+        const retrievalForcedBySafetyNet =
+            modelSaysNoRetrieval &&
+            looksLikeFactualQuestion(rawMessage) &&
+            !CASUAL_INTENT_CATEGORIES.has(String((routerResult as any).intentCategory || ""));
+
+        if (retrievalForcedBySafetyNet) {
+            console.warn(
+                "[retrieval-safety-net] overriding needsRetrieval=false for factual question:",
+                JSON.stringify(rawMessage),
+                "| intentCategory:", (routerResult as any).intentCategory,
+                "| resolverSaysNoRetrieval:", resolverSaysNoRetrieval,
+                "| routerRetrievalNeeded:", (routerResult as any).retrievalNeeded
+            );
+        }
+
+        if (!routerResult.needsClarification && modelSaysNoRetrieval && !retrievalForcedBySafetyNet) {
             const directText = await generateDirectNoRetrievalResponse(rawMessage);
 
             return NextResponse.json({
@@ -2272,6 +2456,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!storeName) {
+            sink?.status("staffDirectory", "Checking UTAR Staff Directory...");
             const staffDirResponse = await tryStaffDirectoryFallback({
                 effectiveMessage,
                 selectedAgent,
@@ -2281,6 +2466,7 @@ export async function POST(req: NextRequest) {
             });
             if (staffDirResponse) return staffDirResponse;
 
+            sink?.status("webFallback", "Searching official UTAR web sources...");
             const webFallback = await generatePublicWebFallback({
                 effectiveMessage,
                 selectedAgent,
@@ -2302,6 +2488,11 @@ export async function POST(req: NextRequest) {
                 routeType: routerResult.routeType,
             });
         }
+
+        sink?.status(
+            "searching",
+            `Searching ${lookupName || selectedAgent.storeDisplayName || selectedAgent.label}...`
+        );
 
         const fileSearchSystemInstruction = `
 You are UTARGPT, the official AI assistant for Universiti Tunku Abdul Rahman (UTAR).
@@ -2336,37 +2527,106 @@ LANGUAGE RULE:
 `;
 
         let fileResponse: any;
+        let streamedText = "";
+        let rawThoughts = "";
+
+        const fileSearchRequest = {
+            model: MODEL_NAME,
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text: buildFileSearchUserMessage(effectiveMessage, selectedAgent.id) }],
+                },
+            ],
+            config: {
+                systemInstruction: { parts: [{ text: fileSearchSystemInstruction }] },
+                tools: [
+                    {
+                        fileSearch: {
+                            fileSearchStoreNames: [storeName],
+                        },
+                    } as any,
+                ],
+                temperature: 0.1,
+                thinkingConfig: {
+                    // -1 = dynamic, the model default. Do NOT cap this: the KB call
+                    // generates the student-facing answer, and reduced thinking
+                    // degrades it silently. includeThoughts only surfaces the
+                    // reasoning for the streaming UI; it does not change the budget.
+                    thinkingBudget: -1,
+                    includeThoughts: true,
+                },
+            },
+        };
 
         try {
-            fileResponse = await withTimeout(
-                ai.models.generateContent({
-                    model: MODEL_NAME,
-                    contents: [
+            if (sink) {
+                const deadline = Date.now() + 120000;
+                const iterator = await withTimeout(
+                    ai.models.generateContentStream(fileSearchRequest),
+                    120000,
+                    "File search"
+                );
+
+                let raw = "";
+                const groundingChunks: any[] = [];
+
+                for await (const chunk of iterateWithDeadline(iterator, deadline, "File search")) {
+                    const meta = (chunk as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks;
+                    if (Array.isArray(meta)) groundingChunks.push(...meta);
+
+                    const thoughtPiece = extractChunkThoughts(chunk);
+                    if (thoughtPiece) {
+                        rawThoughts += thoughtPiece;
+                        sink.thought(thoughtPiece);
+                    }
+
+                    const piece = extractChunkText(chunk);
+                    if (!piece) continue;
+                    raw += piece;
+
+                    // Gate: never emit until we have enough text to rule out the
+                    // NO_KB_ANSWER sentinel / weak-signal fallback triggers. Those
+                    // triggers are monotone in the text, so "false" on a prefix can
+                    // only be invalidated by a later signal — handled by reset below.
+                    if (!streamedText && (raw.length < STREAM_GATE_CHARS || shouldUseWebFallback(raw, effectiveMessage))) {
+                        continue;
+                    }
+
+                    const cleaned = finalClean(raw);
+                    if (cleaned === streamedText) continue;
+
+                    if (cleaned.startsWith(streamedText)) {
+                        sink.text(cleaned.slice(streamedText.length));
+                    } else {
+                        sink.replace(cleaned);
+                    }
+                    streamedText = cleaned;
+                }
+
+                fileResponse = {
+                    text: raw,
+                    candidates: [
                         {
-                            role: "user",
-                            parts: [{ text: buildFileSearchUserMessage(effectiveMessage, selectedAgent.id) }],
+                            content: { parts: [{ text: raw }] },
+                            groundingMetadata: groundingChunks.length ? { groundingChunks } : undefined,
                         },
                     ],
-                    config: {
-                        systemInstruction: { parts: [{ text: fileSearchSystemInstruction }] },
-                        tools: [
-                            {
-                                fileSearch: {
-                                    fileSearchStoreNames: [storeName],
-                                },
-                            } as any,
-                        ],
-                        temperature: 0.1,
-                    },
-                }),
-                120000,
-                "File search"
-            );
+                };
+            } else {
+                fileResponse = await withTimeout(
+                    ai.models.generateContent(fileSearchRequest),
+                    120000,
+                    "File search"
+                );
+            }
         } catch (fileError: any) {
+            if (streamedText) sink?.reset();
 
             console.error("File search error, falling back to web:", fileError?.message || fileError);
             console.error("Full file error stack:", fileError?.stack);
 
+            sink?.status("staffDirectory", "Checking UTAR Staff Directory...");
             const staffDirResponse = await tryStaffDirectoryFallback({
                 effectiveMessage,
                 selectedAgent,
@@ -2376,6 +2636,7 @@ LANGUAGE RULE:
             });
             if (staffDirResponse) return staffDirResponse;
 
+            sink?.status("webFallback", "Searching official UTAR web sources...");
             const webFallback = await generatePublicWebFallback({
                 effectiveMessage,
                 selectedAgent,
@@ -2415,11 +2676,22 @@ LANGUAGE RULE:
 
 
 
+        if (fileNotFound && streamedText) {
+            // We emitted a provisional preview but the answer is being replaced by a
+            // fallback path — retract it so nothing unverified stays on screen.
+            sink?.reset();
+            streamedText = "";
+        } else if (!fileNotFound && streamedText && streamedText !== fileText) {
+            sink?.replace(fileText);
+            streamedText = fileText;
+        }
+
         if (!fileNotFound) {
             const newTopic = inferResolvedTopic(effectiveMessage, fileText) || lastResolvedTopic;
 
             return NextResponse.json({
                 text: fileText,
+                thought: rawThoughts || undefined,
                 citations: fileCitations,
                 sourceMode: "fileSearch",
                 storeDisplayName: selectedAgent.storeDisplayName || "",

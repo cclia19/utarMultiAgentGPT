@@ -10,4 +10,23 @@ data/
 test_direct_rag.mjs
 list_stores.mjs
 test_*.mjs
-test_*.py
+test_*.py
+# build/cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+.turbo/
+coverage/
+.vercel/
+
+# env variants
+.env
+.env.*
+!.env.example
+
+# tooling/editor
+.superpowers/
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+Thumbs.db
