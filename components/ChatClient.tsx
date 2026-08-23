@@ -738,7 +738,7 @@ export default function ChatClient() {
                     </div>
                 ))}
 
-                {loading && (
+                {loading && !messages.some((m) => m.isStreaming) && (
                     <div className="flex justify-start">
                         <div className="bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/80 border border-indigo-100/90 rounded-2xl rounded-bl-sm px-4 py-3 shadow-xs flex items-center gap-2.5 transition-all">
                             <span className="relative flex h-2 w-2">
