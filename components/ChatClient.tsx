@@ -9,7 +9,6 @@ import {
     ThumbsUp,
     ThumbsDown,
     Brain,
-    ChevronDown,
     Sparkles,
     Compass,
     Database,
@@ -178,14 +177,6 @@ export default function ChatClient() {
         responseText: "",
     });
     const [feedbackGiven, setFeedbackGiven] = useState<Record<number, "like" | "dislike">>({});
-    const [expandedThoughts, setExpandedThoughts] = useState<Record<number, boolean>>({});
-
-    const toggleThought = (index: number) => {
-        setExpandedThoughts((prev) => ({
-            ...prev,
-            [index]: !prev[index],
-        }));
-    };
 
     const handleOpenFeedback = async (
         index: number,
@@ -346,7 +337,7 @@ export default function ChatClient() {
 
             const renderPreview = () => {
                 const text = shownPreview;
-                const thought = shownThought;
+                if (!text) return;
                 const shown = previewShown;
                 previewShown = true;
                 setMessages((prev) => {
@@ -354,7 +345,6 @@ export default function ChatClient() {
                     const bubble: Message = {
                         role: "model",
                         text,
-                        thought: thought || undefined,
                         isStreaming: true,
                         citations: [],
                         sourceMode: "none",
@@ -583,47 +573,6 @@ export default function ChatClient() {
                         >
                             {msg.role === "model" ? (
                                 <div>
-                                    {msg.isStreaming && currentStatus && !msg.text && (
-                                        <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50/90 border border-indigo-100 text-xs font-medium text-indigo-900 shadow-xs animate-pulse">
-                                            <span className="relative flex h-2 w-2">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                {renderStatusIcon(currentStatus.stage)}
-                                                <span>{currentStatus.text}</span>
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {msg.thought && (
-                                        <div className="mb-3 rounded-lg border border-indigo-100 bg-indigo-50/40 text-xs overflow-hidden transition-all duration-200">
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleThought(i)}
-                                                className="w-full flex items-center justify-between px-3 py-2 text-left font-medium text-indigo-900/90 hover:bg-indigo-100/50 transition-colors"
-                                            >
-                                                <span className="flex items-center gap-1.5">
-                                                    <Brain className={`w-3.5 h-3.5 text-indigo-600 ${msg.isStreaming && !msg.text ? "animate-pulse" : ""}`} />
-                                                    <span>{msg.isStreaming && !msg.text ? "Thinking..." : "Thought Process"}</span>
-                                                </span>
-                                                <ChevronDown
-                                                    className={`w-3.5 h-3.5 text-indigo-500 transition-transform duration-200 ${
-                                                        (expandedThoughts[i] ?? Boolean(msg.isStreaming && !msg.text)) ? "rotate-180" : ""
-                                                    }`}
-                                                />
-                                            </button>
-                                            {(expandedThoughts[i] ?? Boolean(msg.isStreaming && !msg.text)) && (
-                                                <div className="px-3 pb-3 pt-1 text-zinc-600 font-mono text-[11px] leading-relaxed whitespace-pre-wrap border-t border-indigo-100/60 max-h-64 overflow-y-auto">
-                                                    {msg.thought}
-                                                    {msg.isStreaming && !msg.text && (
-                                                        <span className="inline-block w-1.5 h-3 ml-1 bg-indigo-500 animate-pulse align-middle" />
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
                                     <div
                                         className="
                                             prose prose-sm prose-zinc max-w-none leading-relaxed
