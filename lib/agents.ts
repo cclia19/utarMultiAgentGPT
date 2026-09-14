@@ -8,6 +8,7 @@ export interface AgentConfig {
     shortLabel: string;
     description: string;
     storeDisplayName: string;
+    storeResourceIds: string[];
     scopeInstruction: string;
 }
 
@@ -48,6 +49,7 @@ export const AGENTS: AgentConfig[] = getChatEnabledOrgUnits().map((unit) => ({
     shortLabel: unit.shortLabel,
     description: unit.name,
     storeDisplayName: unit.fileStoreDisplayName,
+    storeResourceIds: unit.storeResourceIds,
     scopeInstruction: buildScopeInstruction(unit.id),
 }));
 

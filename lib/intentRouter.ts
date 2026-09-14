@@ -5,9 +5,11 @@ import {
     type OrgUnit,
 } from "./orgUnits";
 import { detectAgentFromText, routeQuestion, resolveControlledAcronym } from "./routing";
+import { isPersonRoleQuestion } from "./personRoleQuestion";
 
 export interface IntentRouteResult {
     agentId: string;
+    secondaryAgentId?: string;
     intentCategory?: string;
     retrievalNeeded?: boolean;
     conversationRelation?:
@@ -43,6 +45,8 @@ type SemanticRouterJson = {
     usePendingQuestion?: boolean;
     scopeType?: string;
     targetAgentId?: string;
+    secondaryTargetAgentId?: string;
+    secondaryAgentId?: string;
     agentId?: string;
     needsClarification?: boolean;
     clarificationQuestion?: string;
@@ -190,6 +194,14 @@ function validateAgentId(agentId: unknown): string {
     return unit.enabledForChat ? unit.id : "general";
 }
 
+function validateSecondaryAgentId(secondaryId: unknown, primaryId: string): string | undefined {
+    if (typeof secondaryId !== "string" || !secondaryId.trim()) return undefined;
+    const trimmed = secondaryId.trim();
+    if (trimmed === primaryId) return undefined;
+    const unit = getOrgUnitById(trimmed);
+    return unit.enabledForChat && unit.id !== primaryId ? unit.id : undefined;
+}
+
 function validateSemanticRouterJson(params: {
     raw: SemanticRouterJson;
     originalQuestion: string;
@@ -197,6 +209,10 @@ function validateSemanticRouterJson(params: {
     const { raw, originalQuestion } = params;
 
     const agentId = validateAgentId(raw.targetAgentId || raw.agentId);
+    const secondaryAgentId = validateSecondaryAgentId(
+        raw.secondaryTargetAgentId || raw.secondaryAgentId,
+        agentId
+    );
     const selectedUnit = getOrgUnitById(agentId);
 
     const rewrittenQuestion =
@@ -260,6 +276,7 @@ function validateSemanticRouterJson(params: {
 
     return {
         agentId,
+        secondaryAgentId,
         intentCategory:
             typeof raw.intentCategory === "string"
                 ? raw.intentCategory
@@ -285,17 +302,35 @@ function applySafetyGuards(params: {
     rawMessage?: string;
     currentAgentId: string;
     pendingQuestion: string | null;
+    acronymPrimaryAgentId?: string | null;
 }): IntentRouteResult {
-    const { result, message, rawMessage, currentAgentId, pendingQuestion } = params;
+    const { result, message, rawMessage, currentAgentId, pendingQuestion, acronymPrimaryAgentId } = params;
+
+    let agentId = acronymPrimaryAgentId || result.agentId;
+    let secondaryAgentId = result.secondaryAgentId;
+
+    if (acronymPrimaryAgentId && acronymPrimaryAgentId !== result.agentId) {
+        if (result.secondaryAgentId) {
+            secondaryAgentId = result.agentId;
+        } else {
+            secondaryAgentId = undefined;
+        }
+    }
+
+    if (secondaryAgentId === agentId) {
+        secondaryAgentId = undefined;
+    }
 
     const currentUnit = getOrgUnitById(currentAgentId);
-    const selectedUnit = getOrgUnitById(result.agentId);
+    const selectedUnit = getOrgUnitById(agentId);
     const directAgent = getDirectAgent(message);
 
     if (result.routeType === "context_setting") {
         if (!directAgent || !isExplicitContextSettingMessage(message)) {
             return {
                 ...result,
+                agentId,
+                secondaryAgentId: undefined,
                 routeType: isAcademicContext(selectedUnit)
                     ? "faculty_specific"
                     : selectedUnit.id === "general"
@@ -318,6 +353,7 @@ function applySafetyGuards(params: {
 
         return {
             agentId: targetUnit.id,
+            secondaryAgentId: undefined,
             intentCategory: result.intentCategory || "unknown",
             retrievalNeeded: true,
             conversationRelation: "clarification_for_pending",
@@ -339,12 +375,12 @@ function applySafetyGuards(params: {
     const isRouteOrScheduleQuery =
         /^(route\s*\d+|schedule\s*[ivx\d]+|westlake.*|option\s*\d+|\d+)$/i.test(message.trim()) ||
         /^(route\s*\d+|schedule\s*[ivx\d]+|westlake.*|option\s*\d+|\d+)$/i.test(rawMsg) ||
-        (/route\s*\d+/i.test(message) && (currentAgentId === "dgs-kampar" || currentAgentId === "dgs-sungai-long" || result.agentId === "dgs-kampar" || result.agentId === "dgs-sungai-long")) ||
+        (/route\s*\d+/i.test(message) && (currentAgentId === "dgs-kampar" || currentAgentId === "dgs-sungai-long" || agentId === "dgs-kampar" || agentId === "dgs-sungai-long")) ||
         (/bus\s*schedule/i.test(message) && (/route\s*\d+/i.test(message) || /^\d+$/.test(rawMsg) || /option\s*\d+/i.test(rawMsg))) ||
         (/bus\s*schedule/i.test(pendingQuestion || "") && (/route\s*\d+/i.test(message) || /route\s*\d+/i.test(rawMsg) || /^\d+$/.test(rawMsg) || /option\s*\d+/i.test(rawMsg)));
 
     if (isRouteOrScheduleQuery) {
-        let targetAgentId: string | null = currentAgentId !== "general" ? currentAgentId : (result.agentId !== "general" ? result.agentId : null);
+        let targetAgentId: string | null = currentAgentId !== "general" ? currentAgentId : (agentId !== "general" ? agentId : null);
         if (!targetAgentId || targetAgentId === "general") {
             if (/sungai\s*long|sl/i.test(message) || /sungai\s*long|sl/i.test(pendingQuestion || "")) {
                 targetAgentId = "dgs-sungai-long";
@@ -362,6 +398,7 @@ function applySafetyGuards(params: {
             return {
                 ...result,
                 agentId: targetAgentId,
+                secondaryAgentId: undefined,
                 retrievalNeeded: true,
                 needsClarification: false,
                 rewrittenQuestion: resolvedQuery,
@@ -373,7 +410,17 @@ function applySafetyGuards(params: {
         }
     }
 
-    return result;
+    // Person and role questions take staff directory / single unit path and must NOT fan out
+    const isRole = isPersonRoleQuestion(message).isRoleQuestion || isPersonRoleQuestion(rawMsg).isRoleQuestion;
+    if (isRole || result.needsClarification || result.routeType === "private_sensitive" || result.routeType === "unclear") {
+        secondaryAgentId = undefined;
+    }
+
+    return {
+        ...result,
+        agentId,
+        secondaryAgentId,
+    };
 }
 
 function fallbackRoute(params: {
@@ -390,6 +437,7 @@ function fallbackRoute(params: {
 
         return {
             agentId: targetUnit.id,
+            secondaryAgentId: undefined,
             intentCategory: "unknown",
             retrievalNeeded: true,
             conversationRelation: "clarification_for_pending",
@@ -411,6 +459,7 @@ function fallbackRoute(params: {
 
     return {
         agentId: fallback.agentId,
+        secondaryAgentId: undefined,
         intentCategory: "unknown",
         retrievalNeeded: true,
         conversationRelation: "none",
@@ -442,26 +491,27 @@ export async function routeWithLLM(params: {
     const pendingQuestion = params.pendingQuestion || null;
 
     const acronymResult = resolveControlledAcronym(rawMessage) || resolveControlledAcronym(message);
-    if (acronymResult) {
+    if (acronymResult && acronymResult.needsClarification) {
         const selectedUnit = getOrgUnitById(acronymResult.agentId);
         return {
             agentId: acronymResult.agentId,
+            secondaryAgentId: undefined,
             intentCategory: "admin_service",
             retrievalNeeded: true,
             conversationRelation: "none",
             usePendingQuestion: false,
-            needsClarification: acronymResult.needsClarification,
+            needsClarification: true,
             clarificationQuestion: acronymResult.clarificationMessage || "",
             rewrittenQuestion: message,
             allowWebFallback: false,
-            routeType: acronymResult.needsClarification
-                ? "unclear"
-                : selectedUnit.type === "faculty"
-                    ? "faculty_specific"
-                    : "admin_specific",
+            routeType: "unclear",
             confidence: 1.0,
         };
     }
+
+    const acronymPrimaryAgentId = acronymResult && !acronymResult.needsClarification
+        ? acronymResult.agentId
+        : null;
 
     const currentUnit = getOrgUnitById(currentAgentId);
     const orgUnitList = buildOrgUnitList();
@@ -537,6 +587,13 @@ Routing principles:
     - Questions about SRC, election rules, Regulation XIII, or student council Constitution belong to the Department of Student Affairs (DSA). Route to "dsa-kampar" or "dsa-sungai-long". Do NOT route to "vp-student-alumni" (OVP SDAR).
 18. CGPA Calculation & Grading System (Rule IV):
     - Questions asking HOW CGPA is calculated, Grade Point Average formulas, grade point mappings, or passing grade rules (Rule IV) belong to the Division of Examination and Awards (DEAS). Route to "deas".
+19. Cross-Department Fan-Out (Conservative):
+    - If the user's prompt plainly asks two distinct questions or inquiries about two distinct UTAR organizational units (e.g. combining inquiries for two different departments, divisions, or faculties in one prompt):
+      - Set "targetAgentId" to the primary unit (the first or main topic).
+      - Set "secondaryTargetAgentId" to the second unit (the other topic).
+    - HARD RULE: Cap at 2 units maximum (targetAgentId and secondaryTargetAgentId). Never return 3 or more units.
+    - BIAS HARD TOWARD NO SECONDARY: When in doubt, or if the question is single-topic, general, or asks about only one unit, leave "secondaryTargetAgentId" as null or empty string. Do NOT add a secondary assistant unless explicitly and clearly asked about two distinct units.
+    - Do NOT set "secondaryTargetAgentId" for staff directory / person-role questions, casual chat, complaints, private/sensitive data requests, or single-unit questions.
 
 Conversation relation:
 - If there is a pendingPreviousQuestion, decide if the latest message is:
@@ -557,6 +614,7 @@ JSON schema:
   "intentCategory": "university_info" | "staff_profile" | "faculty_programme" | "admin_service" | "borrow_or_request_resource" | "complaint_feedback" | "recommendation" | "academic_integrity" | "casual_or_social" | "casual_or_offtopic" | "private_sensitive" | "unknown",
   "scopeType": "university_wide" | "faculty_specific" | "admin_unit" | "personal_private" | "needs_clarification" | "casual",
   "targetAgentId": "one valid assistant id from the available assistants",
+  "secondaryTargetAgentId": "optional second assistant id ONLY if prompt plainly asks two distinct questions for two different units, else null",
   "retrievalNeeded": true or false,
   "conversationRelation": "none" | "clarification_for_pending" | "follow_up_same_topic" | "new_standalone_question",
   "usePendingQuestion": true or false,
@@ -589,6 +647,7 @@ JSON schema:
             rawMessage,
             currentAgentId,
             pendingQuestion,
+            acronymPrimaryAgentId,
         });
     } catch (error) {
         console.error("Semantic Router Error:", error);

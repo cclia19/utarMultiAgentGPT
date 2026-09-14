@@ -155,6 +155,24 @@ function isOfficialUtarSource(uri: string, title = ""): boolean {
     }
 }
 
+function isSocialMediaHost(uri: string): boolean {
+    try {
+        const url = new URL(uri);
+        const host = url.hostname.toLowerCase();
+        return (
+            host.includes("facebook.com") ||
+            host.includes("instagram.com") ||
+            host.includes("linkedin.com") ||
+            host.includes("youtube.com") ||
+            host.includes("youtu.be") ||
+            host.includes("x.com") ||
+            host.includes("twitter.com")
+        );
+    } catch {
+        return false;
+    }
+}
+
 function isGroundingRedirectUri(uri: string): boolean {
     try {
         const url = new URL(uri);
@@ -238,112 +256,116 @@ function mergeLinks(...groups: OfficialLink[][]): OfficialLink[] {
     return merged;
 }
 
-function getCanonicalLinksForAgent(agentId: string, question = ""): OfficialLink[] {
-    const id = String(agentId || "").toLowerCase();
-    const q = normalize(question);
-    const links: OfficialLink[] = [];
+function computeUrlRankScore(uri: string): number {
+    try {
+        const url = new URL(uri);
+        const host = url.hostname.toLowerCase();
+        const path = url.pathname.replace(/\/+$/, "");
 
-    links.push({
-        title: "UTAR Official Website",
-        uri: "https://www.utar.edu.my/",
+        const isUtarDomain =
+            host === "utar.edu.my" ||
+            host.endsWith(".utar.edu.my") ||
+            host.includes("utar.edu.my");
+
+        const isSocial = isSocialMediaHost(uri);
+
+        if (isUtarDomain) {
+            const pathSegments = path.split("/").filter(Boolean);
+            const isDeep = pathSegments.length > 0;
+
+            if (isDeep) {
+                // Tier 1: UTAR deep link (path deeper than /).
+                // Base 1000 + depth bonus + query bonus + subdomain bonus.
+                let score = 1000 + Math.min(pathSegments.length, 10) * 10;
+                if (url.search) score += 5;
+                if (host !== "www.utar.edu.my" && host !== "utar.edu.my") {
+                    score += 2;
+                }
+                return score;
+            } else {
+                // Tier 2: UTAR root link.
+                // Subdomain root (e.g. library.utar.edu.my) base 500, main root base 400.
+                if (host !== "www.utar.edu.my" && host !== "utar.edu.my") {
+                    return 500;
+                }
+                return 400;
+            }
+        }
+
+        if (isSocial) {
+            // Tier 3: Social media link. Base score 10.
+            return 10;
+        }
+
+        return 0;
+    } catch {
+        return 0;
+    }
+}
+
+function rankAndFilterOfficialLinks(links: OfficialLink[]): OfficialLink[] {
+    const merged = mergeLinks(links);
+
+    const utarLinks: { link: OfficialLink; score: number; originalIndex: number }[] = [];
+    const socialLinks: { link: OfficialLink; score: number; originalIndex: number }[] = [];
+
+    merged.forEach((link, originalIndex) => {
+        if (!link.uri || !isOfficialUtarSource(link.uri, link.title)) return;
+
+        const isSocial = isSocialMediaHost(link.uri);
+        const score = computeUrlRankScore(link.uri);
+
+        if (isSocial) {
+            socialLinks.push({ link, score, originalIndex });
+        } else if (score >= 400) {
+            utarLinks.push({ link, score, originalIndex });
+        }
     });
 
-    if (id === "fict" || q.includes("fict")) {
-        links.push(
-            {
-                title: "FICT Official Website",
-                uri: "https://fict.utar.edu.my/",
-            },
-            {
-                title: "FICT Programmes",
-                uri: "https://fict.utar.edu.my/our_programmes.php",
+    // If any official UTAR domain links exist (Tier 1 or Tier 2),
+    // NEVER use social media links as a factual citation.
+    if (utarLinks.length > 0) {
+        utarLinks.sort((a, b) => {
+            if (b.score !== a.score) {
+                return b.score - a.score;
             }
-        );
-    }
-
-    if (id === "fbf" || q.includes("fbf")) {
-        links.push({
-            title: "FBF Official Website",
-            uri: "https://fbf.utar.edu.my/",
+            return a.originalIndex - b.originalIndex;
         });
+        return utarLinks.map((item) => item.link);
     }
 
-    if (id === "deas" || id === "dea" || q.includes("exam") || q.includes("examination")) {
-        links.push({
-            title: "Division of Examination and Awards",
-            uri: "https://dea.utar.edu.my/",
-        });
+    // Only if NO UTAR domain links exist at all, keep social links placed last
+    if (socialLinks.length > 0) {
+        socialLinks.sort((a, b) => a.originalIndex - b.originalIndex);
+        return socialLinks.map((item) => item.link);
     }
 
-    if (id === "dfn" || q.includes("fee") || q.includes("payment")) {
-        links.push({
-            title: "Division of Finance",
-            uri: "https://dfn.utar.edu.my/",
-        });
-    }
+    return [];
+}
 
-    if (id === "dace" || q.includes("admission")) {
-        links.push({
-            title: "Division of Admissions and Credit Evaluation",
-            uri: "https://admission.utar.edu.my/",
-        });
-    }
+function getCanonicalLinksForAgent(agentId: string): OfficialLink[] {
+    const unit = getOrgUnitById(agentId);
+    const unitWebsite = unit.website;
 
-    if (id === "library" || q.includes("library")) {
-        links.push({
-            title: "UTAR Library",
-            uri: "https://library.utar.edu.my/",
-        });
-    }
-
-    if (q.includes("counselling") || q.includes("counseling") || q.includes("stress")) {
-        links.push({
-            title: "Department of Student Affairs",
-            uri: "https://dsa.utar.edu.my/",
-        });
-    }
-
-    if (
-        id.includes("dgs") ||
-        id.includes("dsa") ||
-        q.includes("bus") ||
-        q.includes("shuttle") ||
-        q.includes("shuttles") ||
-        q.includes("schedule") ||
-        q.includes("timetable")
-    ) {
-        links.push(
+    if (unitWebsite && isOfficialUtarSource(unitWebsite)) {
+        return [
             {
-                title: "UTAR Kampar Campus Bus Services",
-                uri: "https://dsa.kpr.utar.edu.my/documents/SSU/Bus%20Schedule/June2026/Bus%20Schedule%20Jun_26%20Intake%20Orientation%20_8-12%20June%202026_.pdf",
+                title: `${unit.shortLabel || unit.name} Official Website`,
+                uri: unitWebsite,
             },
             {
-                title: "UTAR Sungai Long Campus Bus Services",
-                uri: "https://dsa.sl.utar.edu.my/",
+                title: "UTAR Official Website",
+                uri: "https://www.utar.edu.my/",
             },
-            {
-                title: "JustNaik Bus Tracking App",
-                uri: "https://www.justnaik.com/",
-            }
-        );
+        ];
     }
 
-    if (
-        q.includes("staff") ||
-        q.includes("lecturer") ||
-        q.includes("directory") ||
-        q.includes("contact") ||
-        q.includes("professor") ||
-        q.includes("dean") ||
-        q.includes("head")
-    ) {
-        links.push({
-            title: "UTAR Official Staff Directory",
-            uri: "https://www2.utar.edu.my/staffListSearchV2.jsp?searchDept=ALL&searchDiv=All&searchName=&searchExpertise=&submit=Search&searchResult=Y",
-        });
-    }
-
-    return links;
+    return [
+        {
+            title: "UTAR Official Website",
+            uri: "https://www.utar.edu.my/",
+        },
+    ];
 }
 
 function sanitizeMarkdownLinksAgainstAllowed(
@@ -488,53 +510,194 @@ function extractResponseText(response: any): string {
 }
 
 function extractCitations(response: any): string[] {
-    const candidates = response.candidates;
+    const candidates = response?.candidates;
     let citations: string[] = [];
 
-    if (candidates && candidates[0].groundingMetadata?.groundingChunks) {
+    if (candidates && candidates[0]?.groundingMetadata?.groundingChunks) {
         citations = candidates[0].groundingMetadata.groundingChunks
             .map((chunk: any) => {
-                if (chunk.web?.uri) return chunk.web.uri;
-                if (chunk.web?.title) return chunk.web.title;
                 if (chunk.retrievedContext?.title) return chunk.retrievedContext.title;
-                return "Unknown Source";
+                if (chunk.retrievedContext?.uri) return chunk.retrievedContext.uri;
+                if (chunk.web?.title) return chunk.web.title;
+                if (
+                    chunk.web?.uri &&
+                    !isGroundingRedirectUri(chunk.web.uri) &&
+                    isOfficialUtarSource(chunk.web.uri, chunk.web?.title || "")
+                ) {
+                    return chunk.web.uri;
+                }
+                return null;
             })
             .filter(
-                (val: string, index: number, self: string[]) =>
-                    val && self.indexOf(val) === index
+                (val: string | null, index: number, self: (string | null)[]): val is string =>
+                    Boolean(val) && self.indexOf(val) === index
             );
     }
 
     return citations;
 }
 
-function extractOfficialWebLinks(response: any): OfficialLink[] {
-    const candidates = response.candidates;
-    const links: OfficialLink[] = [];
+const REDIRECT_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
+const redirectResolutionCache = new Map<string, { finalUri: string | null; expiresAt: number }>();
 
-    if (!candidates || !candidates[0]?.groundingMetadata?.groundingChunks) {
-        return links;
+async function resolveRedirectUrl(uri: string, timeoutMs = 2500): Promise<string | null> {
+    if (!uri) return null;
+
+    const cached = redirectResolutionCache.get(uri);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.finalUri;
     }
 
-    for (const chunk of candidates[0].groundingMetadata.groundingChunks) {
-        const title = chunk.web?.title || "";
-        const uri = chunk.web?.uri;
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
-        const verifiedUri = getVerifiedOfficialUri(uri, title);
-        if (!verifiedUri) continue;
+    try {
+        let finalUrl: string | null = null;
 
-        links.push({
-            title: cleanLinkTitle(title || "Official UTAR Link", verifiedUri),
-            uri: verifiedUri,
+        // Try HEAD first
+        try {
+            const headRes = await fetch(uri, {
+                method: "HEAD",
+                redirect: "follow",
+                signal: abortController.signal,
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                },
+            });
+
+            if (headRes.url && !isGroundingRedirectUri(headRes.url)) {
+                finalUrl = headRes.url;
+            }
+        } catch {
+            // HEAD might be rejected or fail; try ranged GET below
+        }
+
+        // If HEAD didn't resolve to a non-redirect destination, try ranged GET
+        if (!finalUrl && !abortController.signal.aborted) {
+            try {
+                const getRes = await fetch(uri, {
+                    method: "GET",
+                    redirect: "follow",
+                    signal: abortController.signal,
+                    headers: {
+                        Range: "bytes=0-0",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    },
+                });
+
+                if (getRes.url && !isGroundingRedirectUri(getRes.url)) {
+                    finalUrl = getRes.url;
+                }
+            } catch {
+                // Ignore GET failure
+            }
+        }
+
+        let result: string | null = null;
+        if (finalUrl && isOfficialUtarSource(finalUrl)) {
+            result = finalUrl;
+        }
+
+        redirectResolutionCache.set(uri, {
+            finalUri: result,
+            expiresAt: Date.now() + REDIRECT_CACHE_TTL_MS,
         });
+
+        return result;
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function extractOfficialWebLinks(response: any): Promise<OfficialLink[]> {
+    const candidates = response?.candidates;
+    const rawChunks = candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (!Array.isArray(rawChunks) || rawChunks.length === 0) {
+        return [];
     }
 
-    return mergeLinks(links);
+    const groundingSupports = candidates?.[0]?.groundingMetadata?.groundingSupports;
+
+    // Resolve all grounding chunks visited by Gemini in parallel
+    const resolvedChunks = await Promise.allSettled(
+        rawChunks.map(async (chunk: any) => {
+            const title = chunk.web?.title || chunk.retrievedContext?.title || "";
+            const uri = chunk.web?.uri || chunk.retrievedContext?.uri;
+            if (!uri || typeof uri !== "string") {
+                return null;
+            }
+
+            if (!isGroundingRedirectUri(uri)) {
+                const directVerified = getVerifiedOfficialUri(uri, title);
+                if (directVerified && !isGroundingRedirectUri(directVerified)) {
+                    return {
+                        title: cleanLinkTitle(title || "Official UTAR Link", directVerified),
+                        uri: directVerified,
+                    };
+                }
+            }
+
+            const resolved = await resolveRedirectUrl(uri, 2500);
+            if (resolved && isOfficialUtarSource(resolved, title)) {
+                return {
+                    title: cleanLinkTitle(title || "Official UTAR Link", resolved),
+                    uri: resolved,
+                };
+            }
+            return null;
+        })
+    );
+
+    const chunkMap = new Map<number, OfficialLink>();
+    resolvedChunks.forEach((res, idx) => {
+        if (res.status === "fulfilled" && res.value) {
+            chunkMap.set(idx, res.value);
+        }
+    });
+
+    const orderedLinks: OfficialLink[] = [];
+
+    // Per-part citations: map groundingSupports segments to chunk indices
+    // so multi-part questions carry sources for each segment
+    if (Array.isArray(groundingSupports) && groundingSupports.length > 0) {
+        for (const support of groundingSupports) {
+            const indices = support?.groundingChunkIndices;
+            if (Array.isArray(indices)) {
+                for (const idx of indices) {
+                    const link = chunkMap.get(idx);
+                    if (link) {
+                        orderedLinks.push(link);
+                    }
+                }
+            }
+        }
+    }
+
+    // Append all resolved chunks in order (for remaining parts or when groundingSupports is absent)
+    for (let i = 0; i < rawChunks.length; i++) {
+        const link = chunkMap.get(i);
+        if (link) {
+            orderedLinks.push(link);
+        }
+    }
+
+    return rankAndFilterOfficialLinks(orderedLinks);
 }
 
 function shouldUseWebFallback(text: string, message = ""): boolean {
     const hasNoKb = text.includes(NO_KB_ANSWER);
     if (hasNoKb) return true;
+
+    if (message && isInstitutionalLeadershipQuestion(message)) {
+        return true;
+    }
+
+    // Detailed substantive answers (>350 chars) should not be forced into web fallback
+    if (text.trim().length > 350) {
+        return false;
+    }
 
     const normText = normalize(text);
 
@@ -554,15 +717,6 @@ function shouldUseWebFallback(text: string, message = ""): boolean {
 
     const matched = weakSignals.find((signal) => normText.includes(normalize(signal)));
     if (matched) return true;
-
-    if (message && isInstitutionalLeadershipQuestion(message)) {
-        return true;
-    }
-
-    // Detailed substantive answers (>350 chars) should not be forced into web fallback
-    if (text.trim().length > 350) {
-        return false;
-    }
 
     return false;
 }
@@ -1347,7 +1501,7 @@ async function fetchLiveUtarSearchSnippets(userQuery: string): Promise<{ text: s
         .replace(/\bvp\b/gi, "vice president")
         .trim();
 
-    const searchQuery = `UTAR ${cleanQuery} active staff directory appointment`;
+    const searchQuery = `UTAR ${cleanQuery}`;
 
     const encoded = encodeURIComponent(searchQuery);
     const searchUrl = `https://html.duckduckgo.com/html/?q=${encoded}`;
@@ -1558,7 +1712,6 @@ async function generatePublicWebFallback(params: {
     } = params;
 
     const agentId = selectedAgent.id || "general";
-    const canonicalLinks = getCanonicalLinksForAgent(agentId, effectiveMessage);
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -1679,8 +1832,24 @@ Important:
             "Web fallback"
         );
 
-        const officialLinks = extractOfficialWebLinks(webResponse);
-        const allowedLinks = mergeLinks(officialLinks, canonicalLinks);
+        const officialLinks = await extractOfficialWebLinks(webResponse);
+        let deepLinks = officialLinks;
+
+        if (deepLinks.length === 0) {
+            const liveSnippets = await fetchLiveUtarSearchSnippets(effectiveMessage);
+            if (liveSnippets.links && liveSnippets.links.length > 0) {
+                const searchLinks: OfficialLink[] = liveSnippets.links
+                    .filter((u) => isOfficialUtarSource(u))
+                    .map((u) => ({
+                        title: cleanLinkTitle("", u),
+                        uri: u,
+                    }));
+                deepLinks = rankAndFilterOfficialLinks(searchLinks);
+            }
+        }
+
+        const canonicalLinks = getCanonicalLinksForAgent(agentId);
+        const allowedLinks = deepLinks.length > 0 ? deepLinks : canonicalLinks;
 
         let baseText = finalCleanWebAnswer(
             extractResponseText(webResponse),
@@ -1722,7 +1891,13 @@ If asked about Vice Presidents, list all active Vice Presidents across portfolio
 
                 const synthesizedText = finalClean(extractResponseText(retryResponse));
                 if (synthesizedText && synthesizedText.length > 30 && !synthesizedText.includes(NO_KB_ANSWER)) {
-                    const extraLinks = mergeLinks(liveSnippets.links.map((u) => ({ title: "UTAR Web Search", uri: u })), canonicalLinks);
+                    const snippetLinks: OfficialLink[] = (liveSnippets.links || [])
+                        .filter((u) => isOfficialUtarSource(u))
+                        .map((u) => ({ title: cleanLinkTitle("", u), uri: u }));
+                    const rankedSnippets = rankAndFilterOfficialLinks(snippetLinks);
+                    const extraLinks = rankedSnippets.length > 0
+                        ? rankedSnippets
+                        : canonicalLinks;
                     return {
                         text: appendOfficialLinks(synthesizedText, extraLinks),
                         citations: extraLinks.map((l) => l.uri),
@@ -1828,7 +2003,13 @@ Synthesize a clear, accurate, and complete answer directly addressing the user's
 
                 const text = finalClean(extractResponseText(retryResponse));
                 if (text && text.length > 30) {
-                    const extraLinks = mergeLinks(liveSnippets.links.map((u) => ({ title: "UTAR Web Search", uri: u })), canonicalLinks);
+                    const snippetLinks: OfficialLink[] = (liveSnippets.links || [])
+                        .filter((u) => isOfficialUtarSource(u))
+                        .map((u) => ({ title: cleanLinkTitle("", u), uri: u }));
+                    const rankedSnippets = rankAndFilterOfficialLinks(snippetLinks);
+                    const extraLinks = rankedSnippets.length > 0
+                        ? rankedSnippets
+                        : getCanonicalLinksForAgent(agentId);
                     return {
                         text: appendOfficialLinks(text, extraLinks),
                         citations: extraLinks.map((l) => l.uri),
@@ -2045,11 +2226,6 @@ Return ONLY valid JSON:
     }
 }
 
-// Global in-memory cache for live Gemini File Search stores to prevent request timeouts
-let storesCache: Record<string, string> | null = null;
-let lastCacheUpdate = 0;
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
 /**
  * Streaming support.
  *
@@ -2160,10 +2336,234 @@ async function* iterateWithDeadline<T>(
     }
 }
 
+/**
+ * Classifies whether an error encountered during File Search is permanent/non-retryable
+ * (e.g. quota/rate-limit 429, auth 401/403, malformed request 400/INVALID_ARGUMENT).
+ * When true, the escalation ladder and primary-store fallback must abort immediately
+ * to avoid hammering rate limits or repeating unfixable errors.
+ * Never throws.
+ */
+function isNonRetryableFileSearchError(error: unknown): boolean {
+    try {
+        if (!error) return false;
+
+        const err = error as any;
+
+        // Check numerical / string status code properties
+        const checkStatus = (val: any): boolean => {
+            const num = typeof val === "number" ? val : parseInt(String(val), 10);
+            return num === 400 || num === 401 || num === 403 || num === 429;
+        };
+
+        if (
+            checkStatus(err.status) ||
+            checkStatus(err.statusCode) ||
+            checkStatus(err.httpStatus) ||
+            checkStatus(err.code) ||
+            checkStatus(err.response?.status) ||
+            checkStatus(err.cause?.status) ||
+            checkStatus(err.cause?.statusCode)
+        ) {
+            return true;
+        }
+
+        // Collect all text from message, details, code, errorDetails, cause, and stringification
+        const textParts: string[] = [];
+
+        const collectText = (obj: any, depth = 0) => {
+            if (!obj || depth > 3) return;
+            if (typeof obj === "string") {
+                textParts.push(obj);
+                return;
+            }
+            if (typeof obj?.message === "string") textParts.push(obj.message);
+            if (typeof obj?.statusText === "string") textParts.push(obj.statusText);
+            if (typeof obj?.code === "string") textParts.push(obj.code);
+            if (typeof obj?.reason === "string") textParts.push(obj.reason);
+            if (typeof obj?.errorDetails === "string") textParts.push(obj.errorDetails);
+            if (Array.isArray(obj?.errorDetails)) {
+                try {
+                    textParts.push(JSON.stringify(obj.errorDetails));
+                } catch { }
+            }
+            if (typeof obj?.details === "string") textParts.push(obj.details);
+            if (obj?.cause) collectText(obj.cause, depth + 1);
+        };
+
+        collectText(err);
+        try {
+            textParts.push(String(error));
+        } catch { }
+
+        const combined = textParts.join(" ").toLowerCase();
+
+        // 1. Quota / Rate limit (HTTP 429, RESOURCE_EXHAUSTED)
+        if (
+            combined.includes("429") ||
+            combined.includes("resource_exhausted") ||
+            combined.includes("resource exhausted") ||
+            combined.includes("rate limit") ||
+            combined.includes("ratelimit") ||
+            combined.includes("rate-limit") ||
+            combined.includes("quota") ||
+            combined.includes("too many requests")
+        ) {
+            return true;
+        }
+
+        // 2. Auth / Permission (HTTP 401, 403, UNAUTHENTICATED, PERMISSION_DENIED)
+        if (
+            combined.includes("401") ||
+            combined.includes("403") ||
+            combined.includes("unauthenticated") ||
+            combined.includes("permission_denied") ||
+            combined.includes("permission denied") ||
+            combined.includes("unauthorized") ||
+            combined.includes("forbidden") ||
+            combined.includes("api key") ||
+            combined.includes("api_key")
+        ) {
+            return true;
+        }
+
+        // 3. Invalid Argument / Malformed request (HTTP 400, INVALID_ARGUMENT)
+        if (
+            combined.includes("400") ||
+            combined.includes("invalid_argument") ||
+            combined.includes("invalid argument") ||
+            combined.includes("bad request")
+        ) {
+            return true;
+        }
+
+        return false;
+    } catch {
+        return false;
+    }
+}
+
 /** Minimum characters buffered before any KB text may be emitted. Must comfortably
  *  exceed the NO_KB_ANSWER sentinel and the longest weak-signal phrase that
  *  shouldUseWebFallback matches on, so we never emit text we would then retract. */
 const STREAM_GATE_CHARS = 80;
+
+async function executeFileSearchAttempt(params: {
+    request: any;
+    sink: StreamSink | null;
+    effectiveMessage: string;
+    timeoutMs: number;
+}): Promise<{
+    fileResponse: any;
+    rawText: string;
+    finishReason: string;
+    isRecoverableFailure: boolean;
+    rawThoughts: string;
+    streamedText: string;
+}> {
+    const { request, sink, effectiveMessage, timeoutMs } = params;
+    let raw = "";
+    let rawThoughts = "";
+    let streamedText = "";
+    let finishReason = "";
+    const groundingChunks: any[] = [];
+    const groundingSupports: any[] = [];
+
+    if (sink) {
+        const deadline = Date.now() + timeoutMs;
+        const iterator = await withTimeout(
+            ai.models.generateContentStream(request),
+            timeoutMs,
+            "File search"
+        );
+
+        for await (const chunk of iterateWithDeadline(iterator, deadline, "File search")) {
+            const cand = (chunk as any)?.candidates?.[0];
+            if (cand?.finishReason) {
+                finishReason = cand.finishReason;
+            }
+            const meta = cand?.groundingMetadata?.groundingChunks;
+            if (Array.isArray(meta)) groundingChunks.push(...meta);
+            const supports = cand?.groundingMetadata?.groundingSupports;
+            if (Array.isArray(supports)) groundingSupports.push(...supports);
+
+            const thoughtPiece = extractChunkThoughts(chunk);
+            if (thoughtPiece) {
+                rawThoughts += thoughtPiece;
+                sink.thought(thoughtPiece);
+            }
+
+            const piece = extractChunkText(chunk);
+            if (!piece) continue;
+            raw += piece;
+
+            // Gate: never emit until we have enough text to rule out the
+            // NO_KB_ANSWER sentinel / weak-signal fallback triggers.
+            if (!streamedText && (raw.length < STREAM_GATE_CHARS || shouldUseWebFallback(raw, effectiveMessage))) {
+                continue;
+            }
+
+            const cleaned = finalClean(raw);
+            if (cleaned === streamedText) continue;
+
+            if (cleaned.startsWith(streamedText)) {
+                sink.text(cleaned.slice(streamedText.length));
+            } else {
+                sink.replace(cleaned);
+            }
+            streamedText = cleaned;
+        }
+
+        const fileResponse = {
+            text: raw,
+            candidates: [
+                {
+                    content: { parts: [{ text: raw }] },
+                    finishReason: finishReason || (raw.trim().length > 0 ? "STOP" : "EMPTY"),
+                    groundingMetadata: {
+                        groundingChunks: groundingChunks.length ? groundingChunks : undefined,
+                        groundingSupports: groundingSupports.length ? groundingSupports : undefined,
+                    },
+                },
+            ],
+        };
+
+        const isRecoverableFailure =
+            raw.trim().length === 0 ||
+            (finishReason !== "" && finishReason !== "STOP");
+
+        return {
+            fileResponse,
+            rawText: raw,
+            finishReason: finishReason || (raw.trim().length > 0 ? "STOP" : "EMPTY"),
+            isRecoverableFailure,
+            rawThoughts,
+            streamedText,
+        };
+    } else {
+        const response = await withTimeout(
+            ai.models.generateContent(request),
+            timeoutMs,
+            "File search"
+        );
+        const cand = response?.candidates?.[0];
+        finishReason = cand?.finishReason || "";
+        raw = extractResponseText(response);
+        if (raw === "No response generated.") raw = "";
+
+        const isRecoverableFailure =
+            raw.trim().length === 0 ||
+            (finishReason !== "" && finishReason !== "STOP");
+
+        return {
+            fileResponse: response,
+            rawText: raw,
+            finishReason: finishReason || (raw.trim().length > 0 ? "STOP" : "EMPTY"),
+            isRecoverableFailure,
+            rawThoughts: "",
+            streamedText: "",
+        };
+    }
+}
 
 export async function POST(req: NextRequest) {
     let body: any;
@@ -2311,7 +2711,24 @@ async function handleChat(
         });
 
         const selectedAgent = getAgentById(routerResult.agentId);
-        sink?.status("agent_selected", `Routing to ${selectedAgent.label}...`);
+        const secondaryAgent = routerResult.secondaryAgentId
+            ? getOrgUnitById(routerResult.secondaryAgentId).enabledForChat
+                ? getAgentById(routerResult.secondaryAgentId)
+                : null
+            : null;
+        const hasSecondary = Boolean(
+            secondaryAgent &&
+            secondaryAgent.id !== selectedAgent.id
+        );
+
+        const displayAgentLabel = hasSecondary
+            ? `${selectedAgent.label} + ${secondaryAgent!.label}`
+            : selectedAgent.label;
+        const displayStoreDisplayName = hasSecondary
+            ? `${selectedAgent.storeDisplayName || selectedAgent.label} + ${secondaryAgent!.storeDisplayName || secondaryAgent!.label}`
+            : (selectedAgent.storeDisplayName || "");
+
+        sink?.status("agent_selected", `Routing to ${displayAgentLabel}...`);
 
         const modelSaysNoRetrieval =
             resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false;
@@ -2419,43 +2836,11 @@ async function handleChat(
             });
         }
 
-        let storeName = "";
-        let lookupName = selectedAgent.storeDisplayName;
-        if (lookupName === "UTAR THP FBF Knowledge Base") {
-            lookupName = "UTAR FBF Knowledge Base";
-        } else if (lookupName === "UTAR Registrar Knowledge Base") {
-            lookupName = "UTAR Registrar's Office Knowledge Base";
-        } else if (lookupName === "UTAR DGS Kampar Knowledge Base") {
-            lookupName = "UTAR DGS Kampar KB Clean";
-        } else if (lookupName === "UTAR Scholarships Knowledge Base" || lookupName === "UTAR DSFA Knowledge Base") {
-            storeName = "fileSearchStores/utar-scholarships-knowledge-5fytwaxg9hdh";
-        }
+        const primaryStoreNames = selectedAgent.storeResourceIds ?? [];
+        const secondaryStoreNames = hasSecondary ? (secondaryAgent!.storeResourceIds ?? []) : [];
+        const storeNames = Array.from(new Set([...primaryStoreNames, ...secondaryStoreNames]));
 
-        const now = Date.now();
-        if (!storesCache || now - lastCacheUpdate > CACHE_TTL) {
-            try {
-                console.log("Fetching live Gemini File Search stores for cache...");
-                const stores = await ai.fileSearchStores.list();
-                const tempCache: Record<string, string> = {};
-                for await (const s of stores) {
-                    const displayName =
-                        (s as any).displayName || (s as any).display_name || "";
-                    if (displayName && s.name) {
-                        tempCache[displayName] = s.name as string;
-                    }
-                }
-                storesCache = tempCache;
-                lastCacheUpdate = now;
-            } catch (err) {
-                console.error("Failed to populate stores cache:", err);
-            }
-        }
-
-        if (!storeName && storesCache && storesCache[lookupName]) {
-            storeName = storesCache[lookupName];
-        }
-
-        if (!storeName) {
+        if (storeNames.length === 0) {
             sink?.status("staffDirectory", "Checking UTAR Staff Directory...");
             const staffDirResponse = await tryStaffDirectoryFallback({
                 effectiveMessage,
@@ -2478,9 +2863,9 @@ async function handleChat(
                 text: webFallback.text,
                 citations: webFallback.citations,
                 sourceMode: "webFallback",
-                storeDisplayName: selectedAgent.storeDisplayName || "",
+                storeDisplayName: displayStoreDisplayName,
                 selectedAgentId: selectedAgent.id,
-                selectedAgentLabel: selectedAgent.label,
+                selectedAgentLabel: displayAgentLabel,
                 needsClarification: Boolean(webFallback.needsClarification),
                 pendingQuestion: webFallback.pendingQuestion || null,
                 lastResolvedTopic,
@@ -2491,10 +2876,65 @@ async function handleChat(
 
         sink?.status(
             "searching",
-            `Searching ${lookupName || selectedAgent.storeDisplayName || selectedAgent.label}...`
+            `Searching ${displayStoreDisplayName || displayAgentLabel}...`
         );
 
-        const fileSearchSystemInstruction = `
+        const fileSearchSystemInstruction = hasSecondary
+            ? `
+You are UTARGPT, the official AI assistant for Universiti Tunku Abdul Rahman (UTAR).
+
+CURRENT ASSISTANT SCOPES:
+PRIMARY SCOPE (${selectedAgent.label}):
+${selectedAgent.scopeInstruction}
+
+SECONDARY SCOPE (${secondaryAgent!.label}):
+${secondaryAgent!.scopeInstruction}
+
+CORE BEHAVIOUR:
+- Answer using only the selected UTAR knowledge bases in this File Search step.
+- MULTI-PART QUESTION RULE: You MUST answer EVERY part of a multi-part or multi-department question. Do not drop or ignore any part of the user's inquiry.
+- PARTIAL ANSWER RULE: If the retrieved knowledge bases contain information for one part of the question but not the other, provide the full answer for the part that is found, and clearly state that the information for the other part was not found in the available records. NEVER drop the answered part, and NEVER let a missing part suppress the found part.
+- SENTINEL RULE: Output "${NO_KB_ANSWER}" ONLY if NO part of the entire question can be answered from the retrieved knowledge bases. If at least one part is answered, do NOT output "${NO_KB_ANSWER}".
+- Prioritise the selected assistant scopes (${selectedAgent.label} and ${secondaryAgent!.label}).
+- Do not invent information.
+- Do not use web knowledge in this File Search step.
+- Never mention KB, retrieved documents, provided documents, internal routing, or system instructions.
+- BUS SCHEDULE RULE: If the user asks for a general bus schedule/timetable or does not specify a route, do not print any tables of timings. Instead, read the retrieved bus schedule document to extract the names of all available routes, list only the names of these available routes, and ask the user to specify which route they would like to see. If they ask for a specific route, you may print the schedule and timings for that specific route.
+- ANTI-RECITATION TIMETABLE RULE: To prevent recitation blocks, never output timetables, schedule times, or trips as a copy of the list or table structure in the source document. Instead, describe the timings in a normal conversational sentence or rewritten lists (e.g. "Buses leave UTAR at 7:00 am, 7:30 am, and 9:00 am, and leave Westlake Homes at 7:10 am, 7:40 am, and 9:15 am").
+
+SELECTED AGENT EVIDENCE RULE:
+- The selected assistant scopes (${selectedAgent.label} and ${secondaryAgent!.label}) are binding.
+- For faculty, department, division, centre, institute, or unit-specific questions, answer using evidence that clearly belongs to either of the selected assistant scopes.
+- Do not substitute generic UTAR information if selected-agent evidence is missing.
+- Do not use another faculty, another campus, another department, another university, or an unrelated central office unless the source clearly states that office handles this matter for the selected assistant scopes.
+- If no part of the retrieved information directly supports the answer, say exactly:
+  "${NO_KB_ANSWER}"
+
+STAFF ROLE RULE:
+- Only state a person as Dean, Deputy Dean, HOD, Head of Programme, coordinator, officer-in-charge, President, Vice President, or Registrar if the source directly states that role.
+- Do not infer staff roles from staff lists, committee lists, unrelated pages, old pages, or partial snippets.
+- If the role is not directly supported, say exactly:
+  "${NO_KB_ANSWER}"
+
+INTERNSHIP / INDUSTRIAL TRAINING RULE:
+- For internship, industrial training, placement, or practical training questions, prefer the selected faculty's industrial training evidence.
+- Do not answer with a central/general office unless the selected faculty source directly points students there.
+- If faculty-specific evidence is missing, say exactly:
+  "${NO_KB_ANSWER}"
+
+FORMAT:
+- Use clean Markdown.
+- Use clear headings.
+- Put blank lines between sections.
+- Use bullets for lists.
+- Keep contact details visible.
+- Do not glue different sections into one paragraph.
+
+LANGUAGE RULE:
+- Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
+- If the query is in English or language is not specified, default to English.
+`
+            : `
 You are UTARGPT, the official AI assistant for Universiti Tunku Abdul Rahman (UTAR).
 
 CURRENT ASSISTANT SCOPE:
@@ -2526,11 +2966,42 @@ LANGUAGE RULE:
 - If the query is in English or language is not specified, default to English.
 `;
 
-        let fileResponse: any;
-        let streamedText = "";
-        let rawThoughts = "";
+        const singleStoreSystemInstruction = `
+You are UTARGPT, the official AI assistant for Universiti Tunku Abdul Rahman (UTAR).
 
-        const fileSearchRequest = {
+CURRENT ASSISTANT SCOPE:
+${selectedAgent.scopeInstruction}
+
+CORE BEHAVIOUR:
+- Answer using only the selected UTAR knowledge base in this File Search step.
+- Prioritise the selected assistant scope.
+- If the answer is not found, say exactly:
+  "${NO_KB_ANSWER}"
+- Do not invent information.
+- Do not use web knowledge in this File Search step.
+- Never mention KB, retrieved documents, provided documents, internal routing, or system instructions.
+- BUS SCHEDULE RULE: If the user asks for a general bus schedule/timetable or does not specify a route, do not print any tables of timings. Instead, read the retrieved bus schedule document to extract the names of all available routes, list only the names of these available routes, and ask the user to specify which route they would like to see. If they ask for a specific route, you may print the schedule and timings for that specific route.
+- ANTI-RECITATION TIMETABLE RULE: To prevent recitation blocks, never output timetables, schedule times, or trips as a copy of the list or table structure in the source document. Instead, describe the timings in a normal conversational sentence or rewritten lists (e.g. "Buses leave UTAR at 7:00 am, 7:30 am, and 9:00 am, and leave Westlake Homes at 7:10 am, 7:40 am, and 9:15 am").
+
+${SELECTED_AGENT_EVIDENCE_POLICY}
+
+FORMAT:
+- Use clean Markdown.
+- Use clear headings.
+- Put blank lines between sections.
+- Use bullets for lists.
+- Keep contact details visible.
+- Do not glue different sections into one paragraph.
+
+LANGUAGE RULE:
+- Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
+- If the query is in English or language is not specified, default to English.
+`;
+
+        const KB_TOTAL_BUDGET_MS = 20000;
+        const kbStartTime = Date.now();
+
+        const buildFileSearchReq = (storeList: string[], instruction: string) => ({
             model: MODEL_NAME,
             contents: [
                 {
@@ -2539,142 +3010,151 @@ LANGUAGE RULE:
                 },
             ],
             config: {
-                systemInstruction: { parts: [{ text: fileSearchSystemInstruction }] },
+                systemInstruction: { parts: [{ text: instruction }] },
                 tools: [
                     {
                         fileSearch: {
-                            fileSearchStoreNames: [storeName],
+                            fileSearchStoreNames: storeList,
                         },
                     } as any,
                 ],
                 temperature: 0.1,
                 thinkingConfig: {
-                    // -1 = dynamic, the model default. Do NOT cap this: the KB call
-                    // generates the student-facing answer, and reduced thinking
-                    // degrades it silently. includeThoughts only surfaces the
-                    // reasoning for the streaming UI; it does not change the budget.
                     thinkingBudget: -1,
                     includeThoughts: true,
                 },
             },
-        };
+        });
 
-        try {
-            if (sink) {
-                const deadline = Date.now() + 120000;
-                const iterator = await withTimeout(
-                    ai.models.generateContentStream(fileSearchRequest),
-                    120000,
-                    "File search"
+        let fileResponse: any = null;
+        let streamedText = "";
+        let rawThoughts = "";
+        let succeeded = false;
+        let escalationAborted = false;
+
+        // Step 1: Identical call retry ladder (up to 2 attempts total: 1 initial + 1 retry)
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            const elapsed = Date.now() - kbStartTime;
+            const remaining = KB_TOTAL_BUDGET_MS - elapsed;
+            if (remaining < 1500) {
+                console.warn(`[fileSearch] escalation budget exhausted (${elapsed}ms elapsed) before attempt ${attempt}`);
+                break;
+            }
+
+            const timeoutForAttempt = Math.min(remaining, 15000);
+
+            try {
+                const req = buildFileSearchReq(storeNames, fileSearchSystemInstruction);
+                const result = await executeFileSearchAttempt({
+                    request: req,
+                    sink,
+                    effectiveMessage,
+                    timeoutMs: timeoutForAttempt,
+                });
+
+                fileResponse = result.fileResponse;
+                streamedText = result.streamedText;
+                rawThoughts = result.rawThoughts;
+
+                console.warn(
+                    `[fileSearch] attempt ${attempt} finished with finishReason=${result.finishReason} (chars=${result.rawText.trim().length})`
                 );
 
-                let raw = "";
-                const groundingChunks: any[] = [];
-
-                for await (const chunk of iterateWithDeadline(iterator, deadline, "File search")) {
-                    const meta = (chunk as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks;
-                    if (Array.isArray(meta)) groundingChunks.push(...meta);
-
-                    const thoughtPiece = extractChunkThoughts(chunk);
-                    if (thoughtPiece) {
-                        rawThoughts += thoughtPiece;
-                        sink.thought(thoughtPiece);
-                    }
-
-                    const piece = extractChunkText(chunk);
-                    if (!piece) continue;
-                    raw += piece;
-
-                    // Gate: never emit until we have enough text to rule out the
-                    // NO_KB_ANSWER sentinel / weak-signal fallback triggers. Those
-                    // triggers are monotone in the text, so "false" on a prefix can
-                    // only be invalidated by a later signal — handled by reset below.
-                    if (!streamedText && (raw.length < STREAM_GATE_CHARS || shouldUseWebFallback(raw, effectiveMessage))) {
-                        continue;
-                    }
-
-                    const cleaned = finalClean(raw);
-                    if (cleaned === streamedText) continue;
-
-                    if (cleaned.startsWith(streamedText)) {
-                        sink.text(cleaned.slice(streamedText.length));
-                    } else {
-                        sink.replace(cleaned);
-                    }
-                    streamedText = cleaned;
+                if (!result.isRecoverableFailure) {
+                    succeeded = true;
+                    break;
                 }
 
-                fileResponse = {
-                    text: raw,
-                    candidates: [
-                        {
-                            content: { parts: [{ text: raw }] },
-                            groundingMetadata: groundingChunks.length ? { groundingChunks } : undefined,
-                        },
-                    ],
-                };
-            } else {
-                fileResponse = await withTimeout(
-                    ai.models.generateContent(fileSearchRequest),
-                    120000,
-                    "File search"
+                // Recoverable failure: reset any streamed preview before next retry
+                if (streamedText) {
+                    sink?.reset();
+                    streamedText = "";
+                    rawThoughts = "";
+                }
+
+                // Short backoff (~300-600ms) between identical attempts if budget permits
+                if (attempt < 2) {
+                    const timeAfterAttempt = Date.now() - kbStartTime;
+                    if (KB_TOTAL_BUDGET_MS - timeAfterAttempt > 2000) {
+                        await new Promise((r) => setTimeout(r, 400));
+                    }
+                }
+            } catch (err: any) {
+                const isNonRetryable = isNonRetryableFileSearchError(err);
+                console.warn(
+                    `[fileSearch] attempt ${attempt} threw error${isNonRetryable ? " (non-retryable, aborting ladder)" : ""}: ${err?.message || err}`
                 );
+                if (streamedText) {
+                    sink?.reset();
+                    streamedText = "";
+                    rawThoughts = "";
+                }
+                if (isNonRetryable) {
+                    escalationAborted = true;
+                    break;
+                }
             }
-        } catch (fileError: any) {
-            if (streamedText) sink?.reset();
-
-            console.error("File search error, falling back to web:", fileError?.message || fileError);
-            console.error("Full file error stack:", fileError?.stack);
-
-            sink?.status("staffDirectory", "Checking UTAR Staff Directory...");
-            const staffDirResponse = await tryStaffDirectoryFallback({
-                effectiveMessage,
-                selectedAgent,
-                lastResolvedTopic,
-                updatedContextSummary,
-                routeType: routerResult.routeType,
-            });
-            if (staffDirResponse) return staffDirResponse;
-
-            sink?.status("webFallback", "Searching official UTAR web sources...");
-            const webFallback = await generatePublicWebFallback({
-                effectiveMessage,
-                selectedAgent,
-                profileMode,
-                reason: "kb_no_answer",
-            });
-
-            return NextResponse.json({
-                text: webFallback.text,
-                citations: webFallback.citations,
-                sourceMode: "webFallback",
-                storeDisplayName: selectedAgent.storeDisplayName || "",
-                selectedAgentId: selectedAgent.id,
-                selectedAgentLabel: selectedAgent.label,
-                needsClarification: Boolean(webFallback.needsClarification),
-                pendingQuestion: webFallback.pendingQuestion || null,
-                lastResolvedTopic,
-                contextSummary: updatedContextSummary,
-                routeType: routerResult.routeType,
-            });
         }
 
-        const rawFileText = extractResponseText(fileResponse);
+        // Step 2: Primary store only retry (if multi-store / secondary attached, and previous attempts were recoverable failures, not aborted)
+        const canTryPrimaryOnly = !escalationAborted && !succeeded && hasSecondary && primaryStoreNames.length > 0;
+        if (canTryPrimaryOnly) {
+            const elapsed = Date.now() - kbStartTime;
+            const remaining = KB_TOTAL_BUDGET_MS - elapsed;
+            if (remaining >= 1500) {
+                const timeoutForAttempt = Math.min(remaining, 15000);
+                try {
+                    console.warn(`[fileSearch] escalating to primary store only (${primaryStoreNames.join(", ")})...`);
+                    const req = buildFileSearchReq(primaryStoreNames, singleStoreSystemInstruction);
+                    const result = await executeFileSearchAttempt({
+                        request: req,
+                        sink,
+                        effectiveMessage,
+                        timeoutMs: timeoutForAttempt,
+                    });
+
+                    fileResponse = result.fileResponse;
+                    streamedText = result.streamedText;
+                    rawThoughts = result.rawThoughts;
+
+                    console.warn(
+                        `[fileSearch] primary-store attempt finished with finishReason=${result.finishReason} (chars=${result.rawText.trim().length})`
+                    );
+
+                    if (!result.isRecoverableFailure) {
+                        succeeded = true;
+                    } else if (streamedText) {
+                        sink?.reset();
+                        streamedText = "";
+                        rawThoughts = "";
+                    }
+                } catch (err: any) {
+                    const isNonRetryable = isNonRetryableFileSearchError(err);
+                    console.warn(
+                        `[fileSearch] primary-store attempt threw error${isNonRetryable ? " (non-retryable)" : ""}: ${err?.message || err}`
+                    );
+                    if (streamedText) {
+                        sink?.reset();
+                        streamedText = "";
+                        rawThoughts = "";
+                    }
+                }
+            } else {
+                console.warn(`[fileSearch] insufficient budget for primary-store attempt (${elapsed}ms elapsed)`);
+            }
+        }
+
+        const rawFileText = fileResponse ? extractResponseText(fileResponse) : "";
         const fileText = finalClean(rawFileText);
-        const fileCitations = extractCitations(fileResponse);
-
-
+        const fileCitations = fileResponse ? extractCitations(fileResponse) : [];
 
         const isGeneralBusQuery = /bus|shuttle|transit|schedule|timetable/i.test(effectiveMessage) && selectedAgent.id === "dgs-kampar";
 
-        console.log("DEBUG FILE SEARCH:", { storeName, rawFileTextSnippet: rawFileText.slice(0, 200), len: fileText.length, shouldWeb: shouldUseWebFallback(rawFileText, effectiveMessage) });
-
         const fileNotFound =
+            !succeeded ||
             fileText.length === 0 ||
             shouldUseWebFallback(rawFileText, effectiveMessage) ||
             (fileCitations.length === 0 && fileText.length < 50);
-
-
 
         if (fileNotFound && streamedText) {
             // We emitted a provisional preview but the answer is being replaced by a
@@ -2694,9 +3174,9 @@ LANGUAGE RULE:
                 thought: rawThoughts || undefined,
                 citations: fileCitations,
                 sourceMode: "fileSearch",
-                storeDisplayName: selectedAgent.storeDisplayName || "",
+                storeDisplayName: displayStoreDisplayName,
                 selectedAgentId: selectedAgent.id,
-                selectedAgentLabel: selectedAgent.label,
+                selectedAgentLabel: displayAgentLabel,
                 needsClarification: false,
                 pendingQuestion: null,
                 lastResolvedTopic: newTopic,
@@ -2730,9 +3210,9 @@ LANGUAGE RULE:
             text: webFallback.text,
             citations: webFallback.citations,
             sourceMode: "webFallback",
-            storeDisplayName: selectedAgent.storeDisplayName || "",
+            storeDisplayName: displayStoreDisplayName,
             selectedAgentId: selectedAgent.id,
-            selectedAgentLabel: selectedAgent.label,
+            selectedAgentLabel: displayAgentLabel,
             needsClarification: Boolean(webFallback.needsClarification),
             pendingQuestion: webFallback.pendingQuestion || null,
 
