@@ -19,6 +19,24 @@ import html2canvas from "html2canvas";
 import DisclaimerModal from "./DisclaimerModal";
 import FeedbackModal from "./FeedbackModal";
 
+// Anonymous per-browser ID for usage stats (no login). Random, holds no personal data.
+const SESSION_KEY = "utarchat_anon_id";
+function getAnonymousSessionId(): string {
+    try {
+        let id = localStorage.getItem(SESSION_KEY);
+        if (!id) {
+            id =
+                typeof crypto !== "undefined" && "randomUUID" in crypto
+                    ? crypto.randomUUID()
+                    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+            localStorage.setItem(SESSION_KEY, id);
+        }
+        return id;
+    } catch {
+        return "";
+    }
+}
+
 type Role = "user" | "model";
 type AgentId = string;
 
@@ -311,6 +329,7 @@ export default function ChatClient() {
                     selectedAgentId: agentForThisRequest,
                     lastResolvedTopic,
                     contextSummary,
+                    sessionId: getAnonymousSessionId(),
                     stream: true,
                 }),
             });

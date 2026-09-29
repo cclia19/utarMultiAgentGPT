@@ -36,9 +36,13 @@ export async function POST(req: NextRequest) {
         };
 
         // 1. Forward to Google Sheets Webhook (Primary Persistent Database)
+        // Set GOOGLE_SHEETS_WEBHOOK_URL=off locally so test feedback never reaches the live Sheet.
+        const configuredWebhook = (process.env.GOOGLE_SHEETS_WEBHOOK_URL || "").trim();
         const webhookUrl =
-            process.env.GOOGLE_SHEETS_WEBHOOK_URL ||
-            "https://script.google.com/macros/s/AKfycbwdhB0g2hJ5nz8YamUr9VGZLGPbVRueEM8ak8EQOrlqavmWU5s21A_xuzhEf5jpM_4u/exec";
+            configuredWebhook.toLowerCase() === "off"
+                ? ""
+                : configuredWebhook ||
+                  "https://script.google.com/macros/s/AKfycbwdhB0g2hJ5nz8YamUr9VGZLGPbVRueEM8ak8EQOrlqavmWU5s21A_xuzhEf5jpM_4u/exec";
         let googleSheetsStatus = "skipped";
         let googleDriveImageUrl = "";
 

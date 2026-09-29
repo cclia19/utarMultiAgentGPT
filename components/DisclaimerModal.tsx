@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { ShieldAlert, Check, FileText, Lock, AlertCircle } from "lucide-react";
 
-const STORAGE_KEY = "utarchat_disclaimer_accepted_v1";
+// v2: adds the anonymous question-logging notice, so returning users see it once.
+const STORAGE_KEY = "utarchat_disclaimer_accepted_v2";
 
 interface DisclaimerModalProps {
     onAccept?: () => void;
@@ -82,7 +83,7 @@ export default function DisclaimerModal({ onAccept }: DisclaimerModalProps) {
                                     Privacy
                                 </h4>
                                 <p className="text-zinc-600">
-                                    Do not enter confidential or sensitive information, including passwords, NRIC/Passport numbers, bank account details or other personal data.
+                                    Do not enter confidential or sensitive information, including passwords, NRIC/Passport numbers, bank account details or other personal data. Questions are logged anonymously, with personal identifiers removed, to improve UTARCHAT.
                                 </p>
                             </div>
                         </div>

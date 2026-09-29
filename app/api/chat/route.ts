@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { metricsStore, newMetrics, markPipelineError } from "@/lib/analytics/metrics";
+import { logChatEvent } from "@/lib/analytics/logEvent";
 import { ai, MODEL_NAME } from "@/lib/gemini";
 import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
@@ -2576,20 +2578,44 @@ export async function POST(req: NextRequest) {
         return handleChat(null, null, err);
     }
 
+    // Usage analytics: count Gemini calls/tokens for this request and log one row
+    // after the response has been sent (see lib/analytics). Logging never blocks
+    // or breaks the chat.
+    const metrics = newMetrics();
+    const startedAt = Date.now();
+
     if (body?.stream !== true) {
-        return handleChat(body);
+        const res = await metricsStore.run(metrics, () => handleChat(body));
+        const latencyMs = Date.now() - startedAt;
+        const payload = await res.clone().json().catch(() => null);
+        after(() => logChatEvent({ body, payload, metrics, latencyMs }));
+        return res;
     }
+
+    let finishLog: (result: { payload: any; latencyMs: number; streamFailed: boolean }) => void = () => {};
+    const logResult = new Promise<{ payload: any; latencyMs: number; streamFailed: boolean }>((resolve) => {
+        finishLog = resolve;
+    });
+    after(async () => {
+        const result = await logResult;
+        await logChatEvent({ body, metrics, ...result });
+    });
 
     const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
             const sink = createStreamSink(controller);
+            let payload: any = null;
+            let streamFailed = false;
             try {
-                const res = await handleChat(body, sink);
-                sink.done(await res.json());
+                const res = await metricsStore.run(metrics, () => handleChat(body, sink));
+                payload = await res.json();
+                sink.done(payload);
             } catch (err: any) {
+                streamFailed = true;
                 console.error("Chat stream error:", err);
                 sink.error(err?.message || "Stream failed");
             } finally {
+                finishLog({ payload, latencyMs: Date.now() - startedAt, streamFailed });
                 controller.close();
             }
         },
@@ -3222,6 +3248,7 @@ LANGUAGE RULE:
         });
     } catch (error: any) {
         console.error("Chat Error:", error);
+        markPipelineError();
 
         const agent = getAgentById(fallbackAgentId || "general");
 
