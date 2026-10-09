@@ -6,6 +6,7 @@ import {
 } from "./orgUnits";
 import { detectAgentFromText, routeQuestion, resolveControlledAcronym } from "./routing";
 import { isPersonRoleQuestion } from "./personRoleQuestion";
+import { isIntakeOrCalendarQuestion } from "./conversationSignals";
 
 export interface IntentRouteResult {
     agentId: string;
@@ -410,6 +411,27 @@ function applySafetyGuards(params: {
         }
     }
 
+    // Intake / commencement / academic-calendar questions are owned by DACE.
+    // The General store only holds the postgraduate handbook's calendar, which
+    // produced "5 Oct 2026 for everyone" answers. Only overrides a General route;
+    // an explicit faculty/unit route is kept.
+    if (
+        agentId === "general" &&
+        result.routeType !== "private_sensitive" &&
+        (isIntakeOrCalendarQuestion(message) || isIntakeOrCalendarQuestion(rawMsg))
+    ) {
+        return {
+            ...result,
+            agentId: "dace",
+            secondaryAgentId: secondaryAgentId === "dace" ? undefined : secondaryAgentId,
+            retrievalNeeded: true,
+            needsClarification: false,
+            clarificationQuestion: "",
+            routeType: "admin_specific",
+            confidence: Math.max(result.confidence, 0.9),
+        };
+    }
+
     // Person and role questions take staff directory / single unit path and must NOT fan out
     const isRole = isPersonRoleQuestion(message).isRoleQuestion || isPersonRoleQuestion(rawMsg).isRoleQuestion;
     if (isRole || result.needsClarification || result.routeType === "private_sensitive" || result.routeType === "unclear") {
@@ -456,6 +478,11 @@ function fallbackRoute(params: {
     }
 
     const fallback = routeQuestion(message, currentAgentId);
+    if (fallback.agentId === "general" && isIntakeOrCalendarQuestion(message)) {
+        fallback.agentId = "dace";
+        fallback.needsClarification = false;
+        fallback.clarificationMessage = undefined;
+    }
 
     return {
         agentId: fallback.agentId,
@@ -536,7 +563,9 @@ ${message}
 Routing principles:
 1. Understand meaning, not keywords.
 2. Broad university-wide questions go to General Assistant.
-   Examples: UTAR president, vice president, campus, location, faculties, general offices, academic calendar, university-wide info.
+   Examples: UTAR president, vice president, campus, location, faculties, general offices, university-wide info.
+2a. Intakes, intake dates, trimester/semester start or commencement dates, the academic calendar, and new-student reporting dates belong to the Division of Admissions and Credit Evaluation ("dace"), NOT the General Assistant. These dates differ by programme level (foundation, undergraduate, postgraduate) and some programmes (e.g. MBBS, Nursing), so do NOT ask for clarification: route to "dace" with retrievalNeeded = true and keep the question as asked.
+2b. If the user questions, challenges, or corrects a previous answer ("are you sure", "you are wrong", "why did you say..."), set retrievalNeeded = true and route to the unit that owns the facts in question, not to the General Assistant by default. The rewrittenQuestion must restate the underlying factual question including the user's correction.
 3. Faculty/programme-specific questions go to the relevant faculty only when faculty/programme is known.
    - NOTE: If the user states they belong to a specific faculty (e.g. "FCS student" or "我是中文系学生") or asks about a procedure (like "certification letter", "internship application", "student assistance fund", or "financial aid / 助学金") in a faculty context, you MUST route to that specific faculty assistant (e.g., "fcs"). Do NOT automatically route to central departments (like "registrar" or "darp") because faculties at UTAR administer their own local forms, placement guidelines, and student funds.
 4. If faculty/programme context is missing and required, ask one concise clarification question.
