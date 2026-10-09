@@ -578,6 +578,10 @@ Routing principles:
    - Do NOT route to Registrar unless the complaint is clearly about registration records, official student records, admission records, or university-wide administration.
    - If faculty/programme/course context is missing, ask for faculty/programme/course.
    - If current faculty context exists, keep current faculty.
+7a. Opinions and rankings of people ("most popular lecturer", "best prof", "favourite tutor", "coolest dean"):
+   - There is no official data to rank staff, so knowing the faculty would not help. Do NOT ask for faculty/programme.
+   - Set intentCategory = "casual_or_social", retrievalNeeded = false, needsClarification = false.
+   - Exception: named awards ("who won the best lecturer award") are factual: retrievalNeeded = true.
 8. Electives / study plan / course structure / subjects:
    - These require programme and usually year/trimester/semester.
    - If missing, ask for programme and year/semester.

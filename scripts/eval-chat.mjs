@@ -23,7 +23,7 @@ function gaveOneDateForEveryone(answer = "") {
     return /(october 5|5 october|5 oct)/i.test(answer) && !/postgraduate/i.test(answer);
 }
 
-/** @typedef {{agent?:string|RegExp, mustMatch?:RegExp[], mustNotMatch?:RegExp[], source?:string[]}} Expect */
+/** @typedef {{agent?:string|RegExp, mustMatch?:RegExp[], mustNotMatch?:RegExp[], source?:string[], needsClarification?:boolean}} Expect */
 /** @type {{name:string, seed?:[string,string][], turns:{say:string, expect?:Expect|((answers:string[])=>Expect)}[]}[]} */
 const CASES = [
     {
@@ -107,6 +107,38 @@ const CASES = [
         ],
     },
     {
+        name: "Small talk about the bot is answered instantly, without a KB search",
+        turns: [
+            { say: "are you smart", expect: { source: ["none"], mustMatch: [/smart enough/i] } },
+            { say: "who build you", expect: { source: ["none"], mustMatch: [/AVO/] } },
+            { say: "whos your daddy", expect: { source: ["none"], mustMatch: [/Avo is my daddy/] } },
+        ],
+    },
+    {
+        name: "Lecturer popularity is not met with 'which faculty?'",
+        turns: [
+            { say: "who is most popular lecturer", expect: { source: ["none"], mustMatch: [/EXO/], needsClarification: false } },
+        ],
+    },
+    {
+        name: "Ranking question the small-talk patterns miss is still not met with 'which faculty?' (router rule)",
+        turns: [
+            {
+                say: "which lecturer do students like the most?",
+                expect: { needsClarification: false, mustNotMatch: [/which (faculty|programme|program)/i] },
+            },
+        ],
+    },
+    {
+        name: "A real question that says 'you' still reaches the knowledge base",
+        turns: [
+            {
+                say: "can you tell me who the FICT dean is",
+                expect: { mustNotMatch: [/EXO|smart enough|AVO YYDS|Avo is my daddy/i] },
+            },
+        ],
+    },
+    {
         name: "Exam questions are not hijacked by the calendar rule",
         turns: [
             {
@@ -152,6 +184,9 @@ function check(data, expect = {}) {
     }
     if (expect.source && !expect.source.includes(data.sourceMode)) {
         problems.push(`source was "${data.sourceMode}", expected one of ${expect.source.join(", ")}`);
+    }
+    if (typeof expect.needsClarification === "boolean" && Boolean(data.needsClarification) !== expect.needsClarification) {
+        problems.push(`needsClarification was ${Boolean(data.needsClarification)}, expected ${expect.needsClarification}`);
     }
     for (const re of expect.mustMatch || []) if (!re.test(text)) problems.push(`missing ${re}`);
     for (const re of expect.mustNotMatch || []) if (re.test(text)) problems.push(`should not match ${re}`);
