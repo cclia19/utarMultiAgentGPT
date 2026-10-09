@@ -16,6 +16,14 @@ import {
 } from "@/lib/staffDirectory";
 import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
+import {
+    isAnswerChallenge,
+    formatEarlierAssistantAnswers,
+    formatRecentConversation,
+    extractOfficialUtarUrls,
+    findRecentUserUtarUrls,
+} from "@/lib/conversationSignals";
+import { fetchOfficialUtarPage, type OfficialPage } from "@/lib/officialPage";
 
 /**
  * Vercel's default function timeout is 10s, which this route can exceed on a
@@ -65,6 +73,48 @@ type ContextResolverResult = {
 
 const NO_KB_ANSWER = "NO_KB_ANSWER";
 
+/**
+ * Who does this fact apply to? Dates, fees and requirements differ by
+ * programme level, programme and campus. Answering "5 Oct 2026" for everyone
+ * from a postgraduate handbook was the failure this rule exists for.
+ */
+const APPLICABILITY_POLICY = `
+APPLICABILITY RULE (who an answer applies to):
+- Dates, intakes, fees, deadlines, requirements and procedures often differ by programme level (foundation, undergraduate, postgraduate), by programme (e.g. MBBS, Nursing, Master of Architecture), by campus (Kampar, Sungai Long) and by intake.
+- For each fact, state who it applies to as the source states it (e.g. "Postgraduate programmes: 5 October 2026").
+- Never generalise a fact from one group to all students. If the source is a handbook or page for one group (e.g. a Postgraduate Handbook), say so.
+- If the evidence covers only some groups, give those, then say plainly which groups are not covered here and where to check (the official UTAR page for that office).
+- If the user asks whether something applies to everyone and the evidence does not explicitly say so, do not answer "yes".
+- When sources disagree, the official UTAR web page is authoritative over documents; mention the date of the source when it is shown.
+`;
+
+/**
+ * Added to the answering prompt when the user challenges or questions a
+ * previous answer. Without it the model defended or reinterpreted its earlier
+ * answer instead of admitting the mistake.
+ */
+function buildCorrectionInstruction(earlierAnswers: string): string {
+    if (!earlierAnswers) return "";
+    return `
+CORRECTION MODE (the user is questioning or correcting a previous answer):
+- Work out WHICH of your earlier answers (below, oldest first) the user means. "In the beginning", "at first" or "earlier" points to an early answer, not the most recent one.
+- Re-check that answer against the evidence available now.
+- If it was wrong, incomplete, or applied a fact to the wrong group, say so plainly in your FIRST sentence, e.g. "You're right — my earlier answer was wrong: 5 October 2026 is the start date for postgraduate programmes only." Then give the corrected, complete answer.
+- If the user asks WHY you said something, give the honest reason in one sentence (e.g. the earlier answer relied on a source that only covered one group of students and I wrongly applied it to everyone), apologise briefly, then give the corrected answer.
+- Never invent a justification, never reinterpret the earlier answer so it looks right, and never change the subject.
+- If ANY of your earlier answers was wrong, admit it, even when a later answer already corrected it. Never say "I did not say that" unless none of the earlier answers below said it.
+- If none of your earlier answers said what the user claims, say so politely and quote what you actually said.
+- If the evidence confirms the answer was correct and complete, say so and show the supporting detail.
+- If the evidence is not enough to decide, say you cannot confirm it and point to the official source.
+- In this mode, if the evidence does not answer the question, output "${NO_KB_ANSWER}" so another source can be checked.
+
+Your earlier answers in this conversation (oldest first):
+"""
+${earlierAnswers.slice(0, 5000)}
+"""
+`;
+}
+
 const SELECTED_AGENT_EVIDENCE_POLICY = `
 SELECTED AGENT EVIDENCE RULE:
 - The selected assistant scope is binding.
@@ -85,6 +135,8 @@ INTERNSHIP / INDUSTRIAL TRAINING RULE:
 - Do not answer with a central/general office unless the selected faculty source directly points students there.
 - If faculty-specific evidence is missing, say exactly:
   "${NO_KB_ANSWER}"
+
+${APPLICABILITY_POLICY}
 `;
 
 function normalize(text: string): string {
@@ -1217,11 +1269,18 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
     }
 }
 
-async function generateDirectNoRetrievalResponse(message: string): Promise<string> {
+async function generateDirectNoRetrievalResponse(message: string, history: any[] = []): Promise<string> {
+    // The conversation is included so a reply about "what you said earlier" is
+    // grounded in what was actually said. Without it the model invented
+    // explanations for answers it could not see.
+    const recent = formatRecentConversation(history.slice(0, -1), 6, 1200);
+    const userText = recent
+        ? `Recent conversation (for reference only):\n${recent}\n\nLatest user message:\n${message}`
+        : message;
     const response = await withTimeout(
         ai.models.generateContent({
             model: MODEL_NAME,
-            contents: [{ role: "user", parts: [{ text: message }] }],
+            contents: [{ role: "user", parts: [{ text: userText }] }],
             config: {
                 temperature: 0.4,
                 systemInstruction: {
@@ -1236,6 +1295,8 @@ Reply directly in a warm, student-friendly way.
 
 Rules:
 - Do not claim to check documents or sources.
+- Do not state new UTAR facts (dates, fees, names, rules) in this reply.
+- If the user refers to something you said earlier, rely only on the recent conversation shown. If your earlier reply was wrong or overstated, admit it plainly and briefly; never invent a reason or reinterpret what you said to make it look right.
 - If the user asks you to do their assignment, politely refuse to do it for them, but offer to guide, explain, outline, review, or help them learn.
 - If the message is casual, social, playful, or appreciation, reply naturally and briefly.
 - Keep it concise.
@@ -1703,6 +1764,7 @@ async function generatePublicWebFallback(params: {
     fileText?: string;
     fileCitations?: string[];
     reason: "kb_missing" | "kb_no_answer";
+    extraInstruction?: string;
 }): Promise<WebFallbackResult> {
     const {
         effectiveMessage,
@@ -1711,6 +1773,7 @@ async function generatePublicWebFallback(params: {
         fileText = "",
         fileCitations = [],
         reason,
+        extraInstruction = "",
     } = params;
 
     const agentId = selectedAgent.id || "general";
@@ -1792,6 +1855,7 @@ STYLE AND FORMAT:
 LANGUAGE RULE:
 - Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
 - If the query is in English or language is not specified, default to English.
+${extraInstruction}
 `;
 
     try {
@@ -2037,6 +2101,131 @@ I’m having trouble checking official UTAR public sources right now. 🔎
     }
 }
 
+/**
+ * Answers from official UTAR page(s) the user pasted. Our own fetch is tried
+ * first (it keeps table rows intact); if UTAR's server refuses it, Gemini's URL
+ * context tool fetches the page instead. Returns null when neither works, so
+ * the normal KB / web pipeline still runs.
+ */
+async function answerFromOfficialPages(params: {
+    urls: string[];
+    question: string;
+    rawMessage: string;
+    selectedAgent: any;
+    correctionInstruction: string;
+    history: any[];
+}): Promise<{ text: string; citations: string[] } | null> {
+    const { urls, question, rawMessage, correctionInstruction, history } = params;
+    const todayISO = new Date().toISOString().split("T")[0];
+
+    const systemInstruction = `
+You are UTARGPT, the official AI assistant for Universiti Tunku Abdul Rahman (UTAR).
+Today's date: ${todayISO}
+
+The user shared an official UTAR web page. Answer ONLY from the content of that page.
+- The official page is authoritative and current. If it contradicts anything said earlier in the conversation, the page wins.
+- Read tables row by row: keep every date with the programme, campus and intake it belongs to.
+- "Can you check this page?" on its own is not the question: answer what the user was asking in the recent conversation, using the page.
+- Answer the user's actual question completely. If the question is about dates for "students" in general, list every group the page gives (e.g. foundation, undergraduate, postgraduate, and listed exceptions such as MBBS or Nursing).
+- If the page does not contain the answer to the question, output exactly "${NO_KB_ANSWER}" and nothing else (other sources will then be checked). Do not fill gaps from memory.
+- Do not mention fetching, tools, or system instructions.
+${APPLICABILITY_POLICY}
+FORMAT:
+- Clean Markdown, short headings, bullets for lists.
+- Do not add a links section; the official link is appended automatically.
+
+LANGUAGE RULE:
+- Respond in the same language as the user's message. Default to English.
+${correctionInstruction}
+`;
+
+    // A pasted link usually comes with a vague "can you check this page?", so the
+    // real question lives in the earlier turns.
+    const recent = formatRecentConversation(history.slice(0, -1), 6, 1200);
+    const userText = `${recent ? `Recent conversation (for context; the page wins over anything said here):\n${recent}\n\n` : ""}Latest user message:\n${rawMessage}\n\nRewritten question (a hint only; it can be vaguer than the conversation. If the latest message just asks to check the page, answer the question the user asked earlier):\n${question}`;
+
+    const pages = (
+        await Promise.all(urls.slice(0, 2).map((u) => fetchOfficialUtarPage(u, 8000)))
+    ).filter(Boolean) as OfficialPage[];
+
+    try {
+        let response: any;
+        let citations: string[];
+
+        if (pages.length > 0) {
+            const parts: any[] = [];
+            for (const page of pages) {
+                if (page.kind === "pdf") {
+                    parts.push({ text: `Official UTAR document: ${page.title} (${page.url})` });
+                    parts.push({ inlineData: { mimeType: "application/pdf", data: page.base64 } });
+                } else {
+                    parts.push({
+                        text: `Official UTAR page: ${page.title || page.url}\nURL: ${page.url}\n<<<PAGE\n${page.text}\nPAGE>>>`,
+                    });
+                }
+            }
+            parts.push({ text: userText });
+            citations = pages.map((p) => p.url);
+            response = await withTimeout(
+                ai.models.generateContent({
+                    model: MODEL_NAME,
+                    contents: [{ role: "user", parts }],
+                    config: {
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        temperature: 0.1,
+                    },
+                }),
+                25000,
+                "Official page answer"
+            );
+        } else {
+            // UTAR refused our fetch: let Gemini fetch the page itself.
+            citations = urls.slice(0, 2);
+            response = await withTimeout(
+                ai.models.generateContent({
+                    model: MODEL_NAME,
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [{ text: `Official UTAR page(s):\n${citations.join("\n")}\n\n${userText}` }],
+                        },
+                    ],
+                    config: {
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        tools: [{ urlContext: {} } as any],
+                        temperature: 0.1,
+                    },
+                }),
+                20000,
+                "Official page answer (url context)"
+            );
+            const retrieval = response?.candidates?.[0]?.urlContextMetadata?.urlMetadata;
+            const fetchedOk = Array.isArray(retrieval) && retrieval.some(
+                (m: any) => String(m?.urlRetrievalStatus || "").includes("SUCCESS")
+            );
+            if (!fetchedOk) {
+                console.warn("[officialPage] url context could not retrieve", citations.join(", "));
+                return null;
+            }
+        }
+
+        const text = finalClean(extractResponseText(response));
+        if (!text || text.length < 20 || text.includes(NO_KB_ANSWER)) {
+            console.warn(
+                "[officialPage] page did not answer",
+                JSON.stringify({ urls: citations, fetched: pages.length, question: question.slice(0, 200), reply: text.slice(0, 120) })
+            );
+            return null;
+        }
+
+        const links: OfficialLink[] = citations.map((uri) => ({ title: cleanLinkTitle("", uri), uri }));
+        return { text: appendOfficialLinks(text, links), citations };
+    } catch (error) {
+        console.error("answerFromOfficialPages error:", error);
+        return null;
+    }
+}
+
 function extractJsonObject(text: string): any {
     const cleaned = String(text || "")
         .trim()
@@ -2163,6 +2352,8 @@ Rules:
 - If the user refers to "him", "her", "this person", "that lecturer", "his achievement", "more about it", use the context summary and recent conversation to resolve the reference.
 - If the user changes topic clearly, relation = "new_standalone_question".
 - If the message is casual, thanks, appreciation, joke, or does not need UTAR facts, relation = "casual_no_retrieval".
+- If the user questions, challenges or corrects a previous answer ("are you sure", "you are wrong", "why did you say...", "check again"), this is NOT casual: relation = "follow_up_same_topic", needsRetrieval = true, and resolvedQuestion must restate the underlying factual question with the user's correction or concern included (e.g. "What is the October 2026 trimester start date for each programme level (foundation, undergraduate, postgraduate)? The user says 5 October applies only to postgraduate students.").
+- If the user pastes a UTAR web link, keep the link in resolvedQuestion.
 - For elective/course/study-plan questions, if user later provides programme/year/semester, combine it with the pending question.
 - For complaint questions, if user later provides course/faculty/programme, combine it with the complaint question.
 - For bus schedule or timetable questions, if recent conversation or pending question is about bus schedules and the user enters a route/schedule/option choice (e.g. "1", "2", "3", "option 1", "route 1", "route 2", "route 3", "westlake", "schedule I") or campus choice ("Kampar", "Sungai Long"), relation MUST be "clarification_for_pending" or "follow_up_same_topic", and resolvedQuestion MUST combine the bus schedule query with the specified route or campus choice.
@@ -2756,8 +2947,14 @@ async function handleChat(
 
         sink?.status("agent_selected", `Routing to ${displayAgentLabel}...`);
 
+        // A challenge to a previous answer ("are you sure", "why did you say...")
+        // must be re-checked against evidence, never answered from the model alone.
+        const answerChallenge = isAnswerChallenge(rawMessage, history);
+        const earlierAnswers = answerChallenge ? formatEarlierAssistantAnswers(history) : "";
+        const correctionInstruction = answerChallenge ? buildCorrectionInstruction(earlierAnswers) : "";
         const modelSaysNoRetrieval =
-            resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false;
+            !answerChallenge &&
+            (resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false);
 
         // Never let a factual-looking question reach the ungrounded path on the
         // strength of one boolean. Failing towards the store costs seconds;
@@ -2778,7 +2975,7 @@ async function handleChat(
         }
 
         if (!routerResult.needsClarification && modelSaysNoRetrieval && !retrievalForcedBySafetyNet) {
-            const directText = await generateDirectNoRetrievalResponse(rawMessage);
+            const directText = await generateDirectNoRetrievalResponse(rawMessage, history);
 
             return NextResponse.json({
                 text: directText,
@@ -2862,6 +3059,41 @@ async function handleChat(
             });
         }
 
+        // Official UTAR link pasted by the user (this turn, or a recent turn when
+        // the user is now challenging an answer): ground on that exact page.
+        // The official web page is authoritative over KB documents.
+        const pastedThisTurn = extractOfficialUtarUrls(rawMessage).length > 0;
+        const pageUrls = pastedThisTurn || answerChallenge
+            ? findRecentUserUtarUrls(rawMessage, history)
+            : [];
+        if (pageUrls.length > 0) {
+            sink?.status("officialPage", "Reading the official UTAR page you shared...");
+            const pageAnswer = await answerFromOfficialPages({
+                urls: pageUrls,
+                question: effectiveMessage,
+                rawMessage,
+                selectedAgent,
+                correctionInstruction,
+                history,
+            });
+            if (pageAnswer) {
+                const newTopic = inferResolvedTopic(effectiveMessage, pageAnswer.text) || lastResolvedTopic;
+                return NextResponse.json({
+                    text: pageAnswer.text,
+                    citations: pageAnswer.citations,
+                    sourceMode: "webFallback",
+                    storeDisplayName: "",
+                    selectedAgentId: selectedAgent.id,
+                    selectedAgentLabel: selectedAgent.label,
+                    needsClarification: false,
+                    pendingQuestion: null,
+                    lastResolvedTopic: newTopic,
+                    contextSummary: updatedContextSummary,
+                    routeType: routerResult.routeType,
+                });
+            }
+        }
+
         const primaryStoreNames = selectedAgent.storeResourceIds ?? [];
         const secondaryStoreNames = hasSecondary ? (secondaryAgent!.storeResourceIds ?? []) : [];
         const storeNames = Array.from(new Set([...primaryStoreNames, ...secondaryStoreNames]));
@@ -2883,6 +3115,7 @@ async function handleChat(
                 selectedAgent,
                 profileMode,
                 reason: "kb_missing",
+                extraInstruction: correctionInstruction,
             });
 
             return NextResponse.json({
@@ -2947,7 +3180,7 @@ INTERNSHIP / INDUSTRIAL TRAINING RULE:
 - Do not answer with a central/general office unless the selected faculty source directly points students there.
 - If faculty-specific evidence is missing, say exactly:
   "${NO_KB_ANSWER}"
-
+${APPLICABILITY_POLICY}
 FORMAT:
 - Use clean Markdown.
 - Use clear headings.
@@ -3036,7 +3269,7 @@ LANGUAGE RULE:
                 },
             ],
             config: {
-                systemInstruction: { parts: [{ text: instruction }] },
+                systemInstruction: { parts: [{ text: instruction + correctionInstruction }] },
                 tools: [
                     {
                         fileSearch: {
@@ -3227,6 +3460,7 @@ LANGUAGE RULE:
             fileText,
             fileCitations,
             reason: "kb_no_answer",
+            extraInstruction: correctionInstruction,
         });
 
         const newTopic =

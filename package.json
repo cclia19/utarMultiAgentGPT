@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test \"lib/**/*.test.ts\""
+    "test": "node --test \"lib/**/*.test.ts\"",
+    "eval": "node scripts/eval-chat.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

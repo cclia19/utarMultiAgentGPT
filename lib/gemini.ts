@@ -3,7 +3,7 @@ import {
   recordGeminiCall,
   recordGeminiError,
   recordUsage,
-} from "@/lib/analytics/metrics";
+} from "./analytics/metrics.ts";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("Missing GEMINI_API_KEY in environment variables");
