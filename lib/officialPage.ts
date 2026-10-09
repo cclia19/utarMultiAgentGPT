@@ -133,3 +133,22 @@ export async function fetchOfficialUtarPage(rawUrl: string, timeoutMs = 10_000):
         clearTimeout(timer);
     }
 }
+
+/** DACE's intake page: commencement dates per programme level, campus and programme. */
+export const DACE_INTAKE_CALENDAR_URL = "https://admission.utar.edu.my/intake-and-Academic-Calendar.php";
+
+const PAGE_CACHE_TTL_MS = 15 * 60 * 1000;
+const pageCache = new Map<string, { at: number; page: OfficialPage }>();
+
+/**
+ * Same as fetchOfficialUtarPage, but reuses a successful fetch for 15 minutes
+ * so a page fetched for every calendar question does not hit UTAR each time.
+ * Failures are not cached.
+ */
+export async function fetchOfficialUtarPageCached(url: string, timeoutMs = 5_000): Promise<OfficialPage | null> {
+    const hit = pageCache.get(url);
+    if (hit && Date.now() - hit.at < PAGE_CACHE_TTL_MS) return hit.page;
+    const page = await fetchOfficialUtarPage(url, timeoutMs);
+    if (page) pageCache.set(url, { at: Date.now(), page });
+    return page;
+}
