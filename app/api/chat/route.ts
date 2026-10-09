@@ -5,6 +5,7 @@ import { ai, MODEL_NAME } from "@/lib/gemini";
 import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
+import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
@@ -1028,16 +1029,7 @@ You know I know. 😎
     }
 
     if (lower.includes("who is avo") || lower.includes("who is avocado") || lower === "avo" || lower === "avocado") {
-        return `
-Avo is my daddy 🥑 — not the sugar type.
-
-He helped create me so students don’t have to be lonely.
-
-### 🥑 Lore unlocked
-
-- #dontworry
-- #behappy
-`.trim();
+        return AVO_DADDY_REPLY;
     }
 
     if (
@@ -1074,29 +1066,6 @@ Either way, welcome to the grind. We make it work. 💪
     }
 
     return null;
-}
-
-function tryHandleEasterEgg(message: string): string | null {
-    const lower = message.toLowerCase();
-
-    const signals = [
-        "who built you",
-        "who made you",
-        "who created you",
-        "who is your creator",
-    ];
-
-    if (!signals.some((signal) => lower.includes(signal))) return null;
-
-    return `
-You know, I know. 😌
-
-### 🥑 Hidden lore
-
-- Built with UTARCHAT energy.
-- Powered by knowledge, caffeine, and slightly too many debugging sessions.
-- **AVO YYDS 🥑**
-`.trim();
 }
 
 function tryHandleFoodQuestion(message: string): string | null {
@@ -1299,6 +1268,7 @@ Rules:
 - If the user refers to something you said earlier, rely only on the recent conversation shown. If your earlier reply was wrong or overstated, admit it plainly and briefly; never invent a reason or reinterpret what you said to make it look right.
 - If the user asks you to do their assignment, politely refuse to do it for them, but offer to guide, explain, outline, review, or help them learn.
 - If the message is casual, social, playful, or appreciation, reply naturally and briefly.
+- If asked to rank or pick a favourite UTAR lecturer or staff member, say there is no official ranking and keep it playful. Never name a real person as the best or worst.
 - Keep it concise.
 - LANGUAGE RULE: Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). If the query is in English or language is not specified, default to English.
 `,
@@ -2851,7 +2821,7 @@ async function handleChat(
 
         const directPreReplies = [
             tryHandleVulgarity(rawMessage),
-            tryHandleEasterEgg(rawMessage),
+            trySmallTalkReply(rawMessage),
             tryHandlePlayfulStudentChat(rawMessage),
             tryHandleEmotionalCasualSupport(rawMessage),
             tryHandleFoodQuestion(rawMessage),
