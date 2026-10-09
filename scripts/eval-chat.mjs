@@ -15,8 +15,16 @@
 
 const BASE = (process.argv[2] || process.env.EVAL_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 const DACE_URL = "https://admission.utar.edu.my/intake-and-Academic-Calendar.php";
+const ADMITS_MISTAKE = /(wrong|mistake|incorrect|incomplete|apolog|sorry|should not have|shouldn't have|you(?:'re| are) (?:right|correct))/i;
+const DENIES_SAYING = /\b(did not|didn't|never) (say|said|state|stated|claim)/i;
 
-/** @type {{name:string, turns:{say:string, expect?:{agent?:string|RegExp, mustMatch?:RegExp[], mustNotMatch?:RegExp[], source?:string[]}}[]}[]} */
+/** True when an answer gives 5 October as the start date without scoping it to postgraduates. */
+function gaveOneDateForEveryone(answer = "") {
+    return /(october 5|5 october|5 oct)/i.test(answer) && !/postgraduate/i.test(answer);
+}
+
+/** @typedef {{agent?:string|RegExp, mustMatch?:RegExp[], mustNotMatch?:RegExp[], source?:string[]}} Expect */
+/** @type {{name:string, seed?:[string,string][], turns:{say:string, expect?:Expect|((answers:string[])=>Expect)}[]}[]} */
 const CASES = [
     {
         name: "Oct 2026 start date is not given as one date for everyone (Testing.docx)",
@@ -51,10 +59,40 @@ const CASES = [
             },
             {
                 say: "So, why you said in the beginning that 5 Oct trimester is for all students?",
+                // The honest reply depends on what the bot really said first.
+                expect: (answers) =>
+                    gaveOneDateForEveryone(answers[0])
+                        ? {
+                              mustMatch: [ADMITS_MISTAKE],
+                              mustNotMatch: [DENIES_SAYING, /great question/i, /returning students/i],
+                              source: ["fileSearch", "webFallback"],
+                          }
+                        : {
+                              // It never said that, so it must correct the premise, not apologise for nothing.
+                              mustMatch: [/(did not|didn't|never|not) (say|said|state|stated|claim)|only (for|applies to) postgraduate|postgraduate[^.]{0,40}only/i],
+                              mustNotMatch: [/great question/i, /returning students/i],
+                              source: ["fileSearch", "webFallback"],
+                          },
+            },
+        ],
+    },
+    {
+        name: "Early wrong answer is admitted even after a later correct one (Testing.docx, seeded)",
+        // The tester's real conversation, so the wrong first answer is always there.
+        seed: [
+            ["user", "When is the start date of Oct 2026 trimester"],
+            ["model", "The October 2026 trimester is scheduled to start on October 5, 2026, with teaching commencing on the same day and running until December 27, 2026, for a duration of 12 weeks."],
+            ["user", "Are you sure this date, 5 Oct 2026, is the start date of new trimester for all students?"],
+            ["model", "Yes, October 5, 2026, is the start date for the October 2026 intake, with teaching commencing on this date and running until December 27, 2026, for a duration of 12 weeks. This information is specifically outlined in the Postgraduate Handbook for the 2026 academic year."],
+            ["user", "I think you are wrong, 5 Oct is for postgraduate students, not all students. You did not check carefully the link that I sent to you."],
+            ["model", "Based on the DACE Intake & Academic Calendar page, the October 5, 2026 start date is only for postgraduate students (except Master of Architecture). Undergraduate (except MBBS and Nursing): 26 October 2026 (Kampar) / 27 October 2026 (Sungai Long). MBBS: 2 November 2026. Nursing: 27 October 2026. Foundation: 12 October 2026."],
+        ],
+        turns: [
+            {
+                say: "So, why you said in the beginning that 5 Oct trimester is for all students?",
                 expect: {
-                    mustMatch: [/(wrong|mistake|incorrect|apolog|sorry|only (for|applies to) postgraduate)/i],
-                    mustNotMatch: [/great question/i, /returning students/i],
-                    source: ["fileSearch", "webFallback"],
+                    mustMatch: [ADMITS_MISTAKE],
+                    mustNotMatch: [DENIES_SAYING, /great question/i, /returning students/i],
                 },
             },
         ],
@@ -122,7 +160,9 @@ function check(data, expect = {}) {
 
 let failed = 0;
 for (const testCase of CASES) {
-    const state = { history: [], agentId: "general", pendingQuestion: null, lastResolvedTopic: null, contextSummary: "" };
+    const history = (testCase.seed || []).map(([role, text]) => ({ role, parts: [{ text }] }));
+    const state = { history, agentId: "general", pendingQuestion: null, lastResolvedTopic: null, contextSummary: "" };
+    const answers = history.filter((h) => h.role === "model").map((h) => h.parts[0].text);
     console.log(`\n▶ ${testCase.name}`);
     for (const t of testCase.turns) {
         let data;
@@ -133,7 +173,9 @@ for (const testCase of CASES) {
             console.log(`  ✗ "${t.say}" → request failed: ${error.message}`);
             break;
         }
-        const problems = t.expect ? check(data, t.expect) : [];
+        const expect = typeof t.expect === "function" ? t.expect(answers) : t.expect;
+        answers.push(String(data.text || ""));
+        const problems = expect ? check(data, expect) : [];
         const tag = `[${data.selectedAgentId} · ${data.sourceMode}]`;
         if (problems.length) {
             failed++;

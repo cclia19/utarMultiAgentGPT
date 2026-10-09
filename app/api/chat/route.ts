@@ -18,7 +18,7 @@ import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
 import {
     isAnswerChallenge,
-    getLastAssistantAnswer,
+    formatEarlierAssistantAnswers,
     formatRecentConversation,
     extractOfficialUtarUrls,
     findRecentUserUtarUrls,
@@ -93,21 +93,24 @@ APPLICABILITY RULE (who an answer applies to):
  * previous answer. Without it the model defended or reinterpreted its earlier
  * answer instead of admitting the mistake.
  */
-function buildCorrectionInstruction(previousAnswer: string): string {
-    if (!previousAnswer) return "";
+function buildCorrectionInstruction(earlierAnswers: string): string {
+    if (!earlierAnswers) return "";
     return `
-CORRECTION MODE (the user is questioning or correcting your previous answer):
-- Re-check the previous answer (below) against the evidence available now.
+CORRECTION MODE (the user is questioning or correcting a previous answer):
+- Work out WHICH of your earlier answers (below, oldest first) the user means. "In the beginning", "at first" or "earlier" points to an early answer, not the most recent one.
+- Re-check that answer against the evidence available now.
 - If it was wrong, incomplete, or applied a fact to the wrong group, say so plainly in your FIRST sentence, e.g. "You're right — my earlier answer was wrong: 5 October 2026 is the start date for postgraduate programmes only." Then give the corrected, complete answer.
 - If the user asks WHY you said something, give the honest reason in one sentence (e.g. the earlier answer relied on a source that only covered one group of students and I wrongly applied it to everyone), apologise briefly, then give the corrected answer.
 - Never invent a justification, never reinterpret the earlier answer so it looks right, and never change the subject.
-- If the evidence confirms the previous answer was correct and complete, say so and show the supporting detail.
+- If ANY of your earlier answers was wrong, admit it, even when a later answer already corrected it. Never say "I did not say that" unless none of the earlier answers below said it.
+- If none of your earlier answers said what the user claims, say so politely and quote what you actually said.
+- If the evidence confirms the answer was correct and complete, say so and show the supporting detail.
 - If the evidence is not enough to decide, say you cannot confirm it and point to the official source.
 - In this mode, if the evidence does not answer the question, output "${NO_KB_ANSWER}" so another source can be checked.
 
-Previous answer:
+Your earlier answers in this conversation (oldest first):
 """
-${previousAnswer.slice(0, 2500)}
+${earlierAnswers.slice(0, 5000)}
 """
 `;
 }
@@ -2110,8 +2113,9 @@ async function answerFromOfficialPages(params: {
     rawMessage: string;
     selectedAgent: any;
     correctionInstruction: string;
+    history: any[];
 }): Promise<{ text: string; citations: string[] } | null> {
-    const { urls, question, rawMessage, correctionInstruction } = params;
+    const { urls, question, rawMessage, correctionInstruction, history } = params;
     const todayISO = new Date().toISOString().split("T")[0];
 
     const systemInstruction = `
@@ -2121,6 +2125,7 @@ Today's date: ${todayISO}
 The user shared an official UTAR web page. Answer ONLY from the content of that page.
 - The official page is authoritative and current. If it contradicts anything said earlier in the conversation, the page wins.
 - Read tables row by row: keep every date with the programme, campus and intake it belongs to.
+- "Can you check this page?" on its own is not the question: answer what the user was asking in the recent conversation, using the page.
 - Answer the user's actual question completely. If the question is about dates for "students" in general, list every group the page gives (e.g. foundation, undergraduate, postgraduate, and listed exceptions such as MBBS or Nursing).
 - If the page does not contain the answer to the question, output exactly "${NO_KB_ANSWER}" and nothing else (other sources will then be checked). Do not fill gaps from memory.
 - Do not mention fetching, tools, or system instructions.
@@ -2134,7 +2139,10 @@ LANGUAGE RULE:
 ${correctionInstruction}
 `;
 
-    const userText = `User message:\n${rawMessage}\n\nQuestion to answer:\n${question}`;
+    // A pasted link usually comes with a vague "can you check this page?", so the
+    // real question lives in the earlier turns.
+    const recent = formatRecentConversation(history.slice(0, -1), 6, 1200);
+    const userText = `${recent ? `Recent conversation (for context; the page wins over anything said here):\n${recent}\n\n` : ""}Latest user message:\n${rawMessage}\n\nRewritten question (a hint only; it can be vaguer than the conversation. If the latest message just asks to check the page, answer the question the user asked earlier):\n${question}`;
 
     const pages = (
         await Promise.all(urls.slice(0, 2).map((u) => fetchOfficialUtarPage(u, 8000)))
@@ -2202,7 +2210,13 @@ ${correctionInstruction}
         }
 
         const text = finalClean(extractResponseText(response));
-        if (!text || text.length < 20 || text.includes(NO_KB_ANSWER)) return null;
+        if (!text || text.length < 20 || text.includes(NO_KB_ANSWER)) {
+            console.warn(
+                "[officialPage] page did not answer",
+                JSON.stringify({ urls: citations, fetched: pages.length, question: question.slice(0, 200), reply: text.slice(0, 120) })
+            );
+            return null;
+        }
 
         const links: OfficialLink[] = citations.map((uri) => ({ title: cleanLinkTitle("", uri), uri }));
         return { text: appendOfficialLinks(text, links), citations };
@@ -2936,8 +2950,8 @@ async function handleChat(
         // A challenge to a previous answer ("are you sure", "why did you say...")
         // must be re-checked against evidence, never answered from the model alone.
         const answerChallenge = isAnswerChallenge(rawMessage, history);
-        const previousAnswer = answerChallenge ? getLastAssistantAnswer(history) : "";
-        const correctionInstruction = answerChallenge ? buildCorrectionInstruction(previousAnswer) : "";
+        const earlierAnswers = answerChallenge ? formatEarlierAssistantAnswers(history) : "";
+        const correctionInstruction = answerChallenge ? buildCorrectionInstruction(earlierAnswers) : "";
         const modelSaysNoRetrieval =
             !answerChallenge &&
             (resolverSaysNoRetrieval || (routerResult as any).retrievalNeeded === false);
@@ -3060,6 +3074,7 @@ async function handleChat(
                 rawMessage,
                 selectedAgent,
                 correctionInstruction,
+                history,
             });
             if (pageAnswer) {
                 const newTopic = inferResolvedTopic(effectiveMessage, pageAnswer.text) || lastResolvedTopic;

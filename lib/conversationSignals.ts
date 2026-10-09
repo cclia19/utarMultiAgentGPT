@@ -87,6 +87,28 @@ export function getLastAssistantAnswer(history: any[]): string {
 }
 
 /**
+ * The assistant's recent answers, oldest first and numbered, for correction
+ * mode. A challenge often points at an earlier answer ("why did you say in the
+ * beginning..."), and only showing the latest one let the model deny a mistake
+ * it made two turns before.
+ */
+export function formatEarlierAssistantAnswers(history: any[], maxAnswers = 4, maxChars = 1200): string {
+    if (!Array.isArray(history)) return "";
+    const answers = history
+        .filter((entry) => entry?.role === "model" || entry?.role === "assistant")
+        .map((entry) => historyEntryText(entry))
+        .filter(Boolean)
+        .slice(-maxAnswers);
+    if (answers.length === 0) return "";
+    return answers
+        .map((text, i) => {
+            const label = i === answers.length - 1 ? `Answer ${i + 1} (most recent)` : `Answer ${i + 1}`;
+            return `${label}:\n${text.slice(0, maxChars)}`;
+        })
+        .join("\n\n");
+}
+
+/**
  * Short transcript of the recent conversation, oldest first, for prompts that
  * must see what the assistant previously said.
  */

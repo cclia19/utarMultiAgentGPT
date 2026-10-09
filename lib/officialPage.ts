@@ -98,7 +98,10 @@ export async function fetchOfficialUtarPage(rawUrl: string, timeoutMs = 10_000):
                 continue;
             }
 
-            if (!response.ok) return null;
+            if (!response.ok) {
+                console.warn("[officialPage] fetch status", response.status, current.toString());
+                return null;
+            }
 
             const contentType = String(response.headers.get("content-type") || "").toLowerCase();
             const finalUrl = current.toString();

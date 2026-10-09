@@ -5,6 +5,7 @@ const {
     isIntakeOrCalendarQuestion,
     isAnswerChallenge,
     getLastAssistantAnswer,
+    formatEarlierAssistantAnswers,
     extractOfficialUtarUrls,
     findRecentUserUtarUrls,
     htmlToGroundingText,
@@ -72,6 +73,29 @@ test("last assistant answer is found", () => {
     const history = [...testingDocHistory, turn("user", "are you sure?")];
     assert.match(getLastAssistantAnswer(history), /October 5, 2026/);
     assert.equal(getLastAssistantAnswer([]), "");
+});
+
+test("correction mode sees the early wrong answer, not just the latest correct one", () => {
+    // Testing.docx: the wrong answer came first, a correct one later, then
+    // "why you said in the beginning...". The early answer must be visible.
+    const history = [
+        ...testingDocHistory,
+        turn("user", "I think you are wrong, 5 Oct is for postgraduate students, not all students."),
+        turn("model", "5 October 2026 is for postgraduate students only. Foundation starts 12 October 2026."),
+        turn("user", "So, why you said in the beginning that 5 Oct trimester is for all students?"),
+    ];
+    const text = formatEarlierAssistantAnswers(history);
+    assert.match(text, /Answer 1:\nThe October 2026 trimester is scheduled to start on October 5, 2026\./);
+    assert.match(text, /Answer 2 \(most recent\):\n5 October 2026 is for postgraduate students only/);
+    assert.ok(text.indexOf("Answer 1") < text.indexOf("Answer 2"), "oldest first");
+    assert.equal(formatEarlierAssistantAnswers([turn("user", "hi")]), "");
+});
+
+test("correction mode keeps only the most recent few answers", () => {
+    const history = [1, 2, 3, 4, 5, 6].flatMap((n) => [turn("user", `q${n}`), turn("model", `a${n}`)]);
+    const text = formatEarlierAssistantAnswers(history, 4);
+    assert.doesNotMatch(text, /\ba2\b/);
+    assert.match(text, /Answer 1:\na3\n\nAnswer 2:\na4\n\nAnswer 3:\na5\n\nAnswer 4 \(most recent\):\na6$/);
 });
 
 test("official UTAR links are extracted", () => {
