@@ -32,6 +32,8 @@ test("intake / commencement / calendar questions are detected (routed to DACE)",
         "十月开学日期是什么时候？",
         "what are the confirmed start dates for october 2026",
         "October 2026 start date?",
+        "When does MBBS start in October 2026?",
+        "when will foundation begin in june",
     ]) {
         assert.equal(isIntakeOrCalendarQuestion(q), true, q);
     }
@@ -43,6 +45,8 @@ test("non-calendar questions are not detected", () => {
         "How is CGPA calculated?",
         "what is the start date of my internship in June?",
         "industrial training start date for October 2026",
+        "When does the final exam start in December?",
+        "when does my internship start in June?",
         "What are the library opening hours?",
         "Who is the dean of FICT?",
         "hi",

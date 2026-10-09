@@ -10,6 +10,9 @@
  *   node scripts/prelaunch-check.mjs --only "dace-|bus-" --budget-myr 5
  *   node scripts/prelaunch-check.mjs --rerun-flagged   # only last run's problems
  *
+ * Runs with --only or --rerun-flagged update the previous results instead of
+ * replacing them, so the report always covers every question asked so far.
+ *
  * Cost comes from the x-chat-metrics header that `next dev` adds to each
  * reply (tokens and web-search calls). Prices are gemini-2.5-flash list
  * prices; web searches are counted at the paid rate even though the first
@@ -49,10 +52,12 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) {
     process.exit(2);
 }
 
+const partial = Boolean(ONLY) || args.includes("--rerun-flagged");
+const previous = partial ? JSON.parse(await readFile(JSON_PATH, "utf8").catch(() => '{"results":[]}')) : { results: [] };
+
 let cases = QUESTIONS;
 if (ONLY) cases = cases.filter((c) => new RegExp(ONLY).test(c.id));
 if (args.includes("--rerun-flagged")) {
-    const previous = JSON.parse(await readFile(JSON_PATH, "utf8"));
     const flagged = new Set(previous.results.filter((r) => r.problems.length).map((r) => r.id));
     cases = cases.filter((c) => flagged.has(c.id));
 }
@@ -168,8 +173,11 @@ async function worker() {
 await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
 // --- Report -----------------------------------------------------------------
-const order = new Map(cases.map((c, i) => [c.id, i]));
-results.sort((a, b) => order.get(a.id) - order.get(b.id));
+// Keep earlier answers for questions not asked this time.
+const askedNow = new Set(results.map((r) => r.id));
+for (const r of previous.results) if (!askedNow.has(r.id)) results.push(r);
+const order = new Map(QUESTIONS.map((c, i) => [c.id, i]));
+results.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
 const flagged = results.filter((r) => r.problems.length);
 const byCode = {};
 for (const r of flagged) for (const p of r.problems) (byCode[p.code] ??= []).push(r.id);
@@ -178,7 +186,7 @@ const esc = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
 const lines = [
     `# Pre-launch check`,
     ``,
-    `${new Date().toISOString()} · ${results.length}/${cases.length} cases · ${flagged.length} with problems · est. cost RM${(spentUsd * MYR_PER_USD).toFixed(2)} (US$${spentUsd.toFixed(2)})${stoppedForBudget ? " · **stopped at budget**" : ""}`,
+    `${new Date().toISOString()} · ${results.length}/${QUESTIONS.length} cases · ${flagged.length} with problems · est. cost of this run RM${(spentUsd * MYR_PER_USD).toFixed(2)} (US$${spentUsd.toFixed(2)})${stoppedForBudget ? " · **stopped at budget**" : ""}`,
     ``,
     `## Problems by type`,
     ``,

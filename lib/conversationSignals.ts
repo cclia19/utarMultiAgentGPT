@@ -21,6 +21,8 @@ const CALENDAR_PATTERNS: RegExp[] = [
     // "start dates for October 2026", "October 2026 start date"
     new RegExp(`\\b(start|starting|begin|beginning|commencement)\\s+dates?\\b[^.?!]{0,30}\\b${MONTH}\\b`, "i"),
     new RegExp(`\\b${MONTH}\\b[^.?!]{0,15}\\b(start|starting|commencement)\\s+dates?\\b`, "i"),
+    // "When does MBBS start in October 2026?"
+    new RegExp(`\\bwhen\\b[^.?!]{0,40}\\b(start|starts|begin|begins|commence|commences)\\b[^.?!]{0,15}\\b${MONTH}\\b`, "i"),
     // Malay
     /\b(pengambilan|kalendar\s+akademik|tarikh\s+mula)\b/i,
     // Chinese
