@@ -66,7 +66,7 @@ interface Message {
     thought?: string;
     isStreaming?: boolean;
     citations?: string[];
-    sourceMode?: "fileSearch" | "webFallback" | "staffDirectory" | "none";
+    sourceMode?: "fileSearch" | "webFallback" | "staffDirectory" | "officialSchedule" | "none";
     storeDisplayName?: string;
     selectedAgentId?: AgentId;
     selectedAgentLabel?: string;
@@ -141,6 +141,7 @@ function sourceLabel(sourceMode?: string): string {
     if (sourceMode === "fileSearch") return "KB";
     if (sourceMode === "webFallback") return "Web";
     if (sourceMode === "staffDirectory") return "Staff Directory";
+    if (sourceMode === "officialSchedule") return "Official schedule";
     return "None";
 }
 
@@ -155,6 +156,10 @@ function sourceBadgeClass(sourceMode?: string): string {
 
     if (sourceMode === "staffDirectory") {
         return "bg-amber-50 text-amber-700 border border-amber-100";
+    }
+
+    if (sourceMode === "officialSchedule") {
+        return "bg-emerald-50 text-emerald-700 border border-emerald-100";
     }
 
     return "bg-zinc-50 text-zinc-500 border border-zinc-100";

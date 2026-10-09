@@ -7,6 +7,7 @@ import {
 import { detectAgentFromText, routeQuestion, resolveControlledAcronym } from "./routing";
 import { isPersonRoleQuestion } from "./personRoleQuestion";
 import { isIntakeOrCalendarQuestion } from "./conversationSignals";
+import { bothCampusOffices } from "./campusOffices";
 
 export interface IntentRouteResult {
     agentId: string;
@@ -432,6 +433,26 @@ function applySafetyGuards(params: {
         };
     }
 
+    // "Which campus?" for an office that exists at both campuses: answer from
+    // both campus offices instead of asking (lib/campusOffices.ts).
+    const campusPair = bothCampusOffices({
+        agentId,
+        needsClarification: result.needsClarification,
+        clarificationQuestion: result.clarificationQuestion,
+        message: `${rawMsg} ${message}`,
+    });
+    if (campusPair) {
+        return {
+            ...result,
+            agentId: campusPair[0],
+            secondaryAgentId: campusPair[1],
+            retrievalNeeded: true,
+            needsClarification: false,
+            clarificationQuestion: "",
+            routeType: "admin_specific",
+        };
+    }
+
     // Person and role questions take staff directory / single unit path and must NOT fan out
     const isRole = isPersonRoleQuestion(message).isRoleQuestion || isPersonRoleQuestion(rawMsg).isRoleQuestion;
     if (isRole || result.needsClarification || result.routeType === "private_sensitive" || result.routeType === "unclear") {
@@ -518,6 +539,32 @@ export async function routeWithLLM(params: {
     const pendingQuestion = params.pendingQuestion || null;
 
     const acronymResult = resolveControlledAcronym(rawMessage) || resolveControlledAcronym(message);
+    // DSA / DSS / DGS without a campus: answer from both campus offices
+    // instead of asking (lib/campusOffices.ts).
+    const acronymCampusPair = acronymResult
+        ? bothCampusOffices({
+              agentId: acronymResult.agentId,
+              needsClarification: acronymResult.needsClarification,
+              clarificationQuestion: acronymResult.clarificationMessage,
+              message: `${rawMessage} ${message}`,
+          })
+        : null;
+    if (acronymCampusPair) {
+        return {
+            agentId: acronymCampusPair[0],
+            secondaryAgentId: acronymCampusPair[1],
+            intentCategory: "admin_service",
+            retrievalNeeded: true,
+            conversationRelation: "none",
+            usePendingQuestion: false,
+            needsClarification: false,
+            clarificationQuestion: "",
+            rewrittenQuestion: message,
+            allowWebFallback: true,
+            routeType: "admin_specific",
+            confidence: 0.9,
+        };
+    }
     if (acronymResult && acronymResult.needsClarification) {
         const selectedUnit = getOrgUnitById(acronymResult.agentId);
         return {

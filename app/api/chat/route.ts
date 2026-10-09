@@ -6,6 +6,8 @@ import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
 import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
+import { tryBusScheduleReply } from "@/lib/busSchedule";
+import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
@@ -104,6 +106,7 @@ const RESPONSE_STYLE = `
 RESPONSE STYLE (every answer):
 - Open with the direct answer in one or two sentences. No preamble ("Here is...", "Based on the information...") and do not restate the question.
 - Then only the detail that answer needs. Aim for under 150 words; go longer only for step-by-step procedures or when the user asks for everything.
+- Leave out background the user did not ask for (history, related services, expansions); offer it in one line instead if it is useful.
 - Pick the layout that fits the content:
   - Dates, fees or rules that differ by group: one bullet per group, bold label first ("**Undergraduate:** 26 October 2026").
   - How-to or procedure: numbered steps, one action per step, with form names and offices in bold.
@@ -2796,6 +2799,11 @@ export async function POST(req: NextRequest) {
         const latencyMs = Date.now() - startedAt;
         const payload = await res.clone().json().catch(() => null);
         after(() => logChatEvent({ body, payload, metrics, latencyMs }));
+        // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
+        // Gemini cost of a test run. Vercel builds run with NODE_ENV=production.
+        if (process.env.NODE_ENV !== "production") {
+            res.headers.set("x-chat-metrics", JSON.stringify({ ...metrics, latencyMs }));
+        }
         return res;
     }
 
@@ -2864,6 +2872,25 @@ async function handleChat(
             rawMessage,
             lastResolvedTopic
         );
+
+        // Kampar bus timetables come from data, not Gemini: Gemini blocks most
+        // answers that reproduce the timetable PDFs (see lib/busSchedule.ts).
+        const busReply = tryHandleVulgarity(rawMessage) ? null : tryBusScheduleReply(rawMessage, history);
+        if (busReply) {
+            const busAgent = getAgentById("dgs-kampar");
+            return NextResponse.json({
+                text: busReply,
+                citations: [],
+                sourceMode: "officialSchedule",
+                storeDisplayName: "",
+                selectedAgentId: busAgent.id,
+                selectedAgentLabel: busAgent.label,
+                needsClarification: false,
+                pendingQuestion: null,
+                lastResolvedTopic,
+                routeType: "admin_specific",
+            });
+        }
 
         const directPreReplies = [
             tryHandleVulgarity(rawMessage),
@@ -3056,7 +3083,12 @@ async function handleChat(
             : routerResult.rewrittenQuestion || resolvedMessage;
 
         const calendarQuestion = isIntakeOrCalendarQuestion(rawMessage) || isIntakeOrCalendarQuestion(effectiveMessage);
-        const answerRules = correctionInstruction + (calendarQuestion ? buildCalendarFormatInstruction() : "");
+        const bothCampuses =
+            hasSecondary && campusFamily(selectedAgent.id) !== null && campusFamily(selectedAgent.id) === campusFamily(secondaryAgent!.id);
+        const answerRules =
+            correctionInstruction +
+            (calendarQuestion ? buildCalendarFormatInstruction() : "") +
+            (bothCampuses ? BOTH_CAMPUSES_RULE : "");
 
         const profileMode = isProfileQuestion(effectiveMessage);
         const sensitiveMode =
