@@ -25,6 +25,8 @@ Anything personal or interactive: results, student feedback, applications, Micro
 - The new version is uploaded before the old one is removed, so a department never loses a document mid-sync.
 - Announcements older than 90 days are retired (removed from the store, history kept). Nothing else is removed automatically.
 - Any version can be made live again from `/admin/upload` (History → Make live again).
+- **Remove** (staff uploads): takes a document out of the chatbot's knowledge; its versions stay, so History → Make live again brings it back. Web and portal documents cannot be removed there (the monthly sync re-adds them).
+- **Older uploads** (previous intranet uploader): **Replace with new version** uploads the newer file with versioning and removes the old one only once the new one is live; **Remove** deletes it for good (that uploader kept no copy).
 
 ## One-time setup
 
