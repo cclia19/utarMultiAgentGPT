@@ -1,0 +1,62 @@
+# Monthly refresh of the chatbot knowledge base from public UTAR web pages
+# (scripts/kb-sync.mjs). Changes go live with safeguards: broken or shrunken
+# pages keep their last good version, and every version can be rolled back
+# from /admin/upload. Portal content is synced separately (needs a login).
+#
+# Repository secrets needed: GEMINI_API_KEY, DATABASE_URL (same values as Vercel).
+name: Knowledge-base sync
+
+on:
+  schedule:
+    - cron: "0 18 1 * *" # 1st of each month, 02:00 Malaysia time
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Publish changes (false = dry run, report only)"
+        type: boolean
+        default: false
+      only:
+        description: "Only pages whose URL or name matches (regex, optional)"
+        type: string
+        default: ""
+
+concurrency:
+  group: kb-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Sync
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+          ONLY: ${{ inputs.only }}
+        shell: bash
+        run: |
+          set -o pipefail
+          args=(--out-dir reports)
+          if [ "$APPLY" = "true" ]; then args+=(--apply); fi
+          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
+          mkdir -p reports
+          node scripts/kb-sync.mjs "${args[@]}"
+      - name: Report
+        if: always()
+        run: cat reports/kb-sync-report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kb-sync-report
+          path: reports/kb-sync-report.md
