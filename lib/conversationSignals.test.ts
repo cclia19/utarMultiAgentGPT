@@ -9,6 +9,7 @@ const {
     extractOfficialUtarUrls,
     findRecentUserUtarUrls,
     htmlToGroundingText,
+    isProgrammeContentQuestion,
 } = await import("./conversationSignals.ts");
 
 const turn = (role: "user" | "model", text: string) => ({ role, parts: [{ text }] });
@@ -162,4 +163,24 @@ test("HTML tables keep each date on the same line as its programme", () => {
     assert.match(text, /^Postgraduate \| 5 October 2026$/m);
     assert.match(text, /Undergraduate \(except MBBS & Nursing\) \| 26 October 2026 \(Kampar\)/);
     assert.doesNotMatch(text, /var a=1|\.x\{\}|Home \| About/);
+});
+
+test("questions about what a programme teaches are detected", () => {
+    for (const q of [
+        "How much mathematics is in the Computer Science programme, especially for AI?",
+        "What subjects are in Bachelor of Computer Science?",
+        "what courses will I study in the accounting degree",
+        "programme structure for Bachelor of Information Systems",
+        "What are the electives for computer science?",
+    ]) {
+        assert.equal(isProgrammeContentQuestion(q), true, q);
+    }
+    for (const q of [
+        "How do I register for courses in the computer science programme?",
+        "What is the fee for the Computer Science degree?",
+        "When is the exam for my degree courses?",
+        "How much is the bus fare?",
+    ]) {
+        assert.equal(isProgrammeContentQuestion(q), false, q);
+    }
 });

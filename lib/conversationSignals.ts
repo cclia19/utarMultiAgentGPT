@@ -281,3 +281,18 @@ export function htmlToGroundingText(html: string): { title: string; text: string
 
     return { title, text: deduped.join("\n") };
 }
+
+// ---------------------------------------------------------------------------
+// 4. What a programme teaches (courses, subjects, maths content).
+// ---------------------------------------------------------------------------
+
+const TEACHING_PATTERN = /\b(courses?|subjects?|modules?|programme structure|program structure|course structure|syllabus|curriculum|electives?|specialis\w*|specializ\w*|what (will|do|would) (i|we|you|students) (learn|study)|how (much|many) (math|maths|mathematics|programming|coding|courses|subjects))\b/i;
+const PROGRAMME_PATTERN = /\b(programme|program|degree|bachelor|master|diploma|foundation|computer science|engineering|accounting|information (systems|technology)|\bbcs\b|\bcs\b|\bit\b)\b/i;
+// Questions about registering for or paying for courses are not about content.
+const COURSE_ADMIN_PATTERN = /\b(register|registration|add\s*(\/|or|and)?\s*drop|withdraw|fees?|pay|deadline|timetable|exam)\b/i;
+
+/** "What subjects are in Computer Science?", "how much maths is in the CS programme?" */
+export function isProgrammeContentQuestion(text: string): boolean {
+    const raw = String(text || "");
+    return TEACHING_PATTERN.test(raw) && PROGRAMME_PATTERN.test(raw) && !COURSE_ADMIN_PATTERN.test(raw);
+}

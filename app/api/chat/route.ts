@@ -8,6 +8,7 @@ import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factua
 import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { tryBusScheduleReply } from "@/lib/busSchedule";
 import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
+import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
@@ -22,6 +23,7 @@ import { getOrgUnitById } from "@/lib/orgUnits";
 import {
     isAnswerChallenge,
     isIntakeOrCalendarQuestion,
+    isProgrammeContentQuestion,
     formatEarlierAssistantAnswers,
     formatRecentConversation,
     extractOfficialUtarUrls,
@@ -118,7 +120,7 @@ RESPONSE STYLE (every answer):
 - Bold only key facts (dates, amounts, deadlines, form names), never whole sentences.
 - Write dates as "5 October 2026" and times as "7:15 am". Never copy footnote markers (*, ^, #) from tables; say what they mean in words.
 - When there is a clear next step (a deadline, a form, an office to contact), end with one line starting "**Next step:**".
-- At most one emoji, and only in a heading. Put blank lines between sections.
+- Start every "###" heading with one fitting emoji (e.g. "### 📚 Core courses", "### 📞 Contact"). No other emoji in factual answers. Put blank lines between sections.
 - Specific format rules elsewhere in these instructions (e.g. profile or contact sections) take precedence.
 `;
 
@@ -601,7 +603,7 @@ function finalCleanWebAnswer(
 }
 
 function finalClean(text: string): string {
-    const base = cleanUserFacingText(text).replace(/\n{3,}/g, "\n\n").trim();
+    const base = dropRepeatedAnswer(cleanUserFacingText(text)).replace(/\n{3,}/g, "\n\n").trim();
     return linkifyRawUrls(base);
 }
 
@@ -1426,6 +1428,17 @@ function inferResolvedTopic(effectiveMessage: string, answerText: string): strin
 }
 
 function buildFileSearchUserMessage(message: string, agentId?: string): string {
+    // Course tables sit far from the programme overview in the handbooks, so
+    // "how much maths is in CS?" found the overview and said "not specified".
+    if (isProgrammeContentQuestion(message)) {
+        return `
+User question:
+${message}
+
+Search intent:
+This asks what a programme teaches. Search the programme structure / course list for the programme named (headings such as "Course Code", "Core", "Specialisation Modules", "Field Electives", "Free Modules"), not only the programme overview or entry requirements. Answer by listing the relevant courses by name and course code, grouped as the source groups them.
+`;
+    }
     if (!isProfileQuestion(message)) return message;
 
     const possibleName = extractPossiblePersonName(message);

@@ -409,11 +409,11 @@ export function tryBusScheduleReply(message: string, history: any[] = [], now: D
 
     if (routes.length) {
         const route = routes[0];
-        parts.push(`### 🚌 Kampar campus bus: ${route.name}`, periodLine(period, upcoming));
+        parts.push(periodLine(period, upcoming));
         const trips = route.trips.map(parseTrip).filter((t) => t.times[0]);
         const next = nextDepartureLine(trips.map((t) => ({ leaves: t.times[0]!, label: `trip ${t.no}`, notFriday: t.notFriday })), now, period, upcoming);
         if (next) parts.push(next);
-        parts.push(routeTable(route));
+        parts.push(`### 🚌 Kampar campus bus: ${route.name}`, routeTable(route));
         if (route.notes) parts.push(route.notes.join(" "));
     } else if (stop) {
         // Every bus that serves this stop, across routes, sorted by time.
@@ -427,9 +427,10 @@ export function tryBusScheduleReply(message: string, history: any[] = [], now: D
             });
         }).sort((a, b) => minutesOf(a.leaves) - minutesOf(b.leaves));
 
-        parts.push(`### 🚌 Kampar campus bus to ${stop}`, periodLine(period, upcoming));
+        parts.push(periodLine(period, upcoming));
         const next = nextDepartureLine(rows.map((r) => ({ leaves: r.leaves, label: r.route, notFriday: r.notFriday })), now, period, upcoming);
         if (next) parts.push(next);
+        parts.push(`### 🚌 Kampar campus bus to ${stop}`);
         parts.push(
             [
                 `| Leaves UTAR | At ${stop} | Back at UTAR | Route |`,
@@ -439,7 +440,7 @@ export function tryBusScheduleReply(message: string, history: any[] = [], now: D
         );
         if (stop === "Champs Elysees / The Trails") parts.push("Meadow Park residents can walk to The Trails bus stop.");
     } else {
-        parts.push(`### 🚌 Kampar campus bus routes`, periodLine(period, upcoming));
+        parts.push(periodLine(period, upcoming), `### 🚌 Kampar campus bus routes`);
         parts.push(
             period.routes
                 .map((route, i) => {
@@ -452,6 +453,7 @@ export function tryBusScheduleReply(message: string, history: any[] = [], now: D
     }
 
     const after = nextPeriodLine(period, periods);
+    parts.push("### ℹ️ Good to know");
     if (after) parts.push(after);
     parts.push(FOOTER, links(period));
     return parts.join("\n\n");
