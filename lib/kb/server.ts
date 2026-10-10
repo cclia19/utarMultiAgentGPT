@@ -49,6 +49,22 @@ export async function legacyDocuments(storeName: string) {
     return out;
 }
 
+/**
+ * An old-uploader document in this store (no kb_key metadata). Checked before
+ * removing one, so the page can never remove a versioned document this way
+ * or a document from another department's store.
+ */
+export async function isLegacyDocument(name: string, storeName: string): Promise<{ ok: boolean; displayName?: string }> {
+    if (!name.startsWith(`${storeName}/documents/`)) return { ok: false };
+    try {
+        const doc: any = await ai.fileSearchStores.documents.get({ name });
+        const managed = (doc?.customMetadata ?? []).some((m: any) => m.key === "kb_key");
+        return { ok: !managed, displayName: doc?.displayName };
+    } catch {
+        return { ok: false };
+    }
+}
+
 export const slug = (s: string) =>
     s
         .toLowerCase()

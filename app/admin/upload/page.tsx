@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { History, Loader2, Lock, LogOut, RefreshCw, RotateCcw, UploadCloud } from "lucide-react";
+import { History, Loader2, Lock, LogOut, RefreshCw, RotateCcw, Trash2, UploadCloud } from "lucide-react";
 import { convertUpload } from "@/lib/kb/convert";
 
 /**
@@ -93,6 +93,8 @@ export default function KnowledgeBaseAdmin() {
     const [file, setFile] = useState<File | null>(null);
     const [note, setNote] = useState("");
     const [versionOf, setVersionOf] = useState<Doc | null>(null);
+    // An older upload (previous uploader) being replaced by a new, versioned one.
+    const [replacing, setReplacing] = useState<Legacy | null>(null);
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
@@ -162,6 +164,7 @@ export default function KnowledgeBaseAdmin() {
         loadDocs(unitId);
         setHistory(null);
         setVersionOf(null);
+        setReplacing(null);
     }, [unitId, loadDocs]);
     useEffect(() => {
         if (tab === "runs") loadRuns();
@@ -195,6 +198,29 @@ export default function KnowledgeBaseAdmin() {
         }
     };
 
+    const remove = async (target: { doc?: Doc; legacy?: Legacy }) => {
+        if (!unit) return;
+        if (!author.trim()) return setMessage({ kind: "error", text: "Enter your name first (it goes into the history)." });
+        const name = target.doc?.title ?? target.legacy?.displayName ?? "this document";
+        const question = target.doc
+            ? `Remove “${name}” from the chatbot's knowledge?\n\nIts versions are kept: History → “Make live again” brings it back.`
+            : `Remove the older upload “${name}”?\n\nIt came from the previous uploader, which kept no copy, so this cannot be undone. To swap it for a newer file, use “Replace with new version” instead.`;
+        if (!confirm(question)) return;
+        try {
+            const { item } = await api<{ item: RunItem }>("/api/admin/kb/remove", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ unit: unit.id, author, ...(target.doc ? { key: target.doc.key } : { legacyName: target.legacy!.name }) }),
+            });
+            setMessage({ kind: item.outcome === "failed" ? "error" : "ok", text: `“${item.title}”: ${item.outcome === "retired" ? "removed from the knowledge base" : item.outcome}${item.detail ? ` – ${item.detail}` : ""}` });
+            if (history?.doc.key === target.doc?.key) setHistory(null);
+            await loadDocs(unit.id);
+            await loadUnits();
+        } catch (err) {
+            handleError(err);
+        }
+    };
+
     const upload = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!unit || !file) return;
@@ -217,20 +243,24 @@ export default function KnowledgeBaseAdmin() {
                 form.set("sourceName", file.name);
             }
             if (versionOf) form.set("key", versionOf.key);
-            const data = await api<{ item: RunItem; converted: string; preview: string | null }>("/api/admin/kb/upload", { method: "POST", body: form });
-            const { item } = data;
+            if (replacing) form.set("replaceLegacy", replacing.name);
+            const data = await api<{ item: RunItem; replaced: RunItem | null; converted: string; preview: string | null }>("/api/admin/kb/upload", { method: "POST", body: form });
+            const { item, replaced } = data;
             setMessage({
                 kind: item.outcome === "failed" ? "error" : "ok",
                 text:
                     item.outcome === "unchanged"
                         ? `“${item.title}” is identical to the live version, so nothing changed.`
-                        : `“${item.title}” ${item.outcome}${item.version ? ` as v${item.version}` : ""} in ${unit.shortLabel} (${data.converted}).${item.detail ? ` ${item.detail}` : ""}`,
+                        : `“${item.title}” ${item.outcome}${item.version ? ` as v${item.version}` : ""} in ${unit.shortLabel} (${data.converted}).${item.detail ? ` ${item.detail}` : ""}${
+                              replaced ? ` Older upload “${replaced.title}”: ${replaced.outcome === "retired" ? "removed" : replaced.detail}.` : ""
+                          }`,
                 preview: data.preview ?? undefined,
             });
             setTitle("");
             setNote("");
             setFile(null);
             setVersionOf(null);
+            setReplacing(null);
             await loadDocs(unit.id);
             await loadUnits();
         } catch (err) {
@@ -348,15 +378,26 @@ export default function KnowledgeBaseAdmin() {
                                                             <td className="px-3 py-2">
                                                                 <span className={`rounded-full border px-2 py-0.5 text-xs ${ORIGIN_STYLE[d.origin]}`}>{ORIGIN_LABEL[d.origin]}</span>
                                                             </td>
-                                                            <td className="px-3 py-2">{d.liveVersion ? `v${d.liveVersion}` : "–"}</td>
+                                                            <td className="px-3 py-2">{d.liveVersion ? `v${d.liveVersion}` : <span className="text-xs text-zinc-400">removed</span>}</td>
                                                             <td className="px-3 py-2 text-xs text-zinc-500">{fmtDate(d.updatedAt)}</td>
                                                             <td className="space-x-1 whitespace-nowrap px-3 py-2 text-right">
                                                                 <button onClick={() => openHistory(d)} className="inline-flex items-center gap-1 rounded border border-zinc-300 px-2 py-0.5 text-xs">
                                                                     <History className="h-3 w-3" /> History
                                                                 </button>
                                                                 {d.origin === "manual" && (
-                                                                    <button onClick={() => setVersionOf(d)} className="rounded border border-zinc-300 px-2 py-0.5 text-xs">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setReplacing(null);
+                                                                            setVersionOf(d);
+                                                                        }}
+                                                                        className="rounded border border-zinc-300 px-2 py-0.5 text-xs"
+                                                                    >
                                                                         New version
+                                                                    </button>
+                                                                )}
+                                                                {d.origin === "manual" && d.liveVersion > 0 && (
+                                                                    <button onClick={() => remove({ doc: d })} className="inline-flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50">
+                                                                        <Trash2 className="h-3 w-3" /> Remove
                                                                     </button>
                                                                 )}
                                                             </td>
@@ -395,15 +436,33 @@ export default function KnowledgeBaseAdmin() {
                                     )}
 
                                     {legacy.length > 0 && (
-                                        <details className="rounded-xl border border-zinc-200 bg-white p-3 text-sm">
+                                        <details open className="rounded-xl border border-zinc-200 bg-white p-3 text-sm">
                                             <summary className="cursor-pointer text-zinc-600">
-                                                {legacy.length} older upload{legacy.length > 1 ? "s" : ""} from the previous uploader (not versioned, left unchanged)
+                                                {legacy.length} older upload{legacy.length > 1 ? "s" : ""} from the previous uploader (not versioned)
                                             </summary>
-                                            <ul className="mt-2 space-y-1 text-xs text-zinc-500">
+                                            <p className="mt-1 text-xs text-zinc-500">“Replace with new version” uploads the newer file with versioning, then removes the older one once the new one is live.</p>
+                                            <ul className="mt-2 divide-y divide-zinc-100 text-xs text-zinc-600">
                                                 {legacy.map((l) => (
-                                                    <li key={l.name}>
-                                                        {l.displayName || l.name} · {fmtDate(l.createTime)}
-                                                        {l.sizeBytes ? ` · ${fmtSize(Number(l.sizeBytes))}` : ""}
+                                                    <li key={l.name} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                                                        <span>
+                                                            {l.displayName || l.name} · {fmtDate(l.createTime)}
+                                                            {l.sizeBytes ? ` · ${fmtSize(Number(l.sizeBytes))}` : ""}
+                                                        </span>
+                                                        <span className="space-x-1 whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setVersionOf(null);
+                                                                    setReplacing(l);
+                                                                    setTitle((l.displayName || "").replace(/\.(pdf|docx?|txt|md)$/i, "").replace(/[_-]+/g, " ").trim());
+                                                                }}
+                                                                className="rounded border border-zinc-300 px-2 py-0.5"
+                                                            >
+                                                                Replace with new version
+                                                            </button>
+                                                            <button onClick={() => remove({ legacy: l })} className="inline-flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-red-700 hover:bg-red-50">
+                                                                <Trash2 className="h-3 w-3" /> Remove
+                                                            </button>
+                                                        </span>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -415,6 +474,14 @@ export default function KnowledgeBaseAdmin() {
                                     <h2 className="flex items-center gap-2 text-sm font-semibold">
                                         <UploadCloud className="h-4 w-4" /> {versionOf ? `New version of “${versionOf.title}”` : `Upload to ${unit.shortLabel}`}
                                     </h2>
+                                    {replacing && (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                                            Replaces the older upload “{replacing.displayName || replacing.name}”. It is removed once the new version is live.{" "}
+                                            <button type="button" onClick={() => setReplacing(null)} className="underline">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    )}
                                     {versionOf ? (
                                         <button type="button" onClick={() => setVersionOf(null)} className="text-xs text-zinc-500 underline">
                                             Upload a different document instead
