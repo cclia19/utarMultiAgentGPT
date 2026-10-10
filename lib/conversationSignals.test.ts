@@ -34,6 +34,9 @@ test("intake / commencement / calendar questions are detected (routed to DACE)",
         "what are the confirmed start dates for october 2026",
         "October 2026 start date?",
         "When does MBBS start in October 2026?",
+        "when is the next trimester",
+        "upcoming semester?",
+        "when is the new intake",
         "when will foundation begin in june",
     ]) {
         assert.equal(isIntakeOrCalendarQuestion(q), true, q);

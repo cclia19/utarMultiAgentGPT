@@ -132,11 +132,13 @@ RESPONSE STYLE (every answer):
  * date instead of one date per programme level.
  */
 function buildCalendarFormatInstruction(): string {
-    const todayISO = new Date().toISOString().split("T")[0];
+    // Malaysia date (UTC+8): "today or later" must not be a day behind before 8 am.
+    const todayISO = new Date(Date.now() + 8 * 3600_000).toISOString().split("T")[0];
     return `
 CALENDAR ANSWER FORMAT (intake and trimester start dates). Today's date: ${todayISO}
 - An official UTAR page may be included below. It is evidence you may use, and it wins over documents when they disagree (e.g. campus-specific dates).
-- Start with a short heading naming the trimester, e.g. "### October 2026 trimester". If the user asked about "the next trimester", work out which one that is from today's date and name it.
+- Start with a short heading naming the trimester, e.g. "### October 2026 trimester".
+- "Next trimester" / "when does the next trimester start": decide PER PROGRAMME LEVEL, using today's date (${todayISO}). For each level, the next start is the earliest start date that is TODAY OR LATER. Levels start on different dates, so one level's trimester having started does not move the others on: e.g. if postgraduate started on 5 October but undergraduate starts on 26 October, the undergraduate answer is still 26 October (October trimester) while postgraduate's next is January. Never present a date before today as the next start; if a level's current trimester has already begun, say so briefly ("Postgraduate: October trimester began 5 October 2026; next intake 25 January 2027"). Use one heading per trimester when levels fall in different trimesters.
 - Then ONE bullet per programme level, date first, in this order: Postgraduate, Undergraduate, Foundation, then programmes with their own dates (e.g. MBBS, Nursing, Master of Architecture).
   Example: "**Postgraduate:** 5 October 2026". Put campus differences on the same bullet: "**Undergraduate:** 26 October 2026 (Kampar) / 27 October 2026 (Sungai Long)".
 - Calendar tables have one column per intake (February, June, October intake). These are groups of students by when they enrolled, not separate programmes. If all intakes of a level start on the same date, give that date once and say it applies to both new and current students. Split by intake only when the dates differ, and then write "students who enrolled in the June intake", never "June Intake Postgraduate Programme".
