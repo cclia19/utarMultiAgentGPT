@@ -29,6 +29,22 @@ const portal = await import("../lib/kb/sources/portal.ts");
 const { PORTAL_SECTIONS, PORTAL_BASE, PORTAL_HOME, menuKeys, sectionLinks, portalKey, formsIndex } = portal;
 const { unitForFaculty } = await import("../lib/kb/sources/studyProgrammes.ts");
 const { publishAll, retireDocument } = await import("../lib/kb/sync.ts");
+const { personalDataReason, isPersonalTitle } = await import("../lib/kb/personalData.ts");
+const { pdfText } = await import("../lib/kb/pdfText.ts");
+
+/**
+ * Nothing with personal data is published (the chatbot is public): the
+ * student-ID check runs on every PDF and page; the title check on
+ * announcements (bar lists, results, slips, …).
+ */
+async function personalReason({ title, pdf, text, checkTitle }) {
+    if (checkTitle && isPersonalTitle(title)) return "title names a list of students (bar list, results, slips, …)";
+    const content = pdf ? await pdfText(pdf) : text;
+    // A scanned announcement PDF cannot be checked, so it is not published.
+    if (pdf && checkTitle && content.replace(/\s+/g, "").length < 100) return "scanned PDF without text, cannot be checked for personal data";
+    return personalDataReason("", content);
+}
+const skipPersonal = (url, title, reason) => problems.push({ url, problem: `skipped (personal data): ${reason} – "${title}"`, note: true });
 const { FileVersionStore, PostgresVersionStore } = await import("../lib/kb/versionStore.ts");
 const { GeminiPublisher, RecordingPublisher } = await import("../lib/kb/publisher.ts");
 
@@ -146,6 +162,11 @@ try {
                 problems.push({ url: doc.url, problem: `larger than ${MAX_PDF_BYTES / 1024 / 1024} MB, skipped`, note: true });
                 continue;
             }
+            const personal = await personalReason({ title: doc.title, pdf: new Uint8Array(body) });
+            if (personal) {
+                skipPersonal(doc.url, doc.title, personal);
+                continue;
+            }
             for (const unitId of section.unitsFor(doc)) {
                 const unit = units.get(unitId);
                 if (!unit) {
@@ -245,6 +266,10 @@ try {
         console.log(`  Announcements (last ${portal.ANNOUNCEMENT_DAYS} days): ${list.length}`);
         const unitIds = new Set(units.keys());
         for (const a of list) {
+            if (isPersonalTitle(a.title)) {
+                skipPersonal(a.url, a.title, "title names a list of students (bar list, results, slips, …)");
+                continue;
+            }
             const unitId = portal.unitForDept(a.dept, unitIds);
             const unit = units.get(unitId);
             const { text, attachments } = portal.announcementContent(await (await context.request.get(a.url)).text());
@@ -263,11 +288,21 @@ try {
                 const res = await context.request.get(pdf.url).catch(() => null);
                 const body = res && res.ok() ? await res.body() : null;
                 if (body && body.length <= 10 * 1024 * 1024 && body.subarray(0, 4).toString() === "%PDF") {
+                    const personal = await personalReason({ title: a.title, pdf: new Uint8Array(body), checkTitle: true });
+                    if (personal) {
+                        skipPersonal(a.url, a.title, personal);
+                        continue;
+                    }
                     drafts.push({ ...base, text: `${a.title} (${a.dept}, ${a.date})`, file: { data: new Uint8Array(body), mimeType: "application/pdf", name: decodeURIComponent(pdf.url.split("/").pop() ?? "attachment.pdf") } });
                     continue;
                 }
             }
             if (text.length < 40) continue; // image-only announcement
+            const personal = await personalReason({ title: a.title, text, checkTitle: true });
+            if (personal) {
+                skipPersonal(a.url, a.title, personal);
+                continue;
+            }
             drafts.push({
                 ...base,
                 text: `# ${a.title}\nUTAR announcement by ${a.dept}, ${a.date}. Source: ${a.url} (student intranet).\n\n${text}\n${attachments.map((l) => `- Attachment: ${l.title || l.url}`).join("\n")}\n`,
