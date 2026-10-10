@@ -94,7 +94,7 @@ export const STRINGS: Record<Lang, Strings> = {
         },
     },
     ms: {
-        tagline: "Tanya saja, saya carikan jabatan UTAR yang berkaitan.",
+        tagline: "Tanya saja, saya free service untuk anda 😉",
         greetingTitle: "Hai, saya UTARCHAT 👋",
         greetingBody: "Kawan UTAR anda untuk soal kursus, yuran, peperiksaan, bas, jabatan dan kehidupan kampus.",
         startersTitle: "Cuba tanya",
@@ -139,7 +139,7 @@ export const STRINGS: Record<Lang, Strings> = {
         },
     },
     zh: {
-        tagline: "有问题尽管问，我帮你找对的 UTAR 部门。",
+        tagline: "你敢问，我敢答 😎",
         greetingTitle: "你好，我是 UTARCHAT 👋",
         greetingBody: "你的 UTAR 小帮手，课程、学费、考试、校车、部门、校园生活都可以问我。",
         startersTitle: "试试问",
