@@ -3,8 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: 255, 255, 255;
-  --foreground: 24, 24, 27; /* Zinc 900 */
+  --background: 248, 250, 252; /* slate 50 */
+  --foreground: 24, 24, 27; /* zinc 900 */
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 9, 9, 11; /* zinc 950 */
+    --foreground: 244, 244, 245; /* zinc 100 */
+    color-scheme: dark;
+  }
 }
 
 body {
@@ -15,6 +24,11 @@ body {
 }
 
 @layer utilities {
+  /* Room for the iPhone home indicator under the input bar. */
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   .text-balance {
     text-wrap: balance;
   }

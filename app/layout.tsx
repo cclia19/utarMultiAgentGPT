@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -9,6 +9,16 @@ export const metadata: Metadata = {
     description: "University Knowledge Base",
 };
 
+export const viewport: Viewport = {
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover",
+    themeColor: [
+        { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+        { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+    ],
+};
+
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -16,7 +26,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" className={inter.variable}>
-            <body className="font-sans bg-white text-zinc-900 selection:bg-zinc-900 selection:text-white antialiased">
+            <body className="font-sans bg-slate-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 selection:bg-indigo-600 selection:text-white antialiased">
                 {children}
             </body>
         </html>

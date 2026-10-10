@@ -1,22 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import AnswerBody from "./AnswerBody";
-import {
-    Send,
-    Loader2,
-    ThumbsUp,
-    ThumbsDown,
-    Brain,
-    Sparkles,
-    Compass,
-    Database,
-    Globe,
-    Users,
-} from "lucide-react";
+import AgentBadge from "./AgentBadge";
+import { ArrowUp, ArrowUpRight, Check, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import html2canvas from "html2canvas";
 import DisclaimerModal from "./DisclaimerModal";
 import FeedbackModal from "./FeedbackModal";
+import { LANGS, STRINGS, defaultLang, type Lang } from "@/lib/i18n";
+
+const LANG_KEY = "utarchat_lang";
 
 // Anonymous per-browser ID for usage stats (no login). Random, holds no personal data.
 const SESSION_KEY = "utarchat_anon_id";
@@ -39,26 +33,6 @@ function getAnonymousSessionId(): string {
 type Role = "user" | "model";
 type AgentId = string;
 
-function renderStatusIcon(stage?: string) {
-    switch (stage) {
-        case "analyzing":
-            return <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />;
-        case "routing":
-        case "agent_selected":
-            return <Compass className="w-3.5 h-3.5 text-indigo-600 animate-spin" />;
-        case "searching":
-            return <Database className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />;
-        case "webFallback":
-            return <Globe className="w-3.5 h-3.5 text-blue-600 animate-pulse" />;
-        case "staffDirectory":
-            return <Users className="w-3.5 h-3.5 text-amber-600 animate-pulse" />;
-        case "reasoning":
-            return <Brain className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />;
-        default:
-            return <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin" />;
-    }
-}
-
 interface Message {
     role: Role;
     text: string;
@@ -70,6 +44,7 @@ interface Message {
     selectedAgentId?: AgentId;
     selectedAgentLabel?: string;
     needsClarification?: boolean;
+    followUps?: string[];
 }
 
 interface HistoryEntry {
@@ -136,39 +111,35 @@ function detectAgentFromMessage(text: string): AgentId | null {
     return map[normalized] || null;
 }
 
-function sourceLabel(sourceMode?: string): string {
-    if (sourceMode === "fileSearch") return "KB";
-    if (sourceMode === "webFallback") return "Web";
-    if (sourceMode === "staffDirectory") return "Staff Directory";
-    if (sourceMode === "officialSchedule") return "Official schedule";
-    return "None";
-}
-
-function sourceBadgeClass(sourceMode?: string): string {
-    if (sourceMode === "fileSearch") {
-        return "bg-emerald-50 text-emerald-700 border border-emerald-100";
-    }
-
-    if (sourceMode === "webFallback") {
-        return "bg-blue-50 text-blue-700 border border-blue-100";
-    }
-
-    if (sourceMode === "staffDirectory") {
-        return "bg-amber-50 text-amber-700 border border-amber-100";
-    }
-
-    if (sourceMode === "officialSchedule") {
-        return "bg-emerald-50 text-emerald-700 border border-emerald-100";
-    }
-
-    return "bg-zinc-50 text-zinc-500 border border-zinc-100";
-}
-
 export default function ChatClient() {
     const [messages, setMessages] = useState<Message[]>([WELCOME]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [currentStatus, setCurrentStatus] = useState<{ stage: string; text: string } | null>(null);
+    // Steps the server reported for the current question, shown as a timeline.
+    const [stages, setStages] = useState<{ stage: string; text: string }[]>([]);
+
+    // EN / BM / 中文: page wording and the language answers are written in.
+    const [lang, setLang] = useState<Lang>("en");
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(LANG_KEY) as Lang | null;
+            setLang(saved && STRINGS[saved] ? saved : defaultLang());
+        } catch {
+            setLang(defaultLang());
+        }
+    }, []);
+    const chooseLang = (l: Lang) => {
+        setLang(l);
+        try {
+            localStorage.setItem(LANG_KEY, l);
+        } catch {
+            // not remembered; fine
+        }
+    };
+    const t = STRINGS[lang];
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     const [selectedAgentId, setSelectedAgentId] = useState<AgentId>("general");
     const [selectedAgentLabel, setSelectedAgentLabel] = useState(
@@ -219,7 +190,8 @@ export default function ChatClient() {
                 wrapper.style.left = "-9999px";
                 wrapper.style.top = "-9999px";
                 wrapper.style.width = "680px";
-                wrapper.style.backgroundColor = "#ffffff";
+                const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+                wrapper.style.backgroundColor = dark ? "#09090b" : "#ffffff";
                 wrapper.style.padding = "24px";
                 wrapper.style.borderRadius = "20px";
                 wrapper.style.display = "flex";
@@ -241,7 +213,7 @@ export default function ChatClient() {
                 const canvas = await html2canvas(wrapper, {
                     scale: 1.5,
                     useCORS: true,
-                    backgroundColor: "#ffffff",
+                    backgroundColor: dark ? "#09090b" : "#ffffff",
                     logging: false,
                 });
                 screenshotBase64 = canvas.toDataURL("image/png");
@@ -271,10 +243,31 @@ export default function ChatClient() {
     const [contextSummary, setContextSummary] = useState<string>("");
 
     const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollToBottom = useCallback((smooth = true) => {
+        bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
+    }, []);
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, loading]);
+        // The welcome screen stays at the top; scroll only once a chat starts.
+        if (messages.length > 1 || loading) scrollToBottom();
+    }, [messages, loading, stages, scrollToBottom]);
+
+    // Phone keyboards shrink the visual viewport: keep the latest answer in view.
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const onResize = () => scrollToBottom(false);
+        vv.addEventListener("resize", onResize);
+        return () => vv.removeEventListener("resize", onResize);
+    }, [scrollToBottom]);
+
+    // Text box grows with the question (up to about five lines).
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    }, [input]);
 
     const buildHistory = (msgs: Message[]): HistoryEntry[] =>
         msgs
@@ -284,10 +277,16 @@ export default function ChatClient() {
                 parts: [{ text: m.text }],
             }));
 
-    const handleSend = async () => {
-        const trimmed = input.trim();
+    const handleSend = async (override?: string) => {
+        const trimmed = (override ?? input).trim();
 
         if (!trimmed || loading) return;
+        // A light tap on phones that support it (Android); iOS ignores it.
+        try {
+            navigator.vibrate?.(8);
+        } catch {
+            // no vibration support
+        }
 
         const detectedAgent = detectAgentFromMessage(trimmed);
 
@@ -311,6 +310,7 @@ export default function ChatClient() {
         setInput("");
         setLoading(true);
         setCurrentStatus({ stage: "analyzing", text: "Analyzing your question..." });
+        setStages([{ stage: "analyzing", text: "" }]);
 
         // The streaming preview bubble always lands at this index: nextMessages is
         // already committed and nothing else appends while the stream is open. Keeping
@@ -334,6 +334,7 @@ export default function ChatClient() {
                     lastResolvedTopic,
                     contextSummary,
                     sessionId: getAnonymousSessionId(),
+                    language: lang,
                     stream: true,
                 }),
             });
@@ -413,8 +414,10 @@ export default function ChatClient() {
 
                 if (frame.type === "status") {
                     setCurrentStatus({ stage: frame.stage, text: frame.text });
+                    setStages((prev) => (prev.some((p) => p.stage === frame.stage) ? prev : [...prev, { stage: frame.stage, text: frame.text }]));
                 } else if (frame.type === "thought") {
                     setCurrentStatus({ stage: "reasoning", text: "Synthesizing verified answer..." });
+                    setStages((prev) => (prev.some((p) => p.stage === "reasoning") ? prev : [...prev, { stage: "reasoning", text: "" }]));
                     previewThought += frame.delta || "";
                 } else if (frame.type === "text") {
                     if (preview.length === 0) {
@@ -503,6 +506,7 @@ export default function ChatClient() {
                 selectedAgentLabel:
                     data.selectedAgentLabel ?? selectedAgentLabel,
                 needsClarification: data.needsClarification ?? false,
+                followUps: Array.isArray(data.followUps) ? data.followUps : [],
             };
 
             const shown = previewShown;
@@ -537,187 +541,270 @@ export default function ChatClient() {
         } finally {
             if (drain !== undefined) window.clearInterval(drain);
             setLoading(false);
+            setStages([]);
         }
     };
 
-    return (
-        <div className="flex flex-col min-h-[100dvh] bg-[#FDFDFD]">
-            <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-zinc-100/80 shadow-xs px-4 py-3">
-                <div className="max-w-2xl mx-auto w-full flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <img
-                            src="/TARo.png"
-                            alt="UTARCHAT Logo"
-                            className="w-12 h-12 object-contain"
-                        />
+    const lastIndex = messages.length - 1;
+    const showWelcome = messages.length === 1 && !loading;
+    const sourceText = (mode?: string) => (mode && t.sources[mode]) || "";
 
-                        <div>
+    return (
+        <MotionConfig reducedMotion="user">
+        <div className="flex h-[100dvh] flex-col bg-slate-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+            {/* Soft colour behind the glass header */}
+            <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 h-56 bg-gradient-to-b from-indigo-100/70 via-sky-50/40 to-transparent dark:from-indigo-950/40 dark:via-zinc-950/0" />
+
+            <header className="sticky top-0 z-40 border-b border-white/60 bg-white/60 px-4 py-2.5 backdrop-blur-xl backdrop-saturate-150 dark:border-white/5 dark:bg-zinc-950/60">
+                <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                        <img src="/TARo.png" alt="UTARCHAT" className="h-10 w-10 shrink-0 rounded-xl object-contain shadow-sm ring-1 ring-black/5 dark:ring-white/10" />
+                        <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-zinc-900">
-                                    UTARCHAT
-                                </p>
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 rounded-full uppercase tracking-wider">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                    Limited Beta
+                                <p className="text-[15px] font-semibold tracking-tight">UTARCHAT</p>
+                                <span className="rounded-full bg-zinc-900/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 ring-1 ring-inset ring-zinc-900/10 dark:bg-white/10 dark:text-zinc-400 dark:ring-white/10">
+                                    Beta
                                 </span>
                             </div>
-                            <p className="text-xs text-zinc-400">
-                                Ask naturally. I’ll route your question to the right place.
-                            </p>
+                            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{t.tagline}</p>
                         </div>
                     </div>
 
-                    <div className="hidden sm:flex flex-col items-end">
-                        <span className="text-[11px] text-zinc-400">
-                            Current context
-                        </span>
-                        <span className="text-xs font-medium text-zinc-700">
-                            {selectedAgentLabel}
-                        </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                        {!showWelcome && (
+                            <span className="hidden sm:inline-flex">
+                                <AgentBadge agentId={selectedAgentId} label={selectedAgentLabel} size="xs" />
+                            </span>
+                        )}
+                        {/* Language switch */}
+                        <div role="radiogroup" aria-label="Language" className="flex rounded-full bg-zinc-900/5 p-0.5 ring-1 ring-inset ring-zinc-900/5 dark:bg-white/10 dark:ring-white/10">
+                            {LANGS.map((l) => (
+                                <button
+                                    key={l.id}
+                                    role="radio"
+                                    aria-checked={lang === l.id}
+                                    onClick={() => chooseLang(l.id)}
+                                    className={`relative rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                        lang === l.id ? "text-zinc-900 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                                    }`}
+                                >
+                                    {lang === l.id && (
+                                        <motion.span layoutId="lang-pill" className="absolute inset-0 rounded-full bg-white shadow-sm dark:bg-zinc-700" transition={{ type: "spring", stiffness: 400, damping: 32 }} />
+                                    )}
+                                    <span className="relative">{l.label}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto px-4 py-6 space-y-5 max-w-2xl mx-auto w-full">
-                {messages.map((msg, i) => (
-                    <div
-                        key={i}
-                        id={`msg-container-${i}`}
-                        className={`flex p-1 rounded-xl transition-colors ${msg.role === "user"
-                            ? "justify-end"
-                            : "justify-start"
-                            }`}
-                    >
-                        <div
-                            className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm ${msg.role === "user"
-                                ? "bg-[#1a1845] text-white rounded-br-sm"
-                                : "bg-white border border-zinc-100 text-zinc-800 rounded-bl-sm shadow-sm"
-                                }`}
-                        >
-                            {msg.role === "model" ? (
-                                <AnswerBody text={msg.text} />
-                            ) : (
-                                <p className="whitespace-pre-wrap">{msg.text}</p>
-                            )}
+            <main ref={scrollRef} className="relative flex-1 overflow-y-auto overscroll-contain">
+                <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
+                    {showWelcome && (
+                        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="pt-6 text-center sm:pt-12">
+                            <motion.img
+                                src="/TARo.png"
+                                alt=""
+                                className="mx-auto h-20 w-20 rounded-[22px] object-contain shadow-lg shadow-indigo-500/10 ring-1 ring-black/5 dark:ring-white/10"
+                                initial={{ scale: 0.85, rotate: -6 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ type: "spring", stiffness: 220, damping: 14 }}
+                            />
+                            <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{t.greetingTitle}</h1>
+                            <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 dark:text-zinc-400">{t.greetingBody}</p>
 
-                            {msg.role === "model" &&
-                                i !== 0 &&
-                                msg.selectedAgentLabel && (
-                                    <div className="mt-3 pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-1.5">
-                                        <div className="flex flex-wrap gap-1.5 items-center">
-                                            <span className="inline-flex items-center text-xs text-zinc-500 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-full">
-                                                Answered by {msg.selectedAgentLabel}
-                                            </span>
+                            <p className="mt-8 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{t.startersTitle}</p>
+                            <div className="mt-3 grid grid-cols-1 gap-2 text-left sm:grid-cols-2">
+                                {t.starters.map((st, n) => (
+                                    <motion.button
+                                        key={st.text}
+                                        onClick={() => handleSend(st.text)}
+                                        initial={{ opacity: 0, y: 8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.12 + n * 0.05 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="group flex min-h-[52px] items-center gap-3 rounded-2xl text-left border border-zinc-200/80 bg-white/80 px-4 py-3 text-sm text-zinc-700 shadow-sm backdrop-blur transition hover:border-indigo-200 hover:bg-white hover:text-zinc-900 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:border-indigo-400/30 dark:hover:bg-white/10 dark:hover:text-white"
+                                    >
+                                        <span className="text-lg" aria-hidden>
+                                            {st.emoji}
+                                        </span>
+                                        <span className="flex-1">{st.text}</span>
+                                        <ArrowUpRight className="h-4 w-4 text-zinc-300 transition group-hover:text-indigo-500 dark:text-zinc-600" />
+                                    </motion.button>
+                                ))}
+                            </div>
+                        </motion.section>
+                    )}
 
-                                            <span
-                                                className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full ${sourceBadgeClass(
-                                                    msg.sourceMode
-                                                )}`}
-                                            >
-                                                Source: {sourceLabel(msg.sourceMode)}
-                                            </span>
+                    <AnimatePresence initial={false}>
+                        {messages.map((msg, i) => {
+                            if (i === 0) return null; // the welcome screen replaces the greeting bubble
+                            const isUser = msg.role === "user";
+                            return (
+                                <motion.div
+                                    key={i}
+                                    id={`msg-container-${i}`}
+                                    layout="position"
+                                    initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
+                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                >
+                                    <div className={isUser ? "min-w-0 max-w-[85%]" : "min-w-0 w-full max-w-[95%] sm:max-w-[88%]"}>
+                                        <div
+                                            className={
+                                                isUser
+                                                    ? "rounded-3xl rounded-br-lg bg-gradient-to-br from-indigo-500 to-indigo-600 px-4 py-2.5 text-[15px] text-white shadow-md shadow-indigo-500/20"
+                                                    : "rounded-3xl rounded-bl-lg border border-zinc-200/80 bg-white px-4 py-3.5 shadow-sm dark:border-white/10 dark:bg-zinc-900"
+                                            }
+                                        >
+                                            {isUser ? <p className="whitespace-pre-wrap">{msg.text}</p> : <AnswerBody text={msg.text} />}
 
-                                            {msg.storeDisplayName && (
-                                                <span className="inline-flex items-center text-xs text-zinc-500 bg-zinc-50 border border-zinc-100 px-2 py-0.5 rounded-full">
-                                                    Store: {msg.storeDisplayName}
-                                                </span>
+                                            {!isUser && !msg.isStreaming && msg.selectedAgentLabel && (
+                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2.5 dark:border-white/5">
+                                                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                                                        <span>{t.answeredBy}</span>
+                                                        <AgentBadge agentId={msg.selectedAgentId} label={msg.selectedAgentLabel} size="xs" />
+                                                        {sourceText(msg.sourceMode) && <span className="text-zinc-400 dark:text-zinc-500">· {sourceText(msg.sourceMode)}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => handleOpenFeedback(i, msg, "like")}
+                                                            aria-label={t.helpful}
+                                                            title={t.helpful}
+                                                            className={`rounded-full p-2 transition ${
+                                                                feedbackGiven[i] === "like"
+                                                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                                                                    : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                                                            }`}
+                                                        >
+                                                            <ThumbsUp className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleOpenFeedback(i, msg, "dislike")}
+                                                            aria-label={t.report}
+                                                            title={t.report}
+                                                            className={`rounded-full p-2 transition ${
+                                                                feedbackGiven[i] === "dislike"
+                                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                                                                    : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                                                            }`}
+                                                        >
+                                                            <ThumbsDown className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
 
-                                        {/* Feedback Thumbs Buttons */}
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => handleOpenFeedback(i, msg, "like")}
-                                                className={`p-1.5 rounded-lg border transition-colors ${
-                                                    feedbackGiven[i] === "like"
-                                                        ? "bg-emerald-100 text-emerald-700 border-emerald-300"
-                                                        : "bg-zinc-50 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 border-zinc-200"
-                                                }`}
-                                                title="Helpful Response"
-                                            >
-                                                <ThumbsUp className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleOpenFeedback(i, msg, "dislike")}
-                                                className={`p-1.5 rounded-lg border transition-colors ${
-                                                    feedbackGiven[i] === "dislike"
-                                                        ? "bg-amber-100 text-amber-700 border-amber-300"
-                                                        : "bg-zinc-50 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 border-zinc-200"
-                                                }`}
-                                                title="Report Issue / Inaccurate Response"
-                                            >
-                                                <ThumbsDown className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
+                                        {/* Suggested next questions, under the latest answer only */}
+                                        {!isUser && i === lastIndex && !loading && (msg.followUps?.length ?? 0) > 0 && (
+                                            <div className="mt-2.5 flex flex-wrap gap-2">
+                                                {msg.followUps!.map((q, n) => (
+                                                    <motion.button
+                                                        key={q}
+                                                        onClick={() => handleSend(q)}
+                                                        initial={{ opacity: 0, y: 6 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: 0.15 + n * 0.07 }}
+                                                        whileTap={{ scale: 0.97 }}
+                                                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-indigo-200/80 bg-white/80 px-3.5 py-2 text-left text-[13px] text-indigo-700 shadow-sm backdrop-blur transition hover:bg-indigo-50 dark:border-indigo-400/20 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20"
+                                                    >
+                                                        {q}
+                                                        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                                                    </motion.button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                        </div>
-                    </div>
-                ))}
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
 
-                {loading && !messages.some((m) => m.isStreaming) && (
-                    <div className="flex justify-start">
-                        <div className="bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/80 border border-indigo-100/90 rounded-2xl rounded-bl-sm px-4 py-3 shadow-xs flex items-center gap-2.5 transition-all">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
-                            </span>
-                            <div className="flex items-center gap-1.5 text-xs text-indigo-950 font-medium">
-                                {renderStatusIcon(currentStatus?.stage)}
-                                <span>{currentStatus?.text || "Analyzing your question..."}</span>
+                    {/* Thinking timeline: the steps the server actually takes */}
+                    {loading && !messages.some((m) => m.isStreaming) && (
+                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+                            <div className="rounded-3xl rounded-bl-lg border border-zinc-200/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-zinc-900/80">
+                                <ol className="space-y-1.5">
+                                    {stages.map((st, n) => {
+                                        const current = n === stages.length - 1;
+                                        const label = t.stages[st.stage] || st.text || t.stages.analyzing;
+                                        return (
+                                            <motion.li key={st.stage} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 text-[13px]">
+                                                {current ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
+                                                ) : (
+                                                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                                )}
+                                                <span className={current ? "font-medium text-zinc-800 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"}>
+                                                    {label}
+                                                    {current && <span className="animate-pulse">…</span>}
+                                                </span>
+                                            </motion.li>
+                                        );
+                                    })}
+                                </ol>
                             </div>
-                        </div>
-                    </div>
-                )}
+                        </motion.div>
+                    )}
 
-                <div ref={bottomRef} />
+                    <div ref={bottomRef} className="h-1" />
+                </div>
             </main>
 
-            <footer className="border-t border-zinc-100 px-4 py-3 max-w-2xl mx-auto w-full bg-[#FDFDFD]">
-                {pendingQuestion && (
-                    <div className="mb-2 text-[11px] text-zinc-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                        Waiting for clarification on:{" "}
-                        <span className="font-medium">{pendingQuestion}</span>
-                    </div>
-                )}
+            <footer className="sticky bottom-0 z-30 border-t border-white/60 bg-slate-50/80 px-3 pt-3 backdrop-blur-xl pb-safe dark:border-white/5 dark:bg-zinc-950/80">
+                <div className="mx-auto w-full max-w-3xl">
+                    {pendingQuestion && (
+                        <div className="mb-2 rounded-2xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">
+                            {t.waitingFor} <span className="font-medium">{pendingQuestion}</span>
+                        </div>
+                    )}
 
-                <div className="flex items-center gap-2 bg-white border border-zinc-200 rounded-xl px-3 py-2 focus-within:border-zinc-400 transition-colors">
-                    <input
-                        className="flex-1 text-sm outline-none bg-transparent text-zinc-900 placeholder:text-zinc-400"
-                        placeholder="Ask about UTAR courses, fees, exams, offices, support..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSend();
-                            }
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSend();
                         }}
-                        disabled={loading}
-                    />
-
-                    <button
-                        onClick={handleSend}
-                        disabled={loading || !input.trim()}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-900 text-white disabled:opacity-40 active:scale-95 transition-transform"
+                        className="flex items-end gap-2 rounded-[26px] border border-zinc-200 bg-white p-1.5 pl-4 shadow-sm transition focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-white/10 dark:bg-zinc-900 dark:focus-within:border-indigo-400/40"
                     >
-                        {loading ? (
-                            <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                            <Send size={12} />
-                        )}
-                    </button>
-                </div>
-                <div className="mt-2 text-center text-[11px] text-zinc-400">
-                    UTARCHAT (Limited Beta) can make mistake. Check important info
+                        <textarea
+                            ref={inputRef}
+                            rows={1}
+                            enterKeyHint="send"
+                            aria-label={t.placeholder}
+                            className="max-h-[140px] min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-base leading-6 text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:text-[15px]"
+                            placeholder={t.placeholder}
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onFocus={() => setTimeout(() => scrollToBottom(false), 250)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                                    e.preventDefault();
+                                    handleSend();
+                                }
+                            }}
+                            disabled={loading}
+                        />
+                        <motion.button
+                            type="submit"
+                            whileTap={{ scale: 0.9 }}
+                            disabled={loading || !input.trim()}
+                            aria-label={t.send}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25 transition disabled:from-zinc-200 disabled:to-zinc-200 disabled:text-zinc-400 disabled:shadow-none dark:disabled:from-zinc-800 dark:disabled:to-zinc-800 dark:disabled:text-zinc-500"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" strokeWidth={2.5} />}
+                        </motion.button>
+                    </form>
+                    <p className="mt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">{t.footer}</p>
                 </div>
             </footer>
-            <DisclaimerModal />
+
+            <DisclaimerModal lang={lang} />
             <FeedbackModal
                 isOpen={feedbackModal.isOpen}
-                onClose={() =>
-                    setFeedbackModal((prev) => ({ ...prev, isOpen: false }))
-                }
+                onClose={() => setFeedbackModal((prev) => ({ ...prev, isOpen: false }))}
                 rating={feedbackModal.rating}
                 userQuery={feedbackModal.userQuery}
                 responseText={feedbackModal.responseText}
@@ -737,5 +824,6 @@ export default function ChatClient() {
                 }}
             />
         </div>
+        </MotionConfig>
     );
 }
