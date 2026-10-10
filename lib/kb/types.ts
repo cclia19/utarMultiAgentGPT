@@ -64,7 +64,7 @@ export type KbRunItem = {
     key: string;
     title: string;
     unitId: string;
-    outcome: "published" | "unchanged" | "held" | "failed" | "dry-run" | "note";
+    outcome: "published" | "unchanged" | "held" | "failed" | "dry-run" | "note" | "retired";
     detail?: string;
     version?: number;
 };

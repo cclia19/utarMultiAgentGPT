@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { publishDraft, rollback, contentHash } = await import("./sync.ts");
+const { publishDraft, rollback, contentHash, retireDocument } = await import("./sync.ts");
 const { FileVersionStore } = await import("./versionStore.ts");
 const { RecordingPublisher } = await import("./publisher.ts");
 
@@ -104,4 +104,19 @@ test("rollback publishes the old text again as the newest version", async () => 
     const v3 = await deps.store.getVersion("web:study.utar.edu.my/x.php", 3);
     assert.equal(v3?.note, "rollback to v1");
     assert.equal(v3?.text, page(LONG));
+});
+
+test("retiring removes the document from the store but keeps its history", async () => {
+    const deps = setup();
+    await publishDraft(draft(page(LONG)), deps);
+    assert.equal((await retireDocument("web:study.utar.edu.my/x.php", "older than 90 days", deps, { dryRun: true }))?.outcome, "dry-run");
+    assert.deepEqual(deps.publisher.removed, []);
+    const item = await retireDocument("web:study.utar.edu.my/x.php", "older than 90 days", deps);
+    assert.equal(item?.outcome, "retired");
+    assert.deepEqual(deps.publisher.removed, ["fileSearchStores/fict/documents/test-1"]);
+    assert.equal((await deps.store.getDocument("web:study.utar.edu.my/x.php"))?.liveVersion, 0);
+    assert.equal((await deps.store.listVersions("web:study.utar.edu.my/x.php")).length, 1);
+    assert.equal(await retireDocument("web:study.utar.edu.my/x.php", "again", deps), null);
+    // Published again later: a new version, live again.
+    assert.equal((await publishDraft(draft(page(LONG)), deps)).outcome, "published");
 });

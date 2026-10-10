@@ -20,6 +20,7 @@ import { loadEnv } from "./lib/loadEnv.mjs";
 loadEnv();
 const { ORG_UNITS } = await import("../lib/orgUnits.ts");
 const { collectStudyProgrammes } = await import("../lib/kb/sources/studyProgrammes.ts");
+const { collectPublicPages } = await import("../lib/kb/sources/publicPages.ts");
 const { fetchUtarHtml } = await import("../lib/kb/fetchHtml.ts");
 const { publishAll } = await import("../lib/kb/sync.ts");
 const { FileVersionStore, PostgresVersionStore } = await import("../lib/kb/versionStore.ts");
@@ -35,6 +36,14 @@ const force = args.includes("--force");
 const only = opt("--only") ? new RegExp(opt("--only"), "i") : undefined;
 const limit = opt("--limit") ? Number(opt("--limit")) : undefined;
 const OUT_DIR = opt("--out-dir") ? path.resolve(opt("--out-dir")) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+// Publishing must record versions in the shared database (the admin page and
+// the other sync read them there); a local file would lose track of what is
+// live and the next run would upload duplicates.
+if (apply && !process.env.DATABASE_URL) {
+    console.error("--apply needs DATABASE_URL (in .env.local or the environment). Dry runs work without it.");
+    process.exit(2);
+}
 
 let store;
 let closeDb = async () => {};
@@ -59,7 +68,11 @@ console.log(apply ? "Mode: APPLY (publishing to Gemini stores)" : "Mode: dry run
 const startedAt = new Date().toISOString();
 const units = ORG_UNITS.filter((u) => u.enabledForChat);
 console.log("Collecting study.utar.edu.my programmes…");
-const { drafts, problems } = await collectStudyProgrammes({ fetchHtml: fetchUtarHtml, units, author: "sync:public", only, limit });
+const programmes = await collectStudyProgrammes({ fetchHtml: fetchUtarHtml, units, author: "sync:public", only, limit });
+console.log("Collecting other official pages…");
+const pages = await collectPublicPages({ fetchHtml: fetchUtarHtml, units, author: "sync:public", only });
+const drafts = [...programmes.drafts, ...pages.drafts];
+const problems = [...programmes.problems, ...pages.problems];
 console.log(`${drafts.length} documents from ${new Set(drafts.map((d) => d.sourceUrl)).size} pages; ${problems.length} problems`);
 
 const items = await publishAll(drafts, { store, publisher }, {
