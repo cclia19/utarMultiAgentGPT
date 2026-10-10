@@ -9,6 +9,8 @@
 // 1. Intake / commencement / academic-calendar questions belong to DACE.
 // ---------------------------------------------------------------------------
 
+const MONTH = "(january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)";
+
 const CALENDAR_PATTERNS: RegExp[] = [
     /\bintakes?\b/i,
     /\bacademic\s+calend[ae]r\b/i,
@@ -16,6 +18,11 @@ const CALENDAR_PATTERNS: RegExp[] = [
     /\b(start|starting|begin|beginning|commencement|commence|reporting|registration)\b[^.?!]{0,40}\b(trimester|semester|term|session|intake)\b/i,
     /\bcommencement\s+date/i,
     /\bwhen\b[^.?!]{0,30}\b(class|classes|lectures?)\b[^.?!]{0,20}\b(start|begin|commence)/i,
+    // "start dates for October 2026", "October 2026 start date"
+    new RegExp(`\\b(start|starting|begin|beginning|commencement)\\s+dates?\\b[^.?!]{0,30}\\b${MONTH}\\b`, "i"),
+    new RegExp(`\\b${MONTH}\\b[^.?!]{0,15}\\b(start|starting|commencement)\\s+dates?\\b`, "i"),
+    // "When does MBBS start in October 2026?"
+    new RegExp(`\\bwhen\\b[^.?!]{0,40}\\b(start|starts|begin|begins|commence|commences)\\b[^.?!]{0,15}\\b${MONTH}\\b`, "i"),
     // Malay
     /\b(pengambilan|kalendar\s+akademik|tarikh\s+mula)\b/i,
     // Chinese
@@ -24,6 +31,8 @@ const CALENDAR_PATTERNS: RegExp[] = [
 
 // Exam timetables / results belong to DEAS, not DACE.
 const EXAM_PATTERN = /\b(exam|examination|final\s+exam|result|results|cgpa|gpa)\b/i;
+// Internship start dates belong to the faculty, not DACE.
+const NOT_CALENDAR_PATTERN = /\b(internship|industrial\s+training|practical\s+training|placement)\b/i;
 
 export function isIntakeOrCalendarQuestion(text: string): boolean {
     const raw = String(text || "");
@@ -31,6 +40,7 @@ export function isIntakeOrCalendarQuestion(text: string): boolean {
     if (EXAM_PATTERN.test(raw) && !/\bintake|commence|start date|academic calendar/i.test(raw)) {
         return false;
     }
+    if (NOT_CALENDAR_PATTERN.test(raw)) return false;
     return CALENDAR_PATTERNS.some((pattern) => pattern.test(raw));
 }
 
@@ -270,4 +280,19 @@ export function htmlToGroundingText(html: string): { title: string; text: string
     }
 
     return { title, text: deduped.join("\n") };
+}
+
+// ---------------------------------------------------------------------------
+// 4. What a programme teaches (courses, subjects, maths content).
+// ---------------------------------------------------------------------------
+
+const TEACHING_PATTERN = /\b(courses?|subjects?|modules?|programme structure|program structure|course structure|syllabus|curriculum|electives?|specialis\w*|specializ\w*|what (will|do|would) (i|we|you|students) (learn|study)|how (much|many) (math|maths|mathematics|programming|coding|courses|subjects))\b/i;
+const PROGRAMME_PATTERN = /\b(programme|program|degree|bachelor|master|diploma|foundation|computer science|engineering|accounting|information (systems|technology)|\bbcs\b|\bcs\b|\bit\b)\b/i;
+// Questions about registering for or paying for courses are not about content.
+const COURSE_ADMIN_PATTERN = /\b(register|registration|add\s*(\/|or|and)?\s*drop|withdraw|fees?|pay|deadline|timetable|exam)\b/i;
+
+/** "What subjects are in Computer Science?", "how much maths is in the CS programme?" */
+export function isProgrammeContentQuestion(text: string): boolean {
+    const raw = String(text || "");
+    return TEACHING_PATTERN.test(raw) && PROGRAMME_PATTERN.test(raw) && !COURSE_ADMIN_PATTERN.test(raw);
 }

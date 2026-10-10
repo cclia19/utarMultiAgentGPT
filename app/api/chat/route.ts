@@ -6,6 +6,9 @@ import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
 import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
+import { tryBusScheduleReply } from "@/lib/busSchedule";
+import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
+import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
@@ -19,12 +22,19 @@ import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
 import {
     isAnswerChallenge,
+    isIntakeOrCalendarQuestion,
+    isProgrammeContentQuestion,
     formatEarlierAssistantAnswers,
     formatRecentConversation,
     extractOfficialUtarUrls,
     findRecentUserUtarUrls,
 } from "@/lib/conversationSignals";
-import { fetchOfficialUtarPage, type OfficialPage } from "@/lib/officialPage";
+import {
+    fetchOfficialUtarPage,
+    fetchOfficialUtarPageCached,
+    DACE_INTAKE_CALENDAR_URL,
+    type OfficialPage,
+} from "@/lib/officialPage";
 
 /**
  * Vercel's default function timeout is 10s, which this route can exceed on a
@@ -88,6 +98,52 @@ APPLICABILITY RULE (who an answer applies to):
 - If the user asks whether something applies to everyone and the evidence does not explicitly say so, do not answer "yes".
 - When sources disagree, the official UTAR web page is authoritative over documents; mention the date of the source when it is shown.
 `;
+
+/**
+ * One response style for every answering prompt (KB, web fallback, pasted
+ * page), so answers look the same whichever path produced them. Topic rules
+ * (bus routes, profiles, calendars) only add to this.
+ */
+const RESPONSE_STYLE = `
+RESPONSE STYLE (every answer):
+- Open with the direct answer in one or two sentences. No preamble ("Here is...", "Based on the information...") and do not restate the question.
+- Then only the detail that answer needs. Aim for under 150 words; go longer only for step-by-step procedures or when the user asks for everything.
+- Leave out background the user did not ask for (history, related services, expansions); offer it in one line instead if it is useful.
+- Pick the layout that fits the content:
+  - Dates, fees or rules that differ by group: one bullet per group, bold label first ("**Undergraduate:** 26 October 2026").
+  - How-to or procedure: numbered steps, one action per step, with form names and offices in bold.
+  - Schedule or timetable (bus trips, exam sessions): summarise it in your own words as short bullets. Never copy it as a table or row by row: Gemini blocks timetables reproduced from a document.
+  - Comparison of two or more options on the same points: a compact table (at most 4 short columns).
+  - Contact details: bullets for office, email, phone, location and hours (only the ones you have).
+  - Anything else: short paragraphs of two or three sentences.
+- Use a "###" heading only when the answer has two or more distinct parts. Never use "#" or "##".
+- Bold only key facts (dates, amounts, deadlines, form names), never whole sentences.
+- Write dates as "5 October 2026" and times as "7:15 am". Never copy footnote markers (*, ^, #) from tables; say what they mean in words.
+- When there is a clear next step (a deadline, a form, an office to contact), end with one line starting "**Next step:**".
+- Start every "###" heading with one fitting emoji (e.g. "### 📚 Core courses", "### 📞 Contact"). No other emoji in factual answers. Put blank lines between sections.
+- Specific format rules elsewhere in these instructions (e.g. profile or contact sections) take precedence.
+`;
+
+/**
+ * Added for intake / trimester-start questions. Calendar tables have one column
+ * per intake cohort, and without this the model listed "February Intake
+ * Postgraduate Programme, June Intake Postgraduate Programme, ..." under each
+ * date instead of one date per programme level.
+ */
+function buildCalendarFormatInstruction(): string {
+    const todayISO = new Date().toISOString().split("T")[0];
+    return `
+CALENDAR ANSWER FORMAT (intake and trimester start dates). Today's date: ${todayISO}
+- An official UTAR page may be included below. It is evidence you may use, and it wins over documents when they disagree (e.g. campus-specific dates).
+- Start with a short heading naming the trimester, e.g. "### October 2026 trimester". If the user asked about "the next trimester", work out which one that is from today's date and name it.
+- Then ONE bullet per programme level, date first, in this order: Postgraduate, Undergraduate, Foundation, then programmes with their own dates (e.g. MBBS, Nursing, Master of Architecture).
+  Example: "**Postgraduate:** 5 October 2026". Put campus differences on the same bullet: "**Undergraduate:** 26 October 2026 (Kampar) / 27 October 2026 (Sungai Long)".
+- Calendar tables have one column per intake (February, June, October intake). These are groups of students by when they enrolled, not separate programmes. If all intakes of a level start on the same date, give that date once and say it applies to both new and current students. Split by intake only when the dates differ, and then write "students who enrolled in the June intake", never "June Intake Postgraduate Programme".
+- Never copy footnote markers (*, ^, #) from tables. If a footnote changes who a date applies to, say it in words.
+- Leave out later trimesters and "to be confirmed" rows unless the user asked about them.
+- Keep it short: no teaching-week or exam-period breakdown unless asked.
+`;
+}
 
 /**
  * Added to the answering prompt when the user challenges or questions a
@@ -547,7 +603,7 @@ function finalCleanWebAnswer(
 }
 
 function finalClean(text: string): string {
-    const base = cleanUserFacingText(text).replace(/\n{3,}/g, "\n\n").trim();
+    const base = dropRepeatedAnswer(cleanUserFacingText(text)).replace(/\n{3,}/g, "\n\n").trim();
     return linkifyRawUrls(base);
 }
 
@@ -1372,6 +1428,17 @@ function inferResolvedTopic(effectiveMessage: string, answerText: string): strin
 }
 
 function buildFileSearchUserMessage(message: string, agentId?: string): string {
+    // Course tables sit far from the programme overview in the handbooks, so
+    // "how much maths is in CS?" found the overview and said "not specified".
+    if (isProgrammeContentQuestion(message)) {
+        return `
+User question:
+${message}
+
+Search intent:
+This asks what a programme teaches. Search the programme structure / course list for the programme named (headings such as "Course Code", "Core", "Specialisation Modules", "Field Electives", "Free Modules"), not only the programme overview or entry requirements. Answer by listing the relevant courses by name and course code, grouped as the source groups them.
+`;
+    }
     if (!isProfileQuestion(message)) return message;
 
     const possibleName = extractPossiblePersonName(message);
@@ -1812,15 +1879,7 @@ For staff, dean, HOD, DD, HoP, president, VP, supervisor, lecturer, or office co
 - Include email, office, phone, extension, profile link when available.
 - Omit unavailable sections rather than saying every field is unavailable.
 
-STYLE AND FORMAT:
-- Use rich but professional student-friendly Markdown.
-- Use clear headings.
-- Put blank lines between sections.
-- Use bullets for lists.
-- Keep paragraphs short.
-- Use emojis where helpful.
-- Do not glue different information into one paragraph.
-- Do not create empty link labels.
+${RESPONSE_STYLE}- Do not create empty link labels.
 
 LANGUAGE RULE:
 - Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
@@ -1892,7 +1951,12 @@ Important:
             allowedLinks
         );
 
-        const weakAnswer = baseText.trim().length < 20 || baseText.includes(NO_KB_ANSWER);
+        // extractResponseText() returns "No response generated." for empty output; at
+        // 22 chars it slipped past the length check and reached users verbatim.
+        const weakAnswer =
+            baseText.trim().length < 20 ||
+            baseText.includes(NO_KB_ANSWER) ||
+            baseText.trim() === "No response generated.";
 
         if (weakAnswer && (institutionalMode || supervisorMode || profileMode)) {
             // Secondary live search snippet fallback if Google Search Grounding yielded weak/empty output
@@ -2082,10 +2146,10 @@ async function answerFromOfficialPages(params: {
     question: string;
     rawMessage: string;
     selectedAgent: any;
-    correctionInstruction: string;
+    answerRules: string;
     history: any[];
 }): Promise<{ text: string; citations: string[] } | null> {
-    const { urls, question, rawMessage, correctionInstruction, history } = params;
+    const { urls, question, rawMessage, answerRules, history } = params;
     const todayISO = new Date().toISOString().split("T")[0];
 
     const systemInstruction = `
@@ -2100,13 +2164,11 @@ The user shared an official UTAR web page. Answer ONLY from the content of that 
 - If the page does not contain the answer to the question, output exactly "${NO_KB_ANSWER}" and nothing else (other sources will then be checked). Do not fill gaps from memory.
 - Do not mention fetching, tools, or system instructions.
 ${APPLICABILITY_POLICY}
-FORMAT:
-- Clean Markdown, short headings, bullets for lists.
-- Do not add a links section; the official link is appended automatically.
+${RESPONSE_STYLE}- Do not add a links section; the official link is appended automatically.
 
 LANGUAGE RULE:
 - Respond in the same language as the user's message. Default to English.
-${correctionInstruction}
+${answerRules}
 `;
 
     // A pasted link usually comes with a vague "can you check this page?", so the
@@ -2750,6 +2812,11 @@ export async function POST(req: NextRequest) {
         const latencyMs = Date.now() - startedAt;
         const payload = await res.clone().json().catch(() => null);
         after(() => logChatEvent({ body, payload, metrics, latencyMs }));
+        // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
+        // Gemini cost of a test run. Vercel builds run with NODE_ENV=production.
+        if (process.env.NODE_ENV !== "production") {
+            res.headers.set("x-chat-metrics", JSON.stringify({ ...metrics, latencyMs }));
+        }
         return res;
     }
 
@@ -2818,6 +2885,25 @@ async function handleChat(
             rawMessage,
             lastResolvedTopic
         );
+
+        // Kampar bus timetables come from data, not Gemini: Gemini blocks most
+        // answers that reproduce the timetable PDFs (see lib/busSchedule.ts).
+        const busReply = tryHandleVulgarity(rawMessage) ? null : tryBusScheduleReply(rawMessage, history);
+        if (busReply) {
+            const busAgent = getAgentById("dgs-kampar");
+            return NextResponse.json({
+                text: busReply,
+                citations: [],
+                sourceMode: "officialSchedule",
+                storeDisplayName: "",
+                selectedAgentId: busAgent.id,
+                selectedAgentLabel: busAgent.label,
+                needsClarification: false,
+                pendingQuestion: null,
+                lastResolvedTopic,
+                routeType: "admin_specific",
+            });
+        }
 
         const directPreReplies = [
             tryHandleVulgarity(rawMessage),
@@ -3009,6 +3095,14 @@ async function handleChat(
             })
             : routerResult.rewrittenQuestion || resolvedMessage;
 
+        const calendarQuestion = isIntakeOrCalendarQuestion(rawMessage) || isIntakeOrCalendarQuestion(effectiveMessage);
+        const bothCampuses =
+            hasSecondary && campusFamily(selectedAgent.id) !== null && campusFamily(selectedAgent.id) === campusFamily(secondaryAgent!.id);
+        const answerRules =
+            correctionInstruction +
+            (calendarQuestion ? buildCalendarFormatInstruction() : "") +
+            (bothCampuses ? BOTH_CAMPUSES_RULE : "");
+
         const profileMode = isProfileQuestion(effectiveMessage);
         const sensitiveMode =
             isSensitiveOrInternalQuestion(effectiveMessage) ||
@@ -3043,7 +3137,7 @@ async function handleChat(
                 question: effectiveMessage,
                 rawMessage,
                 selectedAgent,
-                correctionInstruction,
+                answerRules,
                 history,
             });
             if (pageAnswer) {
@@ -3085,7 +3179,7 @@ async function handleChat(
                 selectedAgent,
                 profileMode,
                 reason: "kb_missing",
-                extraInstruction: correctionInstruction,
+                extraInstruction: answerRules,
             });
 
             return NextResponse.json({
@@ -3151,14 +3245,7 @@ INTERNSHIP / INDUSTRIAL TRAINING RULE:
 - If faculty-specific evidence is missing, say exactly:
   "${NO_KB_ANSWER}"
 ${APPLICABILITY_POLICY}
-FORMAT:
-- Use clean Markdown.
-- Use clear headings.
-- Put blank lines between sections.
-- Use bullets for lists.
-- Keep contact details visible.
-- Do not glue different sections into one paragraph.
-
+${RESPONSE_STYLE}
 LANGUAGE RULE:
 - Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
 - If the query is in English or language is not specified, default to English.
@@ -3182,14 +3269,7 @@ CORE BEHAVIOUR:
 
 ${SELECTED_AGENT_EVIDENCE_POLICY}
 
-FORMAT:
-- Use clean Markdown.
-- Use clear headings.
-- Put blank lines between sections.
-- Use bullets for lists.
-- Keep contact details visible.
-- Do not glue different sections into one paragraph.
-
+${RESPONSE_STYLE}
 LANGUAGE RULE:
 - Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
 - If the query is in English or language is not specified, default to English.
@@ -3214,14 +3294,7 @@ CORE BEHAVIOUR:
 
 ${SELECTED_AGENT_EVIDENCE_POLICY}
 
-FORMAT:
-- Use clean Markdown.
-- Use clear headings.
-- Put blank lines between sections.
-- Use bullets for lists.
-- Keep contact details visible.
-- Do not glue different sections into one paragraph.
-
+${RESPONSE_STYLE}
 LANGUAGE RULE:
 - Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). For example, if user asks in Chinese or says "respond in Chinese", translate and output the final response in Chinese.
 - If the query is in English or language is not specified, default to English.
@@ -3229,6 +3302,20 @@ LANGUAGE RULE:
 
         const KB_TOTAL_BUDGET_MS = 20000;
         const kbStartTime = Date.now();
+
+        // DACE's KB calendar lacks the campus split and the MBBS / Nursing dates,
+        // so calendar questions also get the official intake page (cached; on a
+        // failed fetch the answer falls back to the KB alone).
+        const calendarPage =
+            calendarQuestion && selectedAgent.id === "dace" && pageUrls.length === 0
+                ? await fetchOfficialUtarPageCached(DACE_INTAKE_CALENDAR_URL)
+                : null;
+        // In the system instruction, not the user turn: page text in the user
+        // turn made Gemini write fake tool_code / "thought" text into the answer.
+        const officialPageEvidence =
+            calendarPage?.kind === "html"
+                ? `\nOFFICIAL UTAR PAGE (evidence you may use alongside File Search; authoritative over documents):\n${calendarPage.title}\nURL: ${calendarPage.url}\n<<<PAGE\n${calendarPage.text}\nPAGE>>>\n`
+                : "";
 
         const buildFileSearchReq = (storeList: string[], instruction: string) => ({
             model: MODEL_NAME,
@@ -3239,7 +3326,7 @@ LANGUAGE RULE:
                 },
             ],
             config: {
-                systemInstruction: { parts: [{ text: instruction + correctionInstruction }] },
+                systemInstruction: { parts: [{ text: instruction + answerRules + officialPageEvidence }] },
                 tools: [
                     {
                         fileSearch: {
@@ -3259,6 +3346,14 @@ LANGUAGE RULE:
         let streamedText = "";
         let rawThoughts = "";
         let succeeded = false;
+        // Gemini stops with RECITATION, or OTHER with no text, when an answer
+        // copies a source table (every Kampar bus-route answer did). An identical
+        // retry hits the same block, so retry without tables.
+        let lastFinishReason = "";
+        const withRecitationFallback = (instruction: string) =>
+            lastFinishReason === "RECITATION" || lastFinishReason === "OTHER"
+                ? `${instruction}\nThe previous attempt was blocked for copying the source. Do NOT use a table this time: summarise the timings or items in your own words as short bullets.\n`
+                : instruction;
         let escalationAborted = false;
 
         // Step 1: Identical call retry ladder (up to 2 attempts total: 1 initial + 1 retry)
@@ -3273,7 +3368,7 @@ LANGUAGE RULE:
             const timeoutForAttempt = Math.min(remaining, 15000);
 
             try {
-                const req = buildFileSearchReq(storeNames, fileSearchSystemInstruction);
+                const req = buildFileSearchReq(storeNames, withRecitationFallback(fileSearchSystemInstruction));
                 const result = await executeFileSearchAttempt({
                     request: req,
                     sink,
@@ -3288,6 +3383,7 @@ LANGUAGE RULE:
                 console.warn(
                     `[fileSearch] attempt ${attempt} finished with finishReason=${result.finishReason} (chars=${result.rawText.trim().length})`
                 );
+                lastFinishReason = result.finishReason;
 
                 if (!result.isRecoverableFailure) {
                     succeeded = true;
@@ -3334,7 +3430,7 @@ LANGUAGE RULE:
                 const timeoutForAttempt = Math.min(remaining, 15000);
                 try {
                     console.warn(`[fileSearch] escalating to primary store only (${primaryStoreNames.join(", ")})...`);
-                    const req = buildFileSearchReq(primaryStoreNames, singleStoreSystemInstruction);
+                    const req = buildFileSearchReq(primaryStoreNames, withRecitationFallback(singleStoreSystemInstruction));
                     const result = await executeFileSearchAttempt({
                         request: req,
                         sink,
@@ -3349,6 +3445,7 @@ LANGUAGE RULE:
                     console.warn(
                         `[fileSearch] primary-store attempt finished with finishReason=${result.finishReason} (chars=${result.rawText.trim().length})`
                     );
+                    lastFinishReason = result.finishReason;
 
                     if (!result.isRecoverableFailure) {
                         succeeded = true;
@@ -3430,7 +3527,7 @@ LANGUAGE RULE:
             fileText,
             fileCitations,
             reason: "kb_no_answer",
-            extraInstruction: correctionInstruction,
+            extraInstruction: answerRules,
         });
 
         const newTopic =

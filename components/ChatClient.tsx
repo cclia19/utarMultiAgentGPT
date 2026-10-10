@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import AnswerBody from "./AnswerBody";
 import {
     Send,
     Loader2,
@@ -66,7 +65,7 @@ interface Message {
     thought?: string;
     isStreaming?: boolean;
     citations?: string[];
-    sourceMode?: "fileSearch" | "webFallback" | "staffDirectory" | "none";
+    sourceMode?: "fileSearch" | "webFallback" | "staffDirectory" | "officialSchedule" | "none";
     storeDisplayName?: string;
     selectedAgentId?: AgentId;
     selectedAgentLabel?: string;
@@ -141,6 +140,7 @@ function sourceLabel(sourceMode?: string): string {
     if (sourceMode === "fileSearch") return "KB";
     if (sourceMode === "webFallback") return "Web";
     if (sourceMode === "staffDirectory") return "Staff Directory";
+    if (sourceMode === "officialSchedule") return "Official schedule";
     return "None";
 }
 
@@ -155,6 +155,10 @@ function sourceBadgeClass(sourceMode?: string): string {
 
     if (sourceMode === "staffDirectory") {
         return "bg-amber-50 text-amber-700 border border-amber-100";
+    }
+
+    if (sourceMode === "officialSchedule") {
+        return "bg-emerald-50 text-emerald-700 border border-emerald-100";
     }
 
     return "bg-zinc-50 text-zinc-500 border border-zinc-100";
@@ -591,62 +595,7 @@ export default function ChatClient() {
                                 }`}
                         >
                             {msg.role === "model" ? (
-                                <div>
-                                    <div
-                                        className="
-                                            prose prose-sm prose-zinc max-w-none leading-relaxed
-                                            prose-headings:mt-5 prose-headings:mb-2 prose-headings:font-semibold
-                                            prose-p:my-3
-                                            prose-ul:my-3 prose-ol:my-3 prose-li:my-1.5
-                                            prose-a:text-blue-600 prose-a:underline prose-a:font-medium hover:prose-a:text-blue-800
-                                            prose-strong:text-zinc-900
-                                            prose-hr:my-4
-                                        "
-                                    >
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            a: ({ href, children }) => (
-                                                <a
-                                                    href={href}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 underline font-medium hover:text-blue-800 break-words"
-                                                >
-                                                    {children} ↗
-                                                </a>
-                                            ),
-                                            p: ({ children }) => (
-                                                <p className="my-3 leading-relaxed">
-                                                    {children}
-                                                </p>
-                                            ),
-                                            h3: ({ children }) => (
-                                                <h3 className="mt-5 mb-2 text-sm font-semibold text-zinc-900">
-                                                    {children}
-                                                </h3>
-                                            ),
-                                            ul: ({ children }) => (
-                                                <ul className="my-3 list-disc pl-5 space-y-1.5">
-                                                    {children}
-                                                </ul>
-                                            ),
-                                            ol: ({ children }) => (
-                                                <ol className="my-3 list-decimal pl-5 space-y-1.5">
-                                                    {children}
-                                                </ol>
-                                            ),
-                                            blockquote: ({ children }) => (
-                                                <blockquote className="border-l-4 border-zinc-200 pl-3 italic text-zinc-600">
-                                                    {children}
-                                                </blockquote>
-                                            ),
-                                        }}
-                                    >
-                                        {msg.text}
-                                    </ReactMarkdown>
-                                    </div>
-                                </div>
+                                <AnswerBody text={msg.text} />
                             ) : (
                                 <p className="whitespace-pre-wrap">{msg.text}</p>
                             )}

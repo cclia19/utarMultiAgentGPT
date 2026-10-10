@@ -98,6 +98,19 @@ const CASES = [
         ],
     },
     {
+        name: "Calendar answer is one line per programme level, not one per intake cohort",
+        turns: [
+            {
+                say: "what are the confirmed start dates for october 2026",
+                expect: {
+                    agent: "dace",
+                    mustMatch: [/postgraduate/i, /foundation/i, /sungai long/i],
+                    mustNotMatch: [/(february|june) intake/i, /tool_code|^thought/im],
+                },
+            },
+        ],
+    },
+    {
         name: "Foundation intake",
         turns: [
             {
