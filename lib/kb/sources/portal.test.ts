@@ -137,3 +137,14 @@ test("announcement content never includes the signed-in person's name", () => {
     assert.deepEqual(attachments.map((a: any) => a.url), ["https://web2.utar.edu.my/portal/ictService/upload/2026/10/DGS-KPR984092.pdf"]);
     assert.deepEqual(announcementContent("<html>no markers here, Aun Yichiet</html>"), { text: "", attachments: [] });
 });
+
+test("the intranet's unquoted links and marker spacing are handled", () => {
+    const list = `<table><tr > <td><input type="checkbox" name="tick" value="46712"></th> <td>09/10/2026</td> <td><A target="_self" href="https://portal.utar.edu.my/stuIntranet/announcement/annDetail.jsp?fid=46712"><a href=http://www2.utar.edu.my/media/Announcement/2026/LIB984141.pdf target=_blank> Library Maintenance Works at Kampar Library </a></a></td> <td>LIB</td> </table>`;
+    const [a] = parseAnnouncementList(list);
+    assert.equal(a.title, "Library Maintenance Works at Kampar Library");
+    assert.equal(a.pdf, "https://www2.utar.edu.my/media/Announcement/2026/LIB984141.pdf");
+    const detail = `<H3>Aun Yichiet (17057)</H3><!--  Add Content Here --> <div class="title"> <a href=http://www2.utar.edu.my/media/Announcement/2026/LIB984141.pdf target=_blank> Library Maintenance Works </a></div> <!-- End Content Here -->`;
+    const { text, attachments } = announcementContent(detail);
+    assert.equal(text, "Library Maintenance Works");
+    assert.equal(attachments[0].url, "https://www2.utar.edu.my/media/Announcement/2026/LIB984141.pdf");
+});

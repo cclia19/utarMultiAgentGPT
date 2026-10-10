@@ -67,12 +67,18 @@ function allowedHost(url: string): boolean {
     }
 }
 
-/** Absolute links from a page, as [{ title, url }], https and deduplicated. */
+/**
+ * Absolute links from a page, as [{ title, url }], https and deduplicated.
+ * Each opening <a> is read on its own: the intranet nests links
+ * (<A href=detail><a href=file.pdf>title</a></a>) and leaves hrefs unquoted.
+ */
 export function pageLinks(html: string, pageUrl: string): PortalLink[] {
     const seen = new Set<string>();
     const out: PortalLink[] = [];
-    for (const m of html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-        const href = m[1].trim();
+    for (const m of html.matchAll(/<a\b([^>]*)>/gi)) {
+        const attr = /\bhref\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i.exec(m[1]);
+        if (!attr) continue;
+        const href = (attr[1] ?? attr[2] ?? attr[3]).trim();
         if (!href || href.startsWith("#") || /^javascript:/i.test(href) || /^mailto:/i.test(href)) continue;
         let url: string;
         try {
@@ -80,7 +86,15 @@ export function pageLinks(html: string, pageUrl: string): PortalLink[] {
         } catch {
             continue;
         }
-        const title = m[2].replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+        // Link text: up to the next <a or </a>.
+        const after = html.slice(m.index! + m[0].length);
+        const stop = after.search(/<\/?a\b/i);
+        const title = (stop >= 0 ? after.slice(0, stop) : after.slice(0, 300))
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&nbsp;/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
         if (seen.has(url)) continue;
         seen.add(url);
         out.push({ title, url });
@@ -238,7 +252,8 @@ export function structureToMarkdown(html: string, label: string): string {
 export const ANNOUNCEMENT_LIST = `${PORTAL_BASE}announcement/annIndex.jsp`;
 export const ANNOUNCEMENT_DAYS = 90;
 
-export type Announcement = { date: string; title: string; dept: string; url: string; id: string };
+/** `pdf`: the list often links the announcement's PDF directly. */
+export type Announcement = { date: string; title: string; dept: string; url: string; id: string; pdf?: string };
 
 /** Rows "dd/mm/yyyy | title | DEPT" with their detail link, newest first as listed. */
 export function parseAnnouncementList(html: string): Announcement[] {
@@ -249,7 +264,8 @@ export function parseAnnouncementList(html: string): Announcement[] {
         const dateIdx = texts.findIndex((t) => /^\d{2}\/\d{2}\/\d{4}$/.test(t));
         if (!href || dateIdx < 0 || texts.length < dateIdx + 3) continue;
         const [d, m, y] = texts[dateIdx].split("/");
-        out.push({ date: `${y}-${m}-${d}`, title: texts[dateIdx + 1], dept: texts[dateIdx + 2], url: new URL(href[1].replace(/&amp;/g, "&"), ANNOUNCEMENT_LIST).toString(), id: href[2] });
+        const pdf = pageLinks(row.html, ANNOUNCEMENT_LIST).find((l) => allowedHost(l.url) && isDocument(l.url))?.url;
+        out.push({ date: `${y}-${m}-${d}`, title: texts[dateIdx + 1], dept: texts[dateIdx + 2], url: new URL(href[1].replace(/&amp;/g, "&"), ANNOUNCEMENT_LIST).toString(), id: href[2], ...(pdf ? { pdf } : {}) });
     }
     return out;
 }
@@ -264,9 +280,10 @@ export function recentAnnouncements(list: Announcement[], now: Date, days = ANNO
  * person's name and email, which must never reach the knowledge base.
  */
 export function announcementContent(html: string): { text: string; attachments: PortalLink[] } {
-    const start = html.indexOf("<!-- Add Content Here -->");
-    const end = html.indexOf("<!-- End Content Here -->", start);
-    const body = start >= 0 && end > start ? html.slice(start, end) : "";
+    // The markers' spacing varies ("<!--  Add Content Here -->").
+    const start = /<!--\s*Add Content Here\s*-->/i.exec(html);
+    const end = start ? /<!--\s*End Content Here\s*-->/i.exec(html.slice(start.index)) : null;
+    const body = start && end ? html.slice(start.index + start[0].length, start.index + end.index) : "";
     const attachments = pageLinks(body, ANNOUNCEMENT_LIST).filter((l) => allowedHost(l.url) && isDocument(l.url) && !/index\.jsp/i.test(l.url));
     const text = body
         .replace(/<div class="goback">[\s\S]*?<\/div>/i, "")

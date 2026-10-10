@@ -133,9 +133,13 @@ try {
             const file = await context.request.get(doc.url).catch(() => null);
             const body = file && file.ok() ? await file.body() : null;
             const type = file?.headers()["content-type"] ?? "";
+            if (file && file.status() === 404) {
+                problems.push({ url: doc.url, problem: `broken link on the portal (HTTP 404) in "${section.title}": "${doc.title}"`, note: true });
+                continue;
+            }
             const isPdf = body && (/pdf/i.test(type) || body.subarray(0, 4).toString() === "%PDF");
             if (!isPdf) {
-                problems.push({ url: doc.url, problem: body ? `not a PDF (${type})` : "could not be downloaded" });
+                problems.push({ url: doc.url, problem: body ? `not a PDF (${type})` : `could not be downloaded (HTTP ${file?.status() ?? "no response"})` });
                 continue;
             }
             if (body.length > MAX_PDF_BYTES) {
@@ -254,7 +258,7 @@ try {
                 sourceUrl: a.url,
                 author: "sync:portal",
             };
-            const pdf = attachments[0];
+            const pdf = attachments[0] ?? (a.pdf ? { url: a.pdf, title: a.title } : null);
             if (pdf) {
                 const res = await context.request.get(pdf.url).catch(() => null);
                 const body = res && res.ok() ? await res.body() : null;
