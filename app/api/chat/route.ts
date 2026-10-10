@@ -9,6 +9,7 @@ import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { tryBusScheduleReply } from "@/lib/busSchedule";
 import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
+import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
@@ -1294,7 +1295,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
     }
 }
 
-async function generateDirectNoRetrievalResponse(message: string, history: any[] = []): Promise<string> {
+async function generateDirectNoRetrievalResponse(message: string, history: any[] = [], extraRules = ""): Promise<string> {
     // The conversation is included so a reply about "what you said earlier" is
     // grounded in what was actually said. Without it the model invented
     // explanations for answers it could not see.
@@ -1327,6 +1328,7 @@ Rules:
 - If asked to rank or pick a favourite UTAR lecturer or staff member, say there is no official ranking and keep it playful. Never name a real person as the best or worst.
 - Keep it concise.
 - LANGUAGE RULE: Always respond in the same language as the user's query or requested language instruction (e.g. Chinese, Malay, Tamil, etc.). If the query is in English or language is not specified, default to English.
+${extraRules}
 `,
                         },
                     ],
@@ -2790,6 +2792,13 @@ async function executeFileSearchAttempt(params: {
     }
 }
 
+/** Moves Gemini's "FOLLOW-UPS:" line out of the answer into followUps (chips on the chat page). */
+function withFollowUps(payload: any) {
+    if (!payload || typeof payload.text !== "string") return payload;
+    const { text, followUps } = extractFollowUps(payload.text);
+    return { ...payload, text, followUps };
+}
+
 export async function POST(req: NextRequest) {
     let body: any;
 
@@ -2808,10 +2817,11 @@ export async function POST(req: NextRequest) {
     const startedAt = Date.now();
 
     if (body?.stream !== true) {
-        const res = await metricsStore.run(metrics, () => handleChat(body));
+        const raw = await metricsStore.run(metrics, () => handleChat(body));
         const latencyMs = Date.now() - startedAt;
-        const payload = await res.clone().json().catch(() => null);
+        const payload = withFollowUps(await raw.json().catch(() => null));
         after(() => logChatEvent({ body, payload, metrics, latencyMs }));
+        const res = NextResponse.json(payload, { status: raw.status });
         // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
         // Gemini cost of a test run. Vercel builds run with NODE_ENV=production.
         if (process.env.NODE_ENV !== "production") {
@@ -2836,7 +2846,7 @@ export async function POST(req: NextRequest) {
             let streamFailed = false;
             try {
                 const res = await metricsStore.run(metrics, () => handleChat(body, sink));
-                payload = await res.json();
+                payload = withFollowUps(await res.json());
                 sink.done(payload);
             } catch (err: any) {
                 streamFailed = true;
@@ -2879,6 +2889,8 @@ async function handleChat(
 
         fallbackAgentId = selectedAgentId || "general";
         const rawMessage = String(message || "").trim();
+        // Language picked on the chat page (EN / BM / 中文); empty = follow the question.
+        const chosenLanguageRule = languageRule(body?.language);
         sink?.status("analyzing", "Analyzing your question...");
 
         const enrichedMessage = enrichWithLastResolvedTopic(
@@ -3031,7 +3043,7 @@ async function handleChat(
         }
 
         if (!routerResult.needsClarification && modelSaysNoRetrieval && !retrievalForcedBySafetyNet) {
-            const directText = await generateDirectNoRetrievalResponse(rawMessage, history);
+            const directText = await generateDirectNoRetrievalResponse(rawMessage, history, chosenLanguageRule);
 
             return NextResponse.json({
                 text: directText,
@@ -3101,7 +3113,9 @@ async function handleChat(
         const answerRules =
             correctionInstruction +
             (calendarQuestion ? buildCalendarFormatInstruction() : "") +
-            (bothCampuses ? BOTH_CAMPUSES_RULE : "");
+            (bothCampuses ? BOTH_CAMPUSES_RULE : "") +
+            FOLLOW_UPS_RULE +
+            chosenLanguageRule;
 
         const profileMode = isProfileQuestion(effectiveMessage);
         const sensitiveMode =
