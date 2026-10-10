@@ -144,7 +144,7 @@ export class PostgresVersionStore implements KbVersionStore {
         await this.sql.begin(async (tx: Sql) => {
             await tx`UPDATE kb_versions SET gemini_document = NULL WHERE key = ${key} AND version <> ${version}`;
             await tx`UPDATE kb_versions SET gemini_document = ${geminiDocument} WHERE key = ${key} AND version = ${version}`;
-            await tx`UPDATE kb_documents SET live_version = ${version}, gemini_document = ${geminiDocument}, updated_at = now() WHERE key = ${key}`;
+            await tx`UPDATE kb_documents SET live_version = ${version}, gemini_document = ${geminiDocument || null}, updated_at = now() WHERE key = ${key}`;
         });
     }
 
@@ -214,7 +214,7 @@ export class FileVersionStore implements KbVersionStore {
     }
     async setLive(key: string, version: number, geminiDocument: string) {
         for (const v of this.data.versions[key] ?? []) v.geminiDocument = v.version === version ? geminiDocument : undefined;
-        Object.assign(this.data.documents[key], { liveVersion: version, geminiDocument, updatedAt: new Date().toISOString() });
+        Object.assign(this.data.documents[key], { liveVersion: version, geminiDocument: geminiDocument || undefined, updatedAt: new Date().toISOString() });
         this.save();
     }
     async saveRun(run: KbRun) {

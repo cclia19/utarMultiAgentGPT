@@ -29,6 +29,7 @@ const OUTCOME_STYLE: Record<string, string> = {
     held: "text-amber-700",
     failed: "text-red-700",
     note: "text-zinc-500",
+    retired: "text-zinc-500",
 };
 
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "–");

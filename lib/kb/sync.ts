@@ -109,6 +109,29 @@ export async function publishAll(
     return items;
 }
 
+/**
+ * Takes a document out of the store (e.g. an announcement past its window).
+ * Its versions stay in the history; publishing it again later works as usual.
+ */
+export async function retireDocument(
+    key: string,
+    reason: string,
+    deps: { store: KbVersionStore; publisher: KbPublisher },
+    options: { dryRun?: boolean } = {}
+): Promise<KbRunItem | null> {
+    const doc = await deps.store.getDocument(key);
+    if (!doc || !doc.liveVersion) return null;
+    const base = { key, title: doc.title, unitId: doc.unitId, version: doc.liveVersion };
+    if (options.dryRun) return { ...base, outcome: "dry-run", detail: `would retire: ${reason}` };
+    try {
+        if (doc.geminiDocument) await deps.publisher.remove(doc.geminiDocument);
+        await deps.store.setLive(key, 0, "");
+        return { ...base, outcome: "retired", detail: reason };
+    } catch (error: any) {
+        return { ...base, outcome: "failed", detail: `could not retire: ${error?.message || error}` };
+    }
+}
+
 /** Publishes an earlier version's text again as the newest version. */
 export async function rollback(
     key: string,
