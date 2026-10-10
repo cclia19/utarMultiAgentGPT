@@ -45,6 +45,31 @@ export type Strings = {
         acknowledge: string;
         cta: string;
     };
+    /** First-visit welcome screen (the launch bento). */
+    splash: {
+        getStarted: string;
+        answersAsCards: string;
+        smartRouting: string;
+        toRightOffice: string;
+        routeQuestion: string;
+        offices: { library: string; scholarships: string; admissions: string };
+        darkMode: string;
+        verified: string;
+        liveBus: string;
+        nextBus: string;
+        notice: string;
+        tapToRead: string;
+        followUps: string;
+        followUpChips: string[];
+        departments: string;
+        programmes: string;
+        devices: string;
+        atYourService: string;
+        neverSleeps: string;
+        askAnything: string;
+        noHistory: string;
+        close: string;
+    };
 };
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -92,6 +117,30 @@ export const STRINGS: Record<Lang, Strings> = {
             acknowledge: "I understand answers may contain mistakes and I’ll verify important information.",
             cta: "Start chatting",
         },
+        splash: {
+            getStarted: "Get started",
+            answersAsCards: "Answers as cards",
+            smartRouting: "Smart routing",
+            toRightOffice: "to the right office",
+            routeQuestion: "Any scholarships?",
+            offices: { library: "Library", scholarships: "Scholarships", admissions: "Admissions" },
+            darkMode: "Dark mode",
+            verified: "UTAR verified",
+            liveBus: "Live bus times",
+            nextBus: "Next bus",
+            notice: "Before you start",
+            tapToRead: "Tap to read",
+            followUps: "Suggested follow-ups",
+            followUpChips: ["What about fees?", "Who do I contact?", "How do I apply?"],
+            departments: "41 departments",
+            programmes: "Programme structures",
+            devices: "Phone & desktop",
+            atYourService: "At your service",
+            neverSleeps: "UTARCHAT never sleeps",
+            askAnything: "Ask anything.",
+            noHistory: "No history.",
+            close: "Close",
+        },
     },
     ms: {
         tagline: "Tanya saja, saya free service untuk anda 😉",
@@ -137,6 +186,30 @@ export const STRINGS: Record<Lang, Strings> = {
             acknowledge: "Saya faham jawapan mungkin tersilap dan saya akan mengesahkan maklumat penting.",
             cta: "Mula berbual",
         },
+        splash: {
+            getStarted: "Mula",
+            answersAsCards: "Jawapan dalam kad",
+            smartRouting: "Penghalaan pintar",
+            toRightOffice: "ke pejabat yang betul",
+            routeQuestion: "Ada biasiswa?",
+            offices: { library: "Perpustakaan", scholarships: "Biasiswa", admissions: "Kemasukan" },
+            darkMode: "Mod gelap",
+            verified: "Disahkan UTAR",
+            liveBus: "Waktu bas",
+            nextBus: "Bas seterusnya",
+            notice: "Sebelum mula",
+            tapToRead: "Ketik untuk baca",
+            followUps: "Soalan susulan",
+            followUpChips: ["Bagaimana dengan yuran?", "Siapa perlu dihubungi?", "Bagaimana memohon?"],
+            departments: "41 jabatan",
+            programmes: "Struktur program",
+            devices: "Telefon & desktop",
+            atYourService: "Sedia membantu",
+            neverSleeps: "UTARCHAT tak pernah tidur",
+            askAnything: "Tanya apa saja.",
+            noHistory: "Tiada sejarah.",
+            close: "Tutup",
+        },
     },
     zh: {
         tagline: "你敢问，我敢答 😎",
@@ -181,6 +254,30 @@ export const STRINGS: Record<Lang, Strings> = {
             ],
             acknowledge: "我明白答案可能有误，重要信息我会自行核实。",
             cta: "开始聊天",
+        },
+        splash: {
+            getStarted: "开始使用",
+            answersAsCards: "卡片式回答",
+            smartRouting: "智能分流",
+            toRightOffice: "直达对的部门",
+            routeQuestion: "有奖学金吗？",
+            offices: { library: "图书馆", scholarships: "奖学金", admissions: "招生处" },
+            darkMode: "深色模式",
+            verified: "UTAR 认证",
+            liveBus: "巴士时刻",
+            nextBus: "下一班",
+            notice: "开始之前",
+            tapToRead: "点击阅读",
+            followUps: "推荐追问",
+            followUpChips: ["学费呢？", "该联系谁？", "怎么申请？"],
+            departments: "41 个部门",
+            programmes: "课程结构",
+            devices: "手机与电脑",
+            atYourService: "随时为你服务",
+            neverSleeps: "UTARCHAT 从不打烊",
+            askAnything: "尽管问。",
+            noHistory: "不留记录。",
+            close: "关闭",
         },
     },
 };

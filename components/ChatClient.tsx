@@ -6,7 +6,7 @@ import AnswerBody from "./AnswerBody";
 import AgentBadge from "./AgentBadge";
 import { ArrowUp, ArrowUpRight, Check, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import html2canvas from "html2canvas";
-import DisclaimerModal from "./DisclaimerModal";
+import WelcomeSplash from "./WelcomeSplash";
 import FeedbackModal from "./FeedbackModal";
 import { LANGS, STRINGS, defaultLang, type Lang } from "@/lib/i18n";
 
@@ -801,7 +801,7 @@ export default function ChatClient() {
                 </div>
             </footer>
 
-            <DisclaimerModal lang={lang} />
+            <WelcomeSplash lang={lang} onChooseLang={chooseLang} />
             <FeedbackModal
                 isOpen={feedbackModal.isOpen}
                 onClose={() => setFeedbackModal((prev) => ({ ...prev, isOpen: false }))}
