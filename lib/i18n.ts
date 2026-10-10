@@ -50,7 +50,7 @@ export type Strings = {
 export const STRINGS: Record<Lang, Strings> = {
     en: {
         tagline: "Ask naturally. I’ll find the right UTAR office.",
-        greetingTitle: "Hi, I’m TARo 👋",
+        greetingTitle: "Hi, I’m UTARCHAT 👋",
         greetingBody: "Your UTAR buddy for courses, fees, exams, buses, offices and student life.",
         startersTitle: "Try asking",
         starters: [
@@ -94,9 +94,9 @@ export const STRINGS: Record<Lang, Strings> = {
         },
     },
     ms: {
-        tagline: "Tanya seperti biasa. Saya cari pejabat UTAR yang betul.",
-        greetingTitle: "Hai, saya TARo 👋",
-        greetingBody: "Rakan UTAR anda untuk kursus, yuran, peperiksaan, bas, pejabat dan kehidupan pelajar.",
+        tagline: "Tanya saja, saya carikan jabatan UTAR yang berkaitan.",
+        greetingTitle: "Hai, saya UTARCHAT 👋",
+        greetingBody: "Kawan UTAR anda untuk soal kursus, yuran, peperiksaan, bas, jabatan dan kehidupan kampus.",
         startersTitle: "Cuba tanya",
         starters: [
             { emoji: "📅", text: "Bila trimester Oktober 2026 bermula?" },
@@ -139,9 +139,9 @@ export const STRINGS: Record<Lang, Strings> = {
         },
     },
     zh: {
-        tagline: "直接提问，我会帮你找到对的 UTAR 部门。",
-        greetingTitle: "你好，我是 TARo 👋",
-        greetingBody: "你的 UTAR 小帮手：课程、学费、考试、校车、部门和校园生活。",
+        tagline: "有问题尽管问，我帮你找对的 UTAR 部门。",
+        greetingTitle: "你好，我是 UTARCHAT 👋",
+        greetingBody: "你的 UTAR 小帮手，课程、学费、考试、校车、部门、校园生活都可以问我。",
         startersTitle: "试试问",
         starters: [
             { emoji: "📅", text: "2026年10月学期什么时候开始？" },
