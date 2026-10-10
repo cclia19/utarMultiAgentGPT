@@ -38,6 +38,15 @@ Anything personal or interactive: results, student feedback, applications, Micro
 - Or by hand: `node scripts/kb-portal-sync.mjs` (dry run) · `--apply` · `--only regulations|structures|announcements`.
 - Report: `kb-portal-sync-report.md` next to the repo folder, and `/admin/upload` → "Sync & upload history". Log: `~/.utarchat-kb/portal-sync.log`.
 
+## Setting up the portal sync on a new Mac (e.g. the Mac mini)
+
+1. Sign in to macOS with the account that will run the sync, and install Homebrew (https://brew.sh) and the Xcode command line tools (`xcode-select --install`).
+2. Get the code: `git clone https://github.com/cclia19/utarMultiAgentGPT.git && cd utarMultiAgentGPT` (until PR #10 is merged: `git checkout feat/kb-portal-sync`).
+3. Run `bash scripts/setup-portal-mac.sh`: installs Node, pnpm, packages and the Playwright browser; asks for `GEMINI_API_KEY` and `DATABASE_URL` (hidden input, saved only to `.env.local`); does a short dry run (sign in to the portal in the window that opens); installs the monthly schedule.
+4. System Settings: keep the account signed in; Energy → "Prevent automatic sleeping" (or accept that the sync starts on wake); allow notifications for Script Editor so the "please sign in" reminder shows.
+5. First full load: `node scripts/kb-portal-sync.mjs --apply` (sign in when the window opens).
+6. On the old Mac, remove its schedule if it was installed: `bash scripts/install-portal-schedule.sh --uninstall`.
+
 ## Day to day
 
 - Monthly report: Actions → latest "Knowledge-base sync" run (summary page), or `/admin/upload` → "Sync & upload history". Look at *held* and *failed* items.
