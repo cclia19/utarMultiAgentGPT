@@ -43,6 +43,10 @@ const SCHEMA = [
         items JSONB NOT NULL
     )`,
     `CREATE INDEX IF NOT EXISTS kb_documents_unit_idx ON kb_documents (unit_id)`,
+    // Uploaded files (PDF) kept with their version for rollback.
+    `ALTER TABLE kb_versions ADD COLUMN IF NOT EXISTS file_data BYTEA`,
+    `ALTER TABLE kb_versions ADD COLUMN IF NOT EXISTS file_mime TEXT`,
+    `ALTER TABLE kb_versions ADD COLUMN IF NOT EXISTS file_name TEXT`,
 ];
 
 const iso = (d: any) => (d instanceof Date ? d.toISOString() : String(d ?? ""));
@@ -75,7 +79,7 @@ export class PostgresVersionStore implements KbVersionStore {
         };
     }
 
-    async getDocument(key: string) {
+    async getDocument(key: string): Promise<KbDocument | null> {
         await this.schema();
         const [r] = await this.sql`SELECT * FROM kb_documents WHERE key = ${key}`;
         return r ? this.toDoc(r) : null;
@@ -84,12 +88,23 @@ export class PostgresVersionStore implements KbVersionStore {
     async getVersion(key: string, version: number): Promise<KbVersion | null> {
         await this.schema();
         const [r] = await this.sql`SELECT * FROM kb_versions WHERE key = ${key} AND version = ${version}`;
-        return r
-            ? { key: r.key, version: r.version, contentHash: r.content_hash, text: r.text, chars: r.chars, title: r.title, author: r.author, note: r.note ?? undefined, createdAt: iso(r.created_at), geminiDocument: r.gemini_document ?? undefined }
-            : null;
+        if (!r) return null;
+        return {
+            key: r.key,
+            version: r.version,
+            contentHash: r.content_hash,
+            text: r.text,
+            file: r.file_data ? { data: new Uint8Array(r.file_data), mimeType: r.file_mime, name: r.file_name } : undefined,
+            chars: r.chars,
+            title: r.title,
+            author: r.author,
+            note: r.note ?? undefined,
+            createdAt: iso(r.created_at),
+            geminiDocument: r.gemini_document ?? undefined,
+        };
     }
 
-    async listDocuments(unitId?: string) {
+    async listDocuments(unitId?: string): Promise<KbDocument[]> {
         await this.schema();
         const rows = unitId
             ? await this.sql`SELECT * FROM kb_documents WHERE unit_id = ${unitId} ORDER BY title`
@@ -97,7 +112,7 @@ export class PostgresVersionStore implements KbVersionStore {
         return rows.map((r: any) => this.toDoc(r));
     }
 
-    async listVersions(key: string) {
+    async listVersions(key: string): Promise<Omit<KbVersion, "text" | "file">[]> {
         await this.schema();
         const rows = await this.sql`
             SELECT key, version, content_hash, chars, title, author, note, created_at, gemini_document
@@ -105,7 +120,7 @@ export class PostgresVersionStore implements KbVersionStore {
         return rows.map((r: any) => ({ key: r.key, version: r.version, contentHash: r.content_hash, chars: r.chars, title: r.title, author: r.author, note: r.note ?? undefined, createdAt: iso(r.created_at), geminiDocument: r.gemini_document ?? undefined }));
     }
 
-    async addVersion(draft: KbDraft, contentHash: string) {
+    async addVersion(draft: KbDraft, contentHash: string): Promise<number> {
         await this.schema();
         return this.sql.begin(async (tx: Sql) => {
             await tx`
@@ -114,9 +129,12 @@ export class PostgresVersionStore implements KbVersionStore {
                 ON CONFLICT (key) DO UPDATE SET unit_id = EXCLUDED.unit_id, store_name = EXCLUDED.store_name,
                     title = EXCLUDED.title, source_url = EXCLUDED.source_url`;
             const [{ next }] = await tx`SELECT COALESCE(MAX(version), 0) + 1 AS next FROM kb_versions WHERE key = ${draft.key}`;
+            const file = draft.file;
             await tx`
-                INSERT INTO kb_versions (key, version, content_hash, text, chars, title, author, note)
-                VALUES (${draft.key}, ${next}, ${contentHash}, ${draft.text}, ${draft.text.length}, ${draft.title}, ${draft.author}, ${draft.note ?? null})`;
+                INSERT INTO kb_versions (key, version, content_hash, text, chars, title, author, note, file_data, file_mime, file_name)
+                VALUES (${draft.key}, ${next}, ${contentHash}, ${draft.text}, ${file ? file.data.length : draft.text.length},
+                        ${draft.title}, ${draft.author}, ${draft.note ?? null},
+                        ${file ? Buffer.from(file.data) : null}, ${file?.mimeType ?? null}, ${file?.name ?? null})`;
             return Number(next);
         });
     }
@@ -130,7 +148,7 @@ export class PostgresVersionStore implements KbVersionStore {
         });
     }
 
-    async saveRun(run: KbRun) {
+    async saveRun(run: KbRun): Promise<number> {
         await this.schema();
         const [{ id }] = await this.sql`
             INSERT INTO kb_runs (kind, started_at, finished_at, items)
@@ -139,7 +157,7 @@ export class PostgresVersionStore implements KbVersionStore {
         return Number(id);
     }
 
-    async listRuns(limit = 20) {
+    async listRuns(limit = 20): Promise<KbRun[]> {
         await this.schema();
         const rows = await this.sql`SELECT * FROM kb_runs ORDER BY id DESC LIMIT ${limit}`;
         return rows.map((r: any) => ({ id: Number(r.id), kind: r.kind, startedAt: iso(r.started_at), finishedAt: r.finished_at ? iso(r.finished_at) : undefined, items: r.items }));
@@ -162,14 +180,17 @@ export class FileVersionStore implements KbVersionStore {
     async getDocument(key: string) {
         return this.data.documents[key] ?? null;
     }
-    async getVersion(key: string, version: number) {
-        return this.data.versions[key]?.find((v) => v.version === version) ?? null;
+    async getVersion(key: string, version: number): Promise<KbVersion | null> {
+        const v: any = this.data.versions[key]?.find((x) => x.version === version);
+        if (!v) return null;
+        // Files are kept as base64 in the JSON file.
+        return v.file ? { ...v, file: { ...v.file, data: new Uint8Array(Buffer.from(v.file.data, "base64")) } } : v;
     }
     async listDocuments(unitId?: string) {
         return Object.values(this.data.documents).filter((d) => !unitId || d.unitId === unitId);
     }
     async listVersions(key: string) {
-        return (this.data.versions[key] ?? []).map(({ text: _text, ...rest }) => rest).reverse();
+        return (this.data.versions[key] ?? []).map(({ text: _text, file: _file, ...rest }) => rest).reverse();
     }
     async addVersion(draft: KbDraft, contentHash: string) {
         const existing = this.data.documents[draft.key];
@@ -186,7 +207,8 @@ export class FileVersionStore implements KbVersionStore {
         };
         const versions = (this.data.versions[draft.key] ??= []);
         const version = versions.length + 1;
-        versions.push({ key: draft.key, version, contentHash, text: draft.text, chars: draft.text.length, title: draft.title, author: draft.author, note: draft.note, createdAt: new Date().toISOString() });
+        const file = draft.file ? ({ ...draft.file, data: Buffer.from(draft.file.data).toString("base64") } as any) : undefined;
+        versions.push({ key: draft.key, version, contentHash, text: draft.text, file, chars: draft.file ? draft.file.data.length : draft.text.length, title: draft.title, author: draft.author, note: draft.note, createdAt: new Date().toISOString() });
         this.save();
         return version;
     }

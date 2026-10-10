@@ -16,10 +16,10 @@ export class GeminiPublisher implements KbPublisher {
         this.timeoutMs = timeoutMs;
     }
 
-    async upload(params: { storeName: string; displayName: string; text: string; mimeType: string; metadata: Record<string, string | number> }) {
+    async upload(params: { storeName: string; displayName: string; data: string | Uint8Array; mimeType: string; metadata: Record<string, string | number> }) {
         let op: any = await this.ai.fileSearchStores.uploadToFileSearchStore({
             fileSearchStoreName: params.storeName,
-            file: new Blob([params.text], { type: params.mimeType }),
+            file: new Blob([params.data as BlobPart], { type: params.mimeType }),
             config: {
                 mimeType: params.mimeType,
                 displayName: params.displayName,
@@ -49,11 +49,11 @@ export class GeminiPublisher implements KbPublisher {
 
 /** Records what would be uploaded, touches nothing. */
 export class RecordingPublisher implements KbPublisher {
-    uploads: { storeName: string; displayName: string; chars: number; metadata: Record<string, string | number> }[] = [];
+    uploads: { storeName: string; displayName: string; chars: number; mimeType: string; metadata: Record<string, string | number> }[] = [];
     removed: string[] = [];
     private n = 0;
-    async upload(params: { storeName: string; displayName: string; text: string; mimeType: string; metadata: Record<string, string | number> }) {
-        this.uploads.push({ storeName: params.storeName, displayName: params.displayName, chars: params.text.length, metadata: params.metadata });
+    async upload(params: { storeName: string; displayName: string; data: string | Uint8Array; mimeType: string; metadata: Record<string, string | number> }) {
+        this.uploads.push({ storeName: params.storeName, displayName: params.displayName, chars: params.data.length, mimeType: params.mimeType, metadata: params.metadata });
         return `${params.storeName}/documents/test-${++this.n}`;
     }
     async remove(documentName: string) {

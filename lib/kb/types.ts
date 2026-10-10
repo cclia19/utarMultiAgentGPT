@@ -21,18 +21,23 @@ export type KbDraft = {
     title: string;
     origin: KbOrigin;
     sourceUrl?: string;
-    /** Markdown / plain text sent to File Search. */
+    /** Markdown / plain text sent to File Search (a short description when `file` is set). */
     text: string;
+    /** An uploaded file sent as-is (PDF): kept with the version for rollback. */
+    file?: KbFile;
     /** Who made the change: "sync:public", "sync:portal", an admin's name. */
     author: string;
     note?: string;
 };
+
+export type KbFile = { data: Uint8Array; mimeType: string; name: string };
 
 export type KbVersion = {
     key: string;
     version: number;
     contentHash: string;
     text: string;
+    file?: KbFile;
     chars: number;
     title: string;
     author: string;
@@ -77,7 +82,7 @@ export interface KbVersionStore {
     getDocument(key: string): Promise<KbDocument | null>;
     getVersion(key: string, version: number): Promise<KbVersion | null>;
     listDocuments(unitId?: string): Promise<KbDocument[]>;
-    listVersions(key: string): Promise<Omit<KbVersion, "text">[]>;
+    listVersions(key: string): Promise<Omit<KbVersion, "text" | "file">[]>;
     /** Adds the next version of a document (creating the document if new). Returns its number. */
     addVersion(draft: KbDraft, contentHash: string): Promise<number>;
     /** Marks a version as the one in the store. */
@@ -89,7 +94,7 @@ export interface KbVersionStore {
 /** Writes documents to Gemini File Search stores. */
 export interface KbPublisher {
     /** Uploads text as a new document and returns its resource name. */
-    upload(params: { storeName: string; displayName: string; text: string; mimeType: string; metadata: Record<string, string | number> }): Promise<string>;
+    upload(params: { storeName: string; displayName: string; data: string | Uint8Array; mimeType: string; metadata: Record<string, string | number> }): Promise<string>;
     /** Removes a document this system published earlier. */
     remove(documentName: string): Promise<void>;
 }

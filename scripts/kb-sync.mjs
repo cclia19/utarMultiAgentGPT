@@ -6,6 +6,7 @@
  *   node scripts/kb-sync.mjs --apply                 # publish changes to the Gemini stores
  *   node scripts/kb-sync.mjs --only computer-science --apply
  *   node scripts/kb-sync.mjs --force --only <page>   # publish a page the safeguards held
+ *   node scripts/kb-sync.mjs --out-dir reports      # where kb-sync-report.md goes
  *
  * Versions are kept in Postgres when DATABASE_URL is set (production), else in
  * kb-local-state.json next to the repo (local trials). Writes kb-sync-report.md.
@@ -33,7 +34,7 @@ const apply = args.includes("--apply");
 const force = args.includes("--force");
 const only = opt("--only") ? new RegExp(opt("--only"), "i") : undefined;
 const limit = opt("--limit") ? Number(opt("--limit")) : undefined;
-const OUT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const OUT_DIR = opt("--out-dir") ? path.resolve(opt("--out-dir")) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 let store;
 let closeDb = async () => {};

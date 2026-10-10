@@ -16,7 +16,8 @@ const MIN_CHARS = 200;
 const MAX_SHRINK = 0.5;
 
 /** Hash of the content that matters (the retrieval date changes every run). */
-export function contentHash(text: string): string {
+export function contentHash(text: string, file?: { data: Uint8Array }): string {
+    if (file) return createHash("sha256").update(file.data).digest("hex");
     const stable = String(text || "")
         .replace(/retrieved \d{4}-\d{2}-\d{2}/gi, "retrieved")
         .replace(/[ \t]+$/gm, "")
@@ -32,7 +33,8 @@ export async function publishDraft(
     options: PublishOptions = {}
 ): Promise<KbRunItem> {
     const base = { key: draft.key, title: draft.title, unitId: draft.unitId };
-    const hash = contentHash(draft.text);
+    const hash = contentHash(draft.text, draft.file);
+    const size = draft.file ? draft.file.data.length : draft.text.length;
     const doc = await deps.store.getDocument(draft.key);
     const live = doc?.liveVersion ? await deps.store.getVersion(draft.key, doc.liveVersion) : null;
 
@@ -41,19 +43,19 @@ export async function publishDraft(
     }
 
     const guarded = draft.origin !== "manual" && !options.force;
-    if (guarded && draft.text.length < MIN_CHARS) {
-        return { ...base, outcome: "held", detail: `page looks empty (${draft.text.length} chars); kept the live version` };
+    if (guarded && size < MIN_CHARS) {
+        return { ...base, outcome: "held", detail: `page looks empty (${size} chars); kept the live version` };
     }
-    if (guarded && live && draft.text.length < live.chars * MAX_SHRINK) {
+    if (guarded && live && size < live.chars * MAX_SHRINK) {
         return {
             ...base,
             outcome: "held",
-            detail: `shrank from ${live.chars} to ${draft.text.length} chars; kept v${live.version}. Check the page, then sync with --force`,
+            detail: `shrank from ${live.chars} to ${size} chars; kept v${live.version}. Check the page, then sync with --force`,
         };
     }
 
     if (options.dryRun) {
-        const what = live ? `would replace v${live.version} (${live.chars} → ${draft.text.length} chars)` : `new (${draft.text.length} chars)`;
+        const what = live ? `would replace v${live.version} (${live.chars} → ${size} chars)` : `new (${size} chars)`;
         return { ...base, outcome: "dry-run", detail: what };
     }
 
@@ -62,8 +64,8 @@ export async function publishDraft(
         const geminiDocument = await deps.publisher.upload({
             storeName: draft.storeName,
             displayName: `${draft.title} (v${version})`.slice(0, 500),
-            text: draft.text,
-            mimeType: "text/plain",
+            data: draft.file ? draft.file.data : draft.text,
+            mimeType: draft.file ? draft.file.mimeType : "text/plain",
             metadata: {
                 kb_key: draft.key.slice(0, 250),
                 kb_version: version,
@@ -126,6 +128,7 @@ export async function rollback(
             origin: doc.origin,
             sourceUrl: doc.sourceUrl,
             text: old.text,
+            file: old.file,
             author,
             note: `rollback to v${toVersion}`,
         },
