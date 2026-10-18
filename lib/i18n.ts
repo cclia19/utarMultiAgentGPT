@@ -111,7 +111,7 @@ export const STRINGS: Record<Lang, Strings> = {
             intro: "A quick note before you start.",
             items: [
                 { title: "AI guidance, not official decisions", body: "Answers come from official UTAR sources but can be wrong or incomplete. UTAR policies and announcements always prevail." },
-                { title: "Keep personal data out", body: "Don’t type passwords, IC/passport numbers or bank details. Questions are logged anonymously to improve UTARCHAT." },
+                { title: "Keep personal data out", body: "Don’t type passwords, IC/passport numbers or bank details. Questions are logged anonymously to improve UTARCHAT, and a short-lived hash of your IP address is used only to stop abuse." },
                 { title: "Verify what matters", body: "For admissions, exams, fees, scholarships, appeals or graduation, confirm with the UTAR office." },
             ],
             acknowledge: "I understand answers may contain mistakes and I’ll verify important information.",
@@ -180,7 +180,7 @@ export const STRINGS: Record<Lang, Strings> = {
             intro: "Nota ringkas sebelum anda mula.",
             items: [
                 { title: "Panduan AI, bukan keputusan rasmi", body: "Jawapan berdasarkan sumber rasmi UTAR tetapi mungkin salah atau tidak lengkap. Dasar dan pengumuman UTAR sentiasa diutamakan." },
-                { title: "Jangan kongsi data peribadi", body: "Jangan taip kata laluan, nombor IC/pasport atau butiran bank. Soalan direkodkan tanpa nama untuk menambah baik UTARCHAT." },
+                { title: "Jangan kongsi data peribadi", body: "Jangan taip kata laluan, nombor IC/pasport atau butiran bank. Soalan direkodkan tanpa nama untuk menambah baik UTARCHAT, dan cincangan alamat IP anda disimpan sebentar hanya untuk menghalang penyalahgunaan." },
                 { title: "Sahkan perkara penting", body: "Untuk kemasukan, peperiksaan, yuran, biasiswa, rayuan atau konvokesyen, sahkan dengan pejabat UTAR." },
             ],
             acknowledge: "Saya faham jawapan mungkin tersilap dan saya akan mengesahkan maklumat penting.",
@@ -249,7 +249,7 @@ export const STRINGS: Record<Lang, Strings> = {
             intro: "开始前的小提醒。",
             items: [
                 { title: "AI 指引，不是官方决定", body: "答案来自 UTAR 官方资料，但可能有误或不完整。一切以 UTAR 政策和公告为准。" },
-                { title: "不要输入个人资料", body: "请勿输入密码、身份证/护照号码或银行资料。提问会匿名记录，用于改进 UTARCHAT。" },
+                { title: "不要输入个人资料", body: "请勿输入密码、身份证/护照号码或银行资料。提问会匿名记录，用于改进 UTARCHAT；你的 IP 地址仅以短期保存的哈希值用于防止滥用。" },
                 { title: "重要事项请核实", body: "入学、考试、学费、奖学金、申诉或毕业等事项，请向 UTAR 相关部门确认。" },
             ],
             acknowledge: "我明白答案可能有误，重要信息我会自行核实。",

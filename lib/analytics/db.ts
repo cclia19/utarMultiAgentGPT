@@ -54,6 +54,12 @@ export function ensureSchema(sql: Sql): Promise<void> {
                     question_masked TEXT
                 )`;
             await sql`CREATE INDEX IF NOT EXISTS chat_events_env_created_idx ON chat_events (env, created_at)`;
+            // Abuse protection (Oct 2026): rows are written when a request starts and
+            // updated when it ends; blocked requests are logged with their reason.
+            await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS ip_hash TEXT`;
+            await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS block_reason TEXT`;
+            await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`;
+            await sql`CREATE INDEX IF NOT EXISTS chat_events_created_idx ON chat_events (created_at)`;
         })().catch((err) => {
             schemaReady = null; // retry on the next request
             throw err;

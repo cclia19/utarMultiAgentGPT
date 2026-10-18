@@ -14,6 +14,8 @@ export type RequestMetrics = {
     outputTokens: number;
     geminiErrors: number;
     pipelineError: boolean;
+    /** A Gemini call hit its timeout (status "timeout" in the usage log). */
+    timedOut: boolean;
 };
 
 export const metricsStore = new AsyncLocalStorage<RequestMetrics>();
@@ -27,6 +29,7 @@ export function newMetrics(): RequestMetrics {
         outputTokens: 0,
         geminiErrors: 0,
         pipelineError: false,
+        timedOut: false,
     };
 }
 
@@ -55,8 +58,22 @@ export function recordUsage(m: RequestMetrics | undefined, usage: any) {
     m.outputTokens += (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0);
 }
 
-export function recordGeminiError(m: RequestMetrics | undefined) {
-    if (m) m.geminiErrors += 1;
+export function recordGeminiError(m: RequestMetrics | undefined, error?: unknown) {
+    if (!m) return;
+    m.geminiErrors += 1;
+    if (isTimeoutError(error)) m.timedOut = true;
+}
+
+export function isTimeoutError(error: unknown): boolean {
+    const e = error as any;
+    const name = String(e?.name || "");
+    return name === "TimeoutError" || name === "AbortError" || /timed?\s*out|timeout|aborted/i.test(String(e?.message || ""));
+}
+
+/** For timeouts the route enforces itself (Promise.race), which never reach the Gemini wrapper's catch. */
+export function markTimeout() {
+    const m = metricsStore.getStore();
+    if (m) m.timedOut = true;
 }
 
 /** Called from the chat route's catch-all so the event is logged as an error. */

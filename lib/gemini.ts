@@ -4,6 +4,7 @@ import {
   recordGeminiError,
   recordUsage,
 } from "./analytics/metrics.ts";
+import { withChatCallLimits } from "./abuse/callLimits.ts";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("Missing GEMINI_API_KEY in environment variables");
@@ -14,29 +15,30 @@ export const ai = new GoogleGenAI({
 });
 
 // Count Gemini calls and tokens per chat request (see lib/analytics/metrics.ts).
-// Behaviour of the calls themselves is unchanged.
 const originalGenerateContent = ai.models.generateContent.bind(ai.models);
 const originalGenerateContentStream = ai.models.generateContentStream.bind(ai.models);
 
-ai.models.generateContent = (async (params: any) => {
+ai.models.generateContent = (async (rawParams: any) => {
+  const params = withChatCallLimits(rawParams);
   const m = recordGeminiCall(params);
   try {
     const response = await originalGenerateContent(params);
     recordUsage(m, (response as any)?.usageMetadata);
     return response;
   } catch (error) {
-    recordGeminiError(m);
+    recordGeminiError(m, error);
     throw error;
   }
 }) as typeof ai.models.generateContent;
 
-ai.models.generateContentStream = (async (params: any) => {
+ai.models.generateContentStream = (async (rawParams: any) => {
+  const params = withChatCallLimits(rawParams);
   const m = recordGeminiCall(params);
   let stream: AsyncGenerator<any>;
   try {
     stream = (await originalGenerateContentStream(params)) as any;
   } catch (error) {
-    recordGeminiError(m);
+    recordGeminiError(m, error);
     throw error;
   }
   return (async function* () {
@@ -47,7 +49,7 @@ ai.models.generateContentStream = (async (params: any) => {
         yield chunk;
       }
     } catch (error) {
-      recordGeminiError(m);
+      recordGeminiError(m, error);
       throw error;
     } finally {
       recordUsage(m, lastUsage);
