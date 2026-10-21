@@ -2822,6 +2822,8 @@ function finalizePayload(payload: any, metrics: RequestMetrics, language: unknow
         followUps: [],
         needsClarification: false,
         pendingQuestion: null,
+        // The chat page offers "Try again" on this answer.
+        retryable: true,
     };
 }
 
@@ -3703,6 +3705,7 @@ Please try again in a moment. If it keeps happening, try asking the question in 
             pendingQuestion: null,
             lastResolvedTopic: null,
             routeType: "general_public",
+            retryable: true,
         });
     }
 }

@@ -76,6 +76,8 @@ export function refusalPayload(reason: BlockReason, language: unknown, maxChars:
         needsClarification: false,
         routeType: "general_public",
         blocked: reason,
+        // Worth a "Try again" button: the limit store was briefly unreachable.
+        ...(reason === "limit_store" ? { retryable: true } : {}),
     };
 }
 

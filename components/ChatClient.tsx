@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import AnswerBody from "./AnswerBody";
+import AnswerBody, { splitAnswer } from "./AnswerBody";
 import AgentBadge from "./AgentBadge";
 import ThinkingLine, { type ThinkingStep } from "./ThinkingLine";
-import { ArrowUp, ArrowUpRight, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, Copy, ExternalLink, FileText, Loader2, Pencil, RotateCcw, SquarePen, ThumbsUp, ThumbsDown } from "lucide-react";
 import html2canvas from "html2canvas";
 import WelcomeSplash from "./WelcomeSplash";
 import FeedbackModal from "./FeedbackModal";
@@ -54,6 +54,8 @@ interface Message {
     selectedAgentLabel?: string;
     needsClarification?: boolean;
     followUps?: string[];
+    /** The answer is a failure the student can retry ("temporarily unavailable", timeout, no connection). */
+    failed?: boolean;
 }
 
 interface HistoryEntry {
@@ -118,6 +120,50 @@ function detectAgentFromMessage(text: string): AgentId | null {
     };
 
     return map[normalized] || null;
+}
+
+// The conversation is kept for this browser tab only (cleared when the tab closes).
+const CHAT_KEY = "utarchat_chat_v1";
+const STARTERS_SHOWN = 6;
+const TOAST_MS = 5000;
+
+/** Answer as plain text for copying: no markdown symbols, links as "label (url)". */
+function toPlainText(md: string): string {
+    return md
+        .replace(/^#{1,6}\s*/gm, "")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, "$1 ($2)")
+        .replace(/^\s*[-*]\s+/gm, "• ")
+        .replace(/^>\s?/gm, "")
+        .replace(/`/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
+/** Citation -> chip: official links open in a new tab; document names are labels. */
+function sourceChip(citation: string): { label: string; href?: string } {
+    if (/^https?:\/\//i.test(citation)) {
+        try {
+            const url = new URL(citation);
+            const last = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "").replace(/\.(php|html?|aspx?)$/i, "");
+            const host = url.hostname.replace(/^www\./, "");
+            const label = last ? `${host} · ${last.replace(/[-_]+/g, " ")}` : host;
+            return { label: label.length > 48 ? label.slice(0, 47) + "…" : label, href: url.href };
+        } catch {
+            return { label: citation.slice(0, 48) };
+        }
+    }
+    const title = citation.replace(/\.(pdf|docx?|md|txt|html?)$/i, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
+    return { label: title.length > 48 ? title.slice(0, 47) + "…" : title };
+}
+
+function pickStarters<T>(pool: T[], n: number): T[] {
+    const copy = [...pool];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, n);
 }
 
 export default function ChatClient() {
@@ -285,9 +331,36 @@ export default function ChatClient() {
         bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
     }, []);
 
+    // Follow new messages only while the student is at the bottom (or just sent
+    // something). Reading an earlier answer is never interrupted: a "jump to
+    // latest" button appears instead.
+    const atBottomRef = useRef(true);
+    const followNextRef = useRef(false);
+    const [showJump, setShowJump] = useState(false);
+    const [hasNew, setHasNew] = useState(false);
+    const onMainScroll = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        atBottomRef.current = atBottom;
+        setShowJump(!atBottom);
+        if (atBottom) setHasNew(false);
+    }, []);
+    const jumpToLatest = () => {
+        followNextRef.current = true;
+        setHasNew(false);
+        scrollToBottom();
+    };
+
     useEffect(() => {
         // The welcome screen stays at the top; scroll only once a chat starts.
-        if (messages.length > 1 || loading) scrollToBottom();
+        if (!(messages.length > 1 || loading)) return;
+        if (atBottomRef.current || followNextRef.current) {
+            scrollToBottom();
+            followNextRef.current = false;
+        } else if (messages[messages.length - 1]?.role === "model") {
+            setHasNew(true);
+        }
     }, [messages, loading, thinking, scrollToBottom]);
 
     // Phone keyboards shrink the visual viewport: keep the latest answer in view.
@@ -307,6 +380,141 @@ export default function ChatClient() {
         el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
     }, [input]);
 
+    // Small toast above the input (new chat started · Undo, Copied, …).
+    const [toast, setToast] = useState<{ id: number; text: string; action?: { label: string; run: () => void } } | null>(null);
+    const toastTimer = useRef<number | undefined>(undefined);
+    const showToast = useCallback((text: string, action?: { label: string; run: () => void }) => {
+        if (toastTimer.current !== undefined) window.clearTimeout(toastTimer.current);
+        setToast({ id: Date.now(), text, action });
+        toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
+    }, []);
+
+    // Starter questions: 6 picked at random from the language's pool on each visit.
+    const [starters, setStarters] = useState(() => t.starters.slice(0, STARTERS_SHOWN));
+    useEffect(() => {
+        setStarters(pickStarters(STRINGS[lang].starters, STARTERS_SHOWN));
+    }, [lang]);
+
+    // Keep the chat across a refresh, for this tab only.
+    const [restored, setRestored] = useState(false);
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(sessionStorage.getItem(CHAT_KEY) || "null");
+            if (saved && Array.isArray(saved.messages) && saved.messages.length > 0) {
+                setMessages([WELCOME, ...saved.messages]);
+                if (saved.selectedAgentId) setSelectedAgentId(saved.selectedAgentId);
+                if (saved.selectedAgentLabel) setSelectedAgentLabel(saved.selectedAgentLabel);
+                setPendingQuestion(saved.pendingQuestion ?? null);
+                setLastResolvedTopic(saved.lastResolvedTopic ?? null);
+                setContextSummary(saved.contextSummary ?? "");
+                setFeedbackGiven(saved.feedbackGiven ?? {});
+            }
+        } catch {
+            // nothing saved, or storage blocked
+        }
+        setRestored(true);
+    }, []);
+    useEffect(() => {
+        if (!restored || loading) return;
+        try {
+            const kept = messages.slice(1).slice(-40).map(({ thought, isStreaming, ...m }) => m);
+            if (kept.length === 0) sessionStorage.removeItem(CHAT_KEY);
+            else sessionStorage.setItem(CHAT_KEY, JSON.stringify({ messages: kept, selectedAgentId, selectedAgentLabel, pendingQuestion, lastResolvedTopic, contextSummary, feedbackGiven }));
+        } catch {
+            // storage full or blocked: the chat just won't survive a refresh
+        }
+    }, [restored, loading, messages, selectedAgentId, selectedAgentLabel, pendingQuestion, lastResolvedTopic, contextSummary, feedbackGiven]);
+
+    // Each send gets a number; a newer chat ignores answers to an older one.
+    const chatGen = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
+
+    /** New chat (header button or logo). Undo brings the old one back for a few seconds. */
+    const newChat = () => {
+        if (messages.length <= 1 && !loading) {
+            inputRef.current?.focus();
+            return;
+        }
+        chatGen.current += 1;
+        abortRef.current?.abort();
+        abortRef.current = null;
+        setLoading(false);
+        clearSteps();
+        setThinking(null);
+        setThinkingOffice(null);
+        // An unanswered question that was still loading is dropped from the undo copy.
+        const kept = loading && messages[messages.length - 1]?.role === "user" ? messages.slice(0, -1) : messages;
+        const snapshot = { messages: kept, selectedAgentId, selectedAgentLabel, pendingQuestion, lastResolvedTopic, contextSummary, feedbackGiven };
+        setMessages([WELCOME]);
+        setSelectedAgentId("general");
+        setSelectedAgentLabel("General UTAR Assistant");
+        setPendingQuestion(null);
+        setLastResolvedTopic(null);
+        setContextSummary("");
+        setFeedbackGiven({});
+        setInput("");
+        setStarters(pickStarters(t.starters, STARTERS_SHOWN));
+        scrollRef.current?.scrollTo({ top: 0 });
+        showToast(t.ui.newChatStarted, {
+            label: t.ui.undo,
+            run: () => {
+                setMessages(snapshot.messages);
+                setSelectedAgentId(snapshot.selectedAgentId);
+                setSelectedAgentLabel(snapshot.selectedAgentLabel);
+                setPendingQuestion(snapshot.pendingQuestion);
+                setLastResolvedTopic(snapshot.lastResolvedTopic);
+                setContextSummary(snapshot.contextSummary);
+                setFeedbackGiven(snapshot.feedbackGiven);
+                followNextRef.current = true;
+            },
+        });
+    };
+
+    const copyAnswer = async (msg: Message) => {
+        const text = toPlainText(msg.text);
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast(t.ui.copied);
+        } catch {
+            try {
+                const area = document.createElement("textarea");
+                area.value = text;
+                area.style.position = "fixed";
+                area.style.opacity = "0";
+                document.body.appendChild(area);
+                area.select();
+                const ok = document.execCommand("copy");
+                document.body.removeChild(area);
+                showToast(ok ? t.ui.copied : t.ui.copyFailed);
+            } catch {
+                showToast(t.ui.copyFailed);
+            }
+        }
+    };
+
+    /** Ask the question behind a failed answer again. */
+    const retryAnswer = (index: number) => {
+        const question = messages[index - 1];
+        if (loading || question?.role !== "user") return;
+        handleSend(question.text, messages.slice(0, index - 1));
+    };
+
+    /** Put the last question back in the box to fix and resend (its answer is removed). */
+    const editQuestion = (index: number) => {
+        if (loading || messages[index]?.role !== "user") return;
+        const snapshot = messages;
+        setInput(messages[index].text);
+        setMessages(messages.slice(0, index));
+        window.setTimeout(() => inputRef.current?.focus(), 50);
+        showToast(t.ui.editing, {
+            label: t.ui.undo,
+            run: () => {
+                setMessages(snapshot);
+                setInput("");
+            },
+        });
+    };
+
     /** The last few messages, newest first in priority, within the size the server accepts. */
     const buildHistory = (msgs: Message[]): HistoryEntry[] => {
         const encoder = new TextEncoder();
@@ -324,7 +532,7 @@ export default function ChatClient() {
         return out;
     };
 
-    const handleSend = async (override?: string) => {
+    const handleSend = async (override?: string, base?: Message[]) => {
         const trimmed = (override ?? input).trim();
 
         if (!trimmed || loading) return;
@@ -351,13 +559,18 @@ export default function ChatClient() {
             selectedAgentLabel,
         };
 
-        const nextMessages = [...messages, userMsg];
+        const baseMessages = base ?? messages;
+        const nextMessages = [...baseMessages, userMsg];
+        const gen = ++chatGen.current;
+        const controller = new AbortController();
+        abortRef.current = controller;
+        followNextRef.current = true;
 
         setMessages(nextMessages);
         setInput("");
         setLoading(true);
         // A follow-up starts as "Following up with <office>"; the server may move it on.
-        const isFollowUp = messages.some((m) => m.role === "model" && m !== WELCOME);
+        const isFollowUp = baseMessages.some((m) => m.role === "model" && m !== WELCOME);
         const lastOffice = selectedAgentId && selectedAgentId !== "general" ? { stage: "followUp", agentId: selectedAgentId, agentLabel: selectedAgentLabel } : null;
         clearSteps();
         setThinkingOffice(null);
@@ -366,6 +579,7 @@ export default function ChatClient() {
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
+                signal: controller.signal,
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -434,6 +648,8 @@ export default function ChatClient() {
             if (!data) {
                 throw new Error(streamError || "Request failed");
             }
+            // A new chat was started while this answer was on its way.
+            if (gen !== chatGen.current) return;
 
             const incomingAgentId = data.selectedAgentId as string | undefined;
             const incomingAgentLabel = data.selectedAgentLabel as
@@ -478,13 +694,16 @@ export default function ChatClient() {
                     data.selectedAgentLabel ?? selectedAgentLabel,
                 needsClarification: data.needsClarification ?? false,
                 followUps: Array.isArray(data.followUps) ? data.followUps : [],
+                failed: Boolean(data.retryable),
             };
 
             setMessages((prev) => [...prev, botMsg]);
         } catch (e: any) {
+            if (e?.name === "AbortError" || gen !== chatGen.current) return;
             const errorMsg: Message = {
                 role: "model",
-                text: `Error: ${e.message}`,
+                text: t.ui.networkError,
+                failed: true,
                 citations: [],
                 sourceMode: "none",
                 storeDisplayName: "",
@@ -493,15 +712,20 @@ export default function ChatClient() {
             };
             setMessages((prev) => [...prev, errorMsg]);
         } finally {
-            setLoading(false);
-            clearSteps();
-            setThinking(null);
-            setThinkingOffice(null);
+            // Only the current chat's request may reset the loading state.
+            if (gen === chatGen.current) {
+                abortRef.current = null;
+                setLoading(false);
+                clearSteps();
+                setThinking(null);
+                setThinkingOffice(null);
+            }
         }
     };
 
     const lastIndex = messages.length - 1;
-    const showWelcome = messages.length === 1 && !loading;
+    const lastUserIndex = messages.reduce((last, m, i) => (m.role === "user" ? i : last), -1);
+    const showWelcome = messages.length === 1 && !loading && restored;
     const sourceText = (mode?: string) => (mode && t.sources[mode]) || "";
 
     return (
@@ -513,7 +737,9 @@ export default function ChatClient() {
             <header className="sticky top-0 z-40 border-b border-white/60 bg-white/60 px-4 py-2.5 backdrop-blur-xl backdrop-saturate-150 dark:border-white/5 dark:bg-zinc-950/60">
                 <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5">
-                        <img src="/TARo.png" alt="UTARCHAT" className="h-10 w-10 shrink-0 rounded-xl object-contain shadow-sm ring-1 ring-black/5 dark:ring-white/10" />
+                        <button onClick={newChat} aria-label={t.ui.newChat} title={t.ui.newChat} className="shrink-0 rounded-xl transition active:scale-95">
+                            <img src="/TARo.png" alt="UTARCHAT" className="h-10 w-10 rounded-xl object-contain shadow-sm ring-1 ring-black/5 dark:ring-white/10" />
+                        </button>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
                                 <p className="text-[15px] font-semibold tracking-tight">UTARCHAT</p>
@@ -531,6 +757,14 @@ export default function ChatClient() {
                                 <AgentBadge agentId={selectedAgentId} label={selectedAgentLabel} size="xs" />
                             </span>
                         )}
+                        <button
+                            onClick={newChat}
+                            aria-label={t.ui.newChat}
+                            title={t.ui.newChat}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-900/5 hover:text-zinc-900 active:scale-95 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        >
+                            <SquarePen className="h-[18px] w-[18px]" />
+                        </button>
                         {/* Language switch */}
                         <div role="radiogroup" aria-label="Language" className="flex rounded-full bg-zinc-900/5 p-0.5 ring-1 ring-inset ring-zinc-900/5 dark:bg-white/10 dark:ring-white/10">
                             {LANGS.map((l) => (
@@ -554,7 +788,7 @@ export default function ChatClient() {
                 </div>
             </header>
 
-            <main ref={scrollRef} className="relative flex-1 overflow-y-auto overscroll-contain">
+            <main ref={scrollRef} onScroll={onMainScroll} className="relative flex-1 overflow-y-auto overscroll-contain">
                 <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
                     {showWelcome && (
                         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="pt-6 text-center sm:pt-12">
@@ -571,7 +805,7 @@ export default function ChatClient() {
 
                             <p className="mt-8 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{t.startersTitle}</p>
                             <div className="mt-3 grid grid-cols-1 gap-2 text-left sm:grid-cols-2">
-                                {t.starters.map((st, n) => (
+                                {starters.map((st, n) => (
                                     <motion.button
                                         key={st.text}
                                         onClick={() => handleSend(st.text)}
@@ -616,6 +850,29 @@ export default function ChatClient() {
                                         >
                                             {isUser ? <p className="whitespace-pre-wrap">{msg.text}</p> : <AnswerBody text={msg.text} />}
 
+                                            {/* Sources, when the answer doesn't already list its official links */}
+                                            {!isUser && !msg.failed && (msg.citations?.length ?? 0) > 0 && splitAnswer(msg.text).links.length === 0 && (
+                                                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                                    <span className="mr-0.5 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{t.ui.sources}</span>
+                                                    {msg.citations!.slice(0, 3).map((c) => {
+                                                        const chip = sourceChip(c);
+                                                        const cls = "inline-flex max-w-full items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[12px] text-zinc-600 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300";
+                                                        return chip.href ? (
+                                                            <a key={c} href={chip.href} target="_blank" rel="noopener noreferrer" className={`${cls} transition hover:border-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200`}>
+                                                                <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+                                                                <span className="truncate">{chip.label}</span>
+                                                            </a>
+                                                        ) : (
+                                                            <span key={c} className={cls} title={c}>
+                                                                <FileText className="h-3 w-3 shrink-0" aria-hidden />
+                                                                <span className="truncate">{chip.label}</span>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {msg.citations!.length > 3 && <span className="text-[12px] text-zinc-400">+{msg.citations!.length - 3}</span>}
+                                                </div>
+                                            )}
+
                                             {!isUser && !msg.isStreaming && msg.selectedAgentLabel && (
                                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2.5 dark:border-white/5">
                                                     <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -624,6 +881,14 @@ export default function ChatClient() {
                                                         {sourceText(msg.sourceMode) && <span className="text-zinc-400 dark:text-zinc-500">· {sourceText(msg.sourceMode)}</span>}
                                                     </div>
                                                     <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => copyAnswer(msg)}
+                                                            aria-label={t.ui.copy}
+                                                            title={t.ui.copy}
+                                                            className="rounded-full p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                                                        >
+                                                            <Copy className="h-4 w-4" />
+                                                        </button>
                                                         <button
                                                             onClick={() => handleOpenFeedback(i, msg, "like")}
                                                             aria-label={t.helpful}
@@ -652,6 +917,35 @@ export default function ChatClient() {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Try again, under a failed latest answer */}
+                                        {!isUser && msg.failed && i === lastIndex && !loading && (
+                                            <motion.button
+                                                initial={{ opacity: 0, y: 6 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                whileTap={{ scale: 0.97 }}
+                                                onClick={() => retryAnswer(i)}
+                                                className="mt-2.5 inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-medium text-white shadow-sm transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                                            >
+                                                <RotateCcw className="h-3.5 w-3.5" />
+                                                {t.ui.tryAgain}
+                                            </motion.button>
+                                        )}
+
+                                        {/* Edit the last question */}
+                                        {isUser && i === lastUserIndex && !loading && (
+                                            <div className="mt-1 flex justify-end">
+                                                <button
+                                                    onClick={() => editQuestion(i)}
+                                                    aria-label={t.ui.edit}
+                                                    title={t.ui.edit}
+                                                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] text-zinc-400 transition hover:bg-zinc-900/5 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                                                >
+                                                    <Pencil className="h-3 w-3" />
+                                                    {t.ui.edit}
+                                                </button>
+                                            </div>
+                                        )}
 
                                         {/* Suggested next questions, under the latest answer only */}
                                         {!isUser && i === lastIndex && !loading && (msg.followUps?.length ?? 0) > 0 && (
@@ -692,7 +986,53 @@ export default function ChatClient() {
             </main>
 
             <footer className="sticky bottom-0 z-30 border-t border-white/60 bg-slate-50/80 px-3 pt-3 backdrop-blur-xl pb-safe dark:border-white/5 dark:bg-zinc-950/80">
-                <div className="mx-auto w-full max-w-3xl">
+                <div className="relative mx-auto w-full max-w-3xl">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-full mb-3 flex flex-col items-center gap-2">
+                        <AnimatePresence>
+                            {showJump && messages.length > 1 && (
+                                <motion.button
+                                    key="jump"
+                                    initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 8, scale: 0.9 }}
+                                    onClick={jumpToLatest}
+                                    aria-label={t.ui.jumpToLatest}
+                                    className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-full border border-zinc-200 bg-white/90 px-3 text-[13px] font-medium text-zinc-700 shadow-md backdrop-blur transition hover:bg-white dark:border-white/10 dark:bg-zinc-800/90 dark:text-zinc-200"
+                                >
+                                    <ArrowDown className="h-4 w-4" />
+                                    {hasNew && <span>{t.ui.newAnswer}</span>}
+                                </motion.button>
+                            )}
+                            {toast && (
+                                <motion.div
+                                    key={toast.id}
+                                    role="status"
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 8 }}
+                                    className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-zinc-900 py-2 pl-4 pr-2 text-[13px] text-white shadow-lg dark:bg-white dark:text-zinc-900"
+                                >
+                                    <span className="inline-flex items-center gap-1.5">
+                                        {toast.text === t.ui.copied && <Check className="h-3.5 w-3.5" />}
+                                        {toast.text}
+                                    </span>
+                                    {toast.action ? (
+                                        <button
+                                            onClick={() => {
+                                                toast.action!.run();
+                                                setToast(null);
+                                            }}
+                                            className="rounded-full bg-white/15 px-3 py-1 font-semibold transition hover:bg-white/25 dark:bg-zinc-900/10 dark:hover:bg-zinc-900/20"
+                                        >
+                                            {toast.action.label}
+                                        </button>
+                                    ) : (
+                                        <span className="w-1" />
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                     {pendingQuestion && (
                         <div className="mb-2 rounded-2xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">
                             {t.waitingFor} <span className="font-medium">{pendingQuestion}</span>
