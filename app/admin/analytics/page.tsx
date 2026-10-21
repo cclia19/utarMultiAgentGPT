@@ -33,7 +33,7 @@ type QuestionRow = {
 const LAUNCH_DATE = "2026-08-04";
 const DAYS_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SOURCE_LABEL: Record<string, string> = {
-    fileSearch: "KB", webFallback: "Web", staffDirectory: "Directory", none: "Direct",
+    fileSearch: "KB", webFallback: "Web", generalWeb: "General web", staffDirectory: "Directory", none: "Direct",
 };
 
 function klToday() {
