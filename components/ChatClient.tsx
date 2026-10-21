@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import AnswerBody, { splitAnswer } from "./AnswerBody";
+import AnswerBody from "./AnswerBody";
 import AgentBadge from "./AgentBadge";
 import ThinkingLine, { type ThinkingStep } from "./ThinkingLine";
-import { ArrowDown, ArrowUp, ArrowUpRight, Check, Copy, ExternalLink, FileText, Loader2, Pencil, RotateCcw, SquarePen, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, Copy, Loader2, Pencil, RotateCcw, SquarePen, ThumbsUp, ThumbsDown } from "lucide-react";
 import html2canvas from "html2canvas";
 import WelcomeSplash from "./WelcomeSplash";
 import FeedbackModal from "./FeedbackModal";
@@ -56,6 +56,8 @@ interface Message {
     followUps?: string[];
     /** The answer is a failure the student can retry ("temporarily unavailable", timeout, no connection). */
     failed?: boolean;
+    /** Profile tile for answers about someone with a photo (lib/people.ts). */
+    person?: { name: string; title: string; photo: string };
 }
 
 interface HistoryEntry {
@@ -140,21 +142,29 @@ function toPlainText(md: string): string {
         .trim();
 }
 
-/** Citation -> chip: official links open in a new tab; document names are labels. */
-function sourceChip(citation: string): { label: string; href?: string } {
-    if (/^https?:\/\//i.test(citation)) {
-        try {
-            const url = new URL(citation);
-            const last = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "").replace(/\.(php|html?|aspx?)$/i, "");
-            const host = url.hostname.replace(/^www\./, "");
-            const label = last ? `${host} · ${last.replace(/[-_]+/g, " ")}` : host;
-            return { label: label.length > 48 ? label.slice(0, 47) + "…" : label, href: url.href };
-        } catch {
-            return { label: citation.slice(0, 48) };
-        }
-    }
-    const title = citation.replace(/\.(pdf|docx?|md|txt|html?)$/i, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
-    return { label: title.length > 48 ? title.slice(0, 47) + "…" : title };
+/** Who the answer is about: name and title on the left, their photo on the right. */
+function PersonTile({ person }: { person: { name: string; title: string; photo: string } }) {
+    return (
+        <div className="mb-3 flex items-center gap-4 overflow-hidden rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-3 pl-4 dark:border-white/10 dark:from-white/[0.06] dark:to-white/[0.02]">
+            <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">UTAR</p>
+                <p className="mt-0.5 text-[16px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-white">{person.name}</p>
+                <p className="mt-1 text-[13px] leading-snug text-zinc-600 dark:text-zinc-400">{person.title}</p>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={person.photo}
+                alt={person.name}
+                width={96}
+                height={120}
+                loading="lazy"
+                className="h-[120px] w-[96px] shrink-0 rounded-xl object-cover shadow-md ring-1 ring-black/5 dark:ring-white/10"
+                onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                }}
+            />
+        </div>
+    );
 }
 
 function pickStarters<T>(pool: T[], n: number): T[] {
@@ -695,6 +705,7 @@ export default function ChatClient() {
                 needsClarification: data.needsClarification ?? false,
                 followUps: Array.isArray(data.followUps) ? data.followUps : [],
                 failed: Boolean(data.retryable),
+                person: data.person && typeof data.person.photo === "string" ? data.person : undefined,
             };
 
             setMessages((prev) => [...prev, botMsg]);
@@ -848,30 +859,8 @@ export default function ChatClient() {
                                                     : "rounded-3xl rounded-bl-lg border border-zinc-200/80 bg-white px-4 py-3.5 shadow-sm dark:border-white/10 dark:bg-zinc-900"
                                             }
                                         >
+                                            {!isUser && msg.person && <PersonTile person={msg.person} />}
                                             {isUser ? <p className="whitespace-pre-wrap">{msg.text}</p> : <AnswerBody text={msg.text} />}
-
-                                            {/* Sources, when the answer doesn't already list its official links */}
-                                            {!isUser && !msg.failed && (msg.citations?.length ?? 0) > 0 && splitAnswer(msg.text).links.length === 0 && (
-                                                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                                    <span className="mr-0.5 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{t.ui.sources}</span>
-                                                    {msg.citations!.slice(0, 3).map((c) => {
-                                                        const chip = sourceChip(c);
-                                                        const cls = "inline-flex max-w-full items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[12px] text-zinc-600 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300";
-                                                        return chip.href ? (
-                                                            <a key={c} href={chip.href} target="_blank" rel="noopener noreferrer" className={`${cls} transition hover:border-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200`}>
-                                                                <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                                                                <span className="truncate">{chip.label}</span>
-                                                            </a>
-                                                        ) : (
-                                                            <span key={c} className={cls} title={c}>
-                                                                <FileText className="h-3 w-3 shrink-0" aria-hidden />
-                                                                <span className="truncate">{chip.label}</span>
-                                                            </span>
-                                                        );
-                                                    })}
-                                                    {msg.citations!.length > 3 && <span className="text-[12px] text-zinc-400">+{msg.citations!.length - 3}</span>}
-                                                </div>
-                                            )}
 
                                             {!isUser && !msg.isStreaming && msg.selectedAgentLabel && (
                                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2.5 dark:border-white/5">

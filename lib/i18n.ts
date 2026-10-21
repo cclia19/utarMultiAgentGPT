@@ -50,7 +50,6 @@ export type Strings = {
         newAnswer: string;
         edit: string;
         editing: string;
-        sources: string;
         networkError: string;
     };
     disclaimer: {
@@ -141,7 +140,6 @@ export const STRINGS: Record<Lang, Strings> = {
             newAnswer: "New answer",
             edit: "Edit question",
             editing: "Editing your question",
-            sources: "Sources",
             networkError: "Couldn't reach UTARCHAT. Check your connection and try again.",
         },
         helpful: "Helpful",
@@ -235,7 +233,6 @@ export const STRINGS: Record<Lang, Strings> = {
             newAnswer: "Jawapan baharu",
             edit: "Sunting soalan",
             editing: "Menyunting soalan anda",
-            sources: "Sumber",
             networkError: "Tidak dapat menghubungi UTARCHAT. Semak sambungan anda dan cuba lagi.",
         },
         helpful: "Membantu",
@@ -329,7 +326,6 @@ export const STRINGS: Record<Lang, Strings> = {
             newAnswer: "新回答",
             edit: "编辑问题",
             editing: "正在编辑你的问题",
-            sources: "来源",
             networkError: "无法连接 UTARCHAT。请检查网络后重试。",
         },
         helpful: "有帮助",
