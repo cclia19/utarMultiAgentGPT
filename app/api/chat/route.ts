@@ -2483,8 +2483,10 @@ Return ONLY valid JSON:
  * staff directory, pre-handlers) is produced in full, sanitised as today, and then
  * delivered as a single `done` frame.
  */
+type StatusOffice = { agentId?: string; agentLabel?: string };
+
 type StreamSink = {
-    status: (stage: string, text: string) => void;
+    status: (stage: string, text: string, office?: StatusOffice) => void;
     thought: (delta: string) => void;
     text: (delta: string) => void;
     replace: (fullText: string) => void;
@@ -2509,8 +2511,8 @@ function createStreamSink(
     };
 
     return {
-        status: (stage: string, text: string) => {
-            write({ type: "status", stage, text });
+        status: (stage: string, text: string, office?: StatusOffice) => {
+            write({ type: "status", stage, text, ...(office || {}) });
         },
         thought: (delta: string) => {
             if (delta) write({ type: "thought", delta });
@@ -2989,7 +2991,15 @@ async function handleChat(
         const rawMessage = String(message || "").trim();
         // Language picked on the chat page (EN / BM / 中文); empty = follow the question.
         const chosenLanguageRule = languageRule(body?.language);
-        sink?.status("analyzing", "Analyzing your question...");
+        // Thinking line: a follow-up stays with the office that answered last,
+        // so it never says "finding the right office" unless the topic moves.
+        const isFollowUp = Array.isArray(history) && history.some((h: any) => h?.role === "model");
+        const previousAgent = getAgentById(fallbackAgentId);
+        if (isFollowUp) {
+            sink?.status("followUp", "Following up...", { agentId: previousAgent.id, agentLabel: previousAgent.label });
+        } else {
+            sink?.status("analyzing", "Analyzing your question...");
+        }
 
         const enrichedMessage = enrichWithLastResolvedTopic(
             rawMessage,
@@ -3085,7 +3095,7 @@ async function handleChat(
                 ? pendingQuestion
                 : null;
 
-        sink?.status("routing", "Identifying relevant UTAR department...");
+        if (!isFollowUp) sink?.status("routing", "Identifying relevant UTAR department...");
 
         const routerResult = await routeWithLLM({
             message: resolvedMessage,
@@ -3112,7 +3122,10 @@ async function handleChat(
             ? `${selectedAgent.storeDisplayName || selectedAgent.label} + ${secondaryAgent!.storeDisplayName || secondaryAgent!.label}`
             : (selectedAgent.storeDisplayName || "");
 
-        sink?.status("agent_selected", `Routing to ${displayAgentLabel}...`);
+        // A follow-up that stays with the same office keeps "Following up with …".
+        if (!isFollowUp || selectedAgent.id !== previousAgent.id || hasSecondary) {
+            sink?.status("agent_selected", `Routing to ${displayAgentLabel}...`, { agentId: selectedAgent.id, agentLabel: displayAgentLabel });
+        }
 
         // A challenge to a previous answer ("are you sure", "why did you say...")
         // must be re-checked against evidence, never answered from the model alone.
@@ -3316,7 +3329,8 @@ async function handleChat(
 
         sink?.status(
             "searching",
-            `Searching ${displayStoreDisplayName || displayAgentLabel}...`
+            `Searching ${displayStoreDisplayName || displayAgentLabel}...`,
+            { agentId: selectedAgent.id, agentLabel: displayAgentLabel }
         );
 
         const fileSearchSystemInstruction = hasSecondary

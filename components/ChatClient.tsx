@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import AnswerBody from "./AnswerBody";
 import AgentBadge from "./AgentBadge";
-import { ArrowUp, ArrowUpRight, Check, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
+import ThinkingLine, { type ThinkingStep } from "./ThinkingLine";
+import { ArrowUp, ArrowUpRight, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import html2canvas from "html2canvas";
 import WelcomeSplash from "./WelcomeSplash";
 import FeedbackModal from "./FeedbackModal";
@@ -123,9 +124,38 @@ export default function ChatClient() {
     const [messages, setMessages] = useState<Message[]>([WELCOME]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
-    const [currentStatus, setCurrentStatus] = useState<{ stage: string; text: string } | null>(null);
+
     // Steps the server reported for the current question, shown as a timeline.
-    const [stages, setStages] = useState<{ stage: string; text: string }[]>([]);
+    // The thinking line: the current step, and the office it is working with (kept across steps).
+    const [thinking, setThinking] = useState<ThinkingStep | null>(null);
+    const [thinkingOffice, setThinkingOffice] = useState<ThinkingStep | null>(null);
+    // Steps that arrive together (office chosen, then searching) would flash by,
+    // so each one stays on screen for a moment. Never delays the answer itself.
+    const stepQueue = useRef<ThinkingStep[]>([]);
+    const stepTimer = useRef<number | undefined>(undefined);
+    const STEP_MIN_MS = 700;
+    const showNextStep = useCallback(() => {
+        const next = stepQueue.current.shift();
+        if (!next) {
+            stepTimer.current = undefined;
+            return;
+        }
+        setThinking(next);
+        if (next.agentId && next.agentId !== "general") setThinkingOffice(next);
+        stepTimer.current = window.setTimeout(showNextStep, STEP_MIN_MS);
+    }, []);
+    const queueStep = useCallback(
+        (step: ThinkingStep) => {
+            stepQueue.current.push(step);
+            if (stepTimer.current === undefined) showNextStep();
+        },
+        [showNextStep]
+    );
+    const clearSteps = useCallback(() => {
+        stepQueue.current = [];
+        if (stepTimer.current !== undefined) window.clearTimeout(stepTimer.current);
+        stepTimer.current = undefined;
+    }, []);
 
     // EN / BM / 中文: page wording and the language answers are written in.
     const [lang, setLang] = useState<Lang>("en");
@@ -258,7 +288,7 @@ export default function ChatClient() {
     useEffect(() => {
         // The welcome screen stays at the top; scroll only once a chat starts.
         if (messages.length > 1 || loading) scrollToBottom();
-    }, [messages, loading, stages, scrollToBottom]);
+    }, [messages, loading, thinking, scrollToBottom]);
 
     // Phone keyboards shrink the visual viewport: keep the latest answer in view.
     useEffect(() => {
@@ -326,16 +356,12 @@ export default function ChatClient() {
         setMessages(nextMessages);
         setInput("");
         setLoading(true);
-        setCurrentStatus({ stage: "analyzing", text: "Analyzing your question..." });
-        setStages([{ stage: "analyzing", text: "" }]);
-
-        // The streaming preview bubble always lands at this index: nextMessages is
-        // already committed and nothing else appends while the stream is open. Keeping
-        // the index out of the setMessages updater keeps that updater pure, which
-        // matters under React StrictMode's double-invocation in dev.
-        const previewIndex = nextMessages.length;
-        let previewShown = false;
-        let drain: number | undefined;
+        // A follow-up starts as "Following up with <office>"; the server may move it on.
+        const isFollowUp = messages.some((m) => m.role === "model" && m !== WELCOME);
+        const lastOffice = selectedAgentId && selectedAgentId !== "general" ? { stage: "followUp", agentId: selectedAgentId, agentLabel: selectedAgentLabel } : null;
+        clearSteps();
+        setThinkingOffice(null);
+        queueStep(isFollowUp ? lastOffice ?? { stage: "followUp" } : { stage: "analyzing" });
 
         try {
             const res = await fetch("/api/chat", {
@@ -361,64 +387,16 @@ export default function ChatClient() {
                 throw new Error(failed.error || "Request failed");
             }
 
-            // NDJSON stream: provisional "status"/"thought"/"text"/"replace"/"reset" frames render a live
-            // preview; the trailing "done" frame carries the authoritative payload.
+            // NDJSON stream: "status" frames drive the thinking line; the trailing
+            // "done" frame carries the answer. Partial "text" is not shown: answers
+            // are laid out as cards and tiles, which only make sense complete.
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
-            // Target strings grow as frames arrive; the drain loop below reveals
-            // them a few characters at a time. Gemini delivers ~200-char chunks
-            // every ~180ms, which lands as visible blocks if rendered directly.
-            let preview = "";
             let previewThought = "";
-            let shownPreview = "";
-            let shownThought = "";
+            let answering = false;
             let data: any = null;
             let streamError = "";
-
-            const renderPreview = () => {
-                const text = shownPreview;
-                if (!text) return;
-                const shown = previewShown;
-                previewShown = true;
-                setMessages((prev) => {
-                    const next = [...prev];
-                    const bubble: Message = {
-                        role: "model",
-                        text,
-                        isStreaming: true,
-                        citations: [],
-                        sourceMode: "none",
-                        storeDisplayName: "",
-                        selectedAgentId: agentForThisRequest,
-                        selectedAgentLabel,
-                    };
-                    if (!shown && next.length === previewIndex) {
-                        next.push(bubble);
-                    } else {
-                        next[previewIndex] = bubble;
-                    }
-                    return next;
-                });
-            };
-
-            // Reveal buffered text at a steady rate so it reads as typing rather
-            // than as blocks. The step scales with the backlog, so a burst catches
-            // up quickly instead of falling further behind.
-            const REVEAL_INTERVAL_MS = 16;
-            const advance = (shown: string, target: string) => {
-                if (shown.length >= target.length) return target;
-                const remaining = target.length - shown.length;
-                const step = Math.max(2, Math.ceil(remaining / 12));
-                return target.slice(0, shown.length + step);
-            };
-
-            drain = window.setInterval(() => {
-                if (shownPreview === preview && shownThought === previewThought) return;
-                shownPreview = advance(shownPreview, preview);
-                shownThought = advance(shownThought, previewThought);
-                renderPreview();
-            }, REVEAL_INTERVAL_MS);
 
             const handleFrame = (line: string) => {
                 if (!line.trim()) return;
@@ -430,38 +408,16 @@ export default function ChatClient() {
                 }
 
                 if (frame.type === "status") {
-                    setCurrentStatus({ stage: frame.stage, text: frame.text });
-                    setStages((prev) => (prev.some((p) => p.stage === frame.stage) ? prev : [...prev, { stage: frame.stage, text: frame.text }]));
+                    queueStep({ stage: frame.stage, agentId: frame.agentId, agentLabel: frame.agentLabel });
                 } else if (frame.type === "thought") {
-                    setCurrentStatus({ stage: "reasoning", text: "Synthesizing verified answer..." });
-                    setStages((prev) => (prev.some((p) => p.stage === "reasoning") ? prev : [...prev, { stage: "reasoning", text: "" }]));
                     previewThought += frame.delta || "";
-                } else if (frame.type === "text") {
-                    if (preview.length === 0) {
-                        setCurrentStatus(null);
-                    }
-                    preview += frame.delta || "";
-                } else if (frame.type === "replace") {
-                    preview = frame.text || "";
-                    // A replace rewrites history, so the revealed prefix may no
-                    // longer be valid; keep whatever still matches.
-                    if (!preview.startsWith(shownPreview)) shownPreview = "";
-                    renderPreview();
-                } else if (frame.type === "reset") {
-                    preview = "";
-                    previewThought = "";
-                    shownPreview = "";
-                    shownThought = "";
-                    if (previewShown) {
-                        previewShown = false;
-                        setMessages((prev) => prev.filter((_, i) => i !== previewIndex));
-                    }
+                } else if ((frame.type === "text" || frame.type === "replace") && !answering) {
+                    answering = true;
+                    queueStep({ stage: "reasoning" });
                 } else if (frame.type === "done") {
                     data = frame;
-                    setCurrentStatus(null);
                 } else if (frame.type === "error") {
                     streamError = frame.message || "Stream failed";
-                    setCurrentStatus(null);
                 }
             };
 
@@ -474,8 +430,6 @@ export default function ChatClient() {
                 for (const line of lines) handleFrame(line);
             }
             if (buffer) handleFrame(buffer);
-
-            if (drain !== undefined) window.clearInterval(drain);
 
             if (!data) {
                 throw new Error(streamError || "Request failed");
@@ -526,17 +480,8 @@ export default function ChatClient() {
                 followUps: Array.isArray(data.followUps) ? data.followUps : [],
             };
 
-            const shown = previewShown;
-            setMessages((prev) => {
-                if (shown && prev[previewIndex]) {
-                    const next = [...prev];
-                    next[previewIndex] = botMsg;
-                    return next;
-                }
-                return [...prev, botMsg];
-            });
+            setMessages((prev) => [...prev, botMsg]);
         } catch (e: any) {
-            const shown = previewShown;
             const errorMsg: Message = {
                 role: "model",
                 text: `Error: ${e.message}`,
@@ -546,19 +491,12 @@ export default function ChatClient() {
                 selectedAgentId,
                 selectedAgentLabel,
             };
-            // Replace any half-written preview rather than leaving it above the error.
-            setMessages((prev) => {
-                if (shown && prev[previewIndex]) {
-                    const next = [...prev];
-                    next[previewIndex] = errorMsg;
-                    return next;
-                }
-                return [...prev, errorMsg];
-            });
+            setMessages((prev) => [...prev, errorMsg]);
         } finally {
-            if (drain !== undefined) window.clearInterval(drain);
             setLoading(false);
-            setStages([]);
+            clearSteps();
+            setThinking(null);
+            setThinkingOffice(null);
         }
     };
 
@@ -740,29 +678,11 @@ export default function ChatClient() {
                         })}
                     </AnimatePresence>
 
-                    {/* Thinking timeline: the steps the server actually takes */}
-                    {loading && !messages.some((m) => m.isStreaming) && (
+                    {/* Thinking line: one step at a time, changing in place */}
+                    {loading && thinking && (
                         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="rounded-3xl rounded-bl-lg border border-zinc-200/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-zinc-900/80">
-                                <ol className="space-y-1.5">
-                                    {stages.map((st, n) => {
-                                        const current = n === stages.length - 1;
-                                        const label = t.stages[st.stage] || st.text || t.stages.analyzing;
-                                        return (
-                                            <motion.li key={st.stage} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 text-[13px]">
-                                                {current ? (
-                                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
-                                                ) : (
-                                                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                                                )}
-                                                <span className={current ? "font-medium text-zinc-800 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"}>
-                                                    {label}
-                                                    {current && <span className="animate-pulse">…</span>}
-                                                </span>
-                                            </motion.li>
-                                        );
-                                    })}
-                                </ol>
+                            <div className="min-w-[240px] max-w-full rounded-3xl rounded-bl-lg border border-zinc-200/80 bg-white/80 px-4 py-2.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-zinc-900/80">
+                                <ThinkingLine step={thinking} office={thinkingOffice} stages={t.stages} />
                             </div>
                         </motion.div>
                     )}

@@ -84,6 +84,12 @@ export function VerifiedTick({ className = "h-3.5 w-3.5" }: { className?: string
     );
 }
 
+/** The office's icon (same as its badge), for the thinking line. */
+export function agentIcon(agentId?: string): LucideIcon {
+    if (!agentId || agentId === "general") return Building2;
+    return familyOf(agentId).icon;
+}
+
 export function agentDisplayName(agentId?: string, label?: string): string {
     if (!agentId || agentId === "general") return "AVO";
     return (label || agentId).replace(/\s*Assistant$/i, "").trim();
