@@ -16,6 +16,7 @@ import { tryBusScheduleReply } from "@/lib/busSchedule";
 import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
+import { kbAnswerHasGap, isWeakWebAnswer } from "@/lib/answerGaps";
 import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
@@ -3617,9 +3618,16 @@ LANGUAGE RULE:
 
         const isGeneralBusQuery = /bus|shuttle|transit|schedule|timetable/i.test(effectiveMessage) && selectedAgent.id === "dgs-kampar";
 
+        // The knowledge base answered around the question but says the thing
+        // asked for isn't in its documents ("… not specified in the available
+        // documents"): try the web, and keep this answer if the web finds nothing.
+        const kbPartial = succeeded && !rawFileText.includes(NO_KB_ANSWER) && kbAnswerHasGap(fileText);
+        if (kbPartial) console.warn("[fileSearch] answer admits a gap, trying web:", JSON.stringify(fileText.slice(0, 160)));
+
         const fileNotFound =
             !succeeded ||
             fileText.length === 0 ||
+            kbPartial ||
             shouldUseWebFallback(rawFileText, effectiveMessage) ||
             (fileCitations.length === 0 && fileText.length < 50);
 
@@ -3670,6 +3678,23 @@ LANGUAGE RULE:
             reason: "kb_no_answer",
             extraInstruction: answerRules,
         });
+
+        // The web found nothing either: the partial knowledge-base answer beats "I couldn't verify".
+        if (kbPartial && isWeakWebAnswer(webFallback.text)) {
+            return NextResponse.json({
+                text: fileText,
+                citations: fileCitations,
+                sourceMode: "fileSearch",
+                storeDisplayName: displayStoreDisplayName,
+                selectedAgentId: selectedAgent.id,
+                selectedAgentLabel: displayAgentLabel,
+                needsClarification: false,
+                pendingQuestion: null,
+                lastResolvedTopic: inferResolvedTopic(effectiveMessage, fileText) || lastResolvedTopic,
+                contextSummary: updatedContextSummary,
+                routeType: routerResult.routeType,
+            });
+        }
 
         const newTopic =
             inferResolvedTopic(effectiveMessage, webFallback.text) || lastResolvedTopic;
