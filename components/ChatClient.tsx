@@ -56,6 +56,8 @@ interface Message {
     followUps?: string[];
     /** The answer is a failure the student can retry ("temporarily unavailable", timeout, no connection). */
     failed?: boolean;
+    /** Profile tile for answers about someone with a photo (lib/people.ts). */
+    person?: { name: string; title: string; photo: string };
 }
 
 interface HistoryEntry {
@@ -138,6 +140,31 @@ function toPlainText(md: string): string {
         .replace(/`/g, "")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
+}
+
+/** Who the answer is about: name and title on the left, their photo on the right. */
+function PersonTile({ person }: { person: { name: string; title: string; photo: string } }) {
+    return (
+        <div className="mb-3 flex items-center gap-4 overflow-hidden rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-3 pl-4 dark:border-white/10 dark:from-white/[0.06] dark:to-white/[0.02]">
+            <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">UTAR</p>
+                <p className="mt-0.5 text-[16px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-white">{person.name}</p>
+                <p className="mt-1 text-[13px] leading-snug text-zinc-600 dark:text-zinc-400">{person.title}</p>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={person.photo}
+                alt={person.name}
+                width={96}
+                height={120}
+                loading="lazy"
+                className="h-[120px] w-[96px] shrink-0 rounded-xl object-cover shadow-md ring-1 ring-black/5 dark:ring-white/10"
+                onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                }}
+            />
+        </div>
+    );
 }
 
 function pickStarters<T>(pool: T[], n: number): T[] {
@@ -678,6 +705,7 @@ export default function ChatClient() {
                 needsClarification: data.needsClarification ?? false,
                 followUps: Array.isArray(data.followUps) ? data.followUps : [],
                 failed: Boolean(data.retryable),
+                person: data.person && typeof data.person.photo === "string" ? data.person : undefined,
             };
 
             setMessages((prev) => [...prev, botMsg]);
@@ -831,6 +859,7 @@ export default function ChatClient() {
                                                     : "rounded-3xl rounded-bl-lg border border-zinc-200/80 bg-white px-4 py-3.5 shadow-sm dark:border-white/10 dark:bg-zinc-900"
                                             }
                                         >
+                                            {!isUser && msg.person && <PersonTile person={msg.person} />}
                                             {isUser ? <p className="whitespace-pre-wrap">{msg.text}</p> : <AnswerBody text={msg.text} />}
 
                                             {!isUser && !msg.isStreaming && msg.selectedAgentLabel && (

@@ -15,6 +15,7 @@ import { trySmallTalkReply, tryGreetingReply, AVO_DADDY_REPLY } from "@/lib/smal
 import { tryBusScheduleReply } from "@/lib/busSchedule";
 import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
+import { findPerson } from "@/lib/people";
 import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
@@ -2827,6 +2828,13 @@ function finalizePayload(payload: any, metrics: RequestMetrics, language: unknow
     };
 }
 
+/** A profile tile (name, title, photo) when the answer is about someone with a photo (lib/people.ts). */
+function withPerson(payload: any, question: unknown) {
+    if (!payload || typeof payload.text !== "string" || payload.retryable) return payload;
+    const person = findPerson(String(question || ""), payload.text);
+    return person ? { ...payload, person } : payload;
+}
+
 /** Moves Gemini's "FOLLOW-UPS:" line out of the answer into followUps (chips on the chat page). */
 function withFollowUps(payload: any) {
     if (!payload || typeof payload.text !== "string") return payload;
@@ -2926,7 +2934,7 @@ export async function POST(req: NextRequest) {
     if (body?.stream !== true) {
         const raw = await metricsStore.run(metrics, () => handleChat(body));
         const latencyMs = Date.now() - startedAt;
-        const payload = finalizePayload(withFollowUps(await raw.json().catch(() => null)), metrics, body?.language);
+        const payload = withPerson(finalizePayload(withFollowUps(await raw.json().catch(() => null)), metrics, body?.language), body?.message);
         after(() => finish(payload, latencyMs, false));
         const res = NextResponse.json(payload, { status: raw.status });
         // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
@@ -2953,7 +2961,7 @@ export async function POST(req: NextRequest) {
             let streamFailed = false;
             try {
                 const res = await metricsStore.run(metrics, () => handleChat(body, sink));
-                payload = finalizePayload(withFollowUps(await res.json()), metrics, body?.language);
+                payload = withPerson(finalizePayload(withFollowUps(await res.json()), metrics, body?.language), body?.message);
                 if (metrics.providerError) sink.reset();
                 sink.done(payload);
             } catch (err: any) {
