@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { trySmallTalkReply, isCreatorQuestion, isLecturerRankingQuestion, AVO_DADDY_REPLY, tryGreetingReply, greetingKind } = await import("./smallTalk.ts");
+const { trySmallTalkReply, isCreatorQuestion, isLecturerRankingQuestion, AVO_DADDY_REPLY, tryGreetingReply, greetingKind, AVO_WHO_REPLY, AUN_YICHIET_REPLY } = await import("./smallTalk.ts");
 
 test("creator questions reach the Avo easter egg, however they are phrased", () => {
     for (const q of [
@@ -103,5 +103,29 @@ test("a greeting with a real question still goes to the pipeline", () => {
         "你好，请问学费多少？",
     ]) {
         assert.equal(tryGreetingReply(msg, "en"), null, msg);
+    }
+});
+
+test("who is Avo / Aun Yichiet gets the creator easter eggs with the Instagram link", () => {
+    for (const q of ["who is avo", "Who's Avo?", "avo who?", "siapa avo", "avo是谁", "tell me about avo", "do you know avo"]) {
+        assert.equal(trySmallTalkReply(q), AVO_WHO_REPLY, q);
+    }
+    for (const q of ["who is Aun Yichiet", "Aun Yi Chiet", "who is dr aun", "yichiet?", "Prof Aun"]) {
+        assert.equal(trySmallTalkReply(q), AUN_YICHIET_REPLY, q);
+    }
+    assert.match(AVO_WHO_REPLY, /You know, I know la/);
+    assert.match(AVO_WHO_REPLY, /instagram\.com\/yichiet/);
+    assert.match(AUN_YICHIET_REPLY, /Associate Professor at FICT/);
+    assert.match(AUN_YICHIET_REPLY, /Co-founder of ABLEs/);
+});
+
+test("real questions mentioning avocado or Dr Aun's contact still go to the pipeline", () => {
+    for (const q of [
+        "where can I buy avocado on campus",
+        "what is Aun Yichiet's email",
+        "where is Dr Aun's office",
+        "avocado toast near Kampar campus",
+    ]) {
+        assert.equal(trySmallTalkReply(q), null, q);
     }
 });

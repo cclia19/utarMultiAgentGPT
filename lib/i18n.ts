@@ -37,6 +37,22 @@ export type Strings = {
     stages: Record<string, string>;
     helpful: string;
     report: string;
+    /** Chat page controls: new chat, copy, try again, jump to latest, edit, sources. */
+    ui: {
+        newChat: string;
+        newChatStarted: string;
+        undo: string;
+        copy: string;
+        copied: string;
+        copyFailed: string;
+        tryAgain: string;
+        jumpToLatest: string;
+        newAnswer: string;
+        edit: string;
+        editing: string;
+        sources: string;
+        networkError: string;
+    };
     disclaimer: {
         title: string;
         beta: string;
@@ -85,6 +101,14 @@ export const STRINGS: Record<Lang, Strings> = {
             { emoji: "💰", text: "How much is the Computer Science fee?" },
             { emoji: "🎓", text: "What scholarships can I apply for?" },
             { emoji: "🧠", text: "Where can I get counselling?" },
+            { emoji: "📚", text: "What are the library opening hours?" },
+            { emoji: "🏠", text: "How do I apply for hostel accommodation?" },
+            { emoji: "🗓️", text: "When is the final exam timetable released?" },
+            { emoji: "🔄", text: "How do I change my programme?" },
+            { emoji: "💳", text: "How do I pay my fees online?" },
+            { emoji: "💼", text: "How do I apply for industrial training?" },
+            { emoji: "🌏", text: "Can I go on a student exchange?" },
+            { emoji: "🩺", text: "Where is the campus clinic?" },
         ],
         placeholder: "Ask anything about UTAR…",
         send: "Send",
@@ -104,6 +128,21 @@ export const STRINGS: Record<Lang, Strings> = {
             staffDirectory: "Checking the staff directory",
             webFallback: "Checking UTAR websites",
             reasoning: "Answering",
+        },
+        ui: {
+            newChat: "New chat",
+            newChatStarted: "New chat started",
+            undo: "Undo",
+            copy: "Copy answer",
+            copied: "Copied",
+            copyFailed: "Couldn't copy. Select the text instead.",
+            tryAgain: "Try again",
+            jumpToLatest: "Jump to latest",
+            newAnswer: "New answer",
+            edit: "Edit question",
+            editing: "Editing your question",
+            sources: "Sources",
+            networkError: "Couldn't reach UTARCHAT. Check your connection and try again.",
         },
         helpful: "Helpful",
         report: "Report a problem",
@@ -156,6 +195,14 @@ export const STRINGS: Record<Lang, Strings> = {
             { emoji: "💰", text: "Berapa yuran Sains Komputer?" },
             { emoji: "🎓", text: "Biasiswa apa yang boleh saya mohon?" },
             { emoji: "🧠", text: "Di mana boleh dapatkan kaunseling?" },
+            { emoji: "📚", text: "Pukul berapa perpustakaan dibuka?" },
+            { emoji: "🏠", text: "Bagaimana memohon asrama?" },
+            { emoji: "🗓️", text: "Bila jadual peperiksaan akhir dikeluarkan?" },
+            { emoji: "🔄", text: "Bagaimana menukar program?" },
+            { emoji: "💳", text: "Bagaimana membayar yuran secara dalam talian?" },
+            { emoji: "💼", text: "Bagaimana memohon latihan industri?" },
+            { emoji: "🌏", text: "Boleh saya sertai pertukaran pelajar?" },
+            { emoji: "🩺", text: "Di mana klinik kampus?" },
         ],
         placeholder: "Tanya apa sahaja tentang UTAR…",
         send: "Hantar",
@@ -175,6 +222,21 @@ export const STRINGS: Record<Lang, Strings> = {
             staffDirectory: "Menyemak direktori staf",
             webFallback: "Menyemak laman web UTAR",
             reasoning: "Menjawab",
+        },
+        ui: {
+            newChat: "Perbualan baharu",
+            newChatStarted: "Perbualan baharu dimulakan",
+            undo: "Buat asal",
+            copy: "Salin jawapan",
+            copied: "Disalin",
+            copyFailed: "Tidak dapat menyalin. Sila pilih teks itu.",
+            tryAgain: "Cuba lagi",
+            jumpToLatest: "Ke mesej terkini",
+            newAnswer: "Jawapan baharu",
+            edit: "Sunting soalan",
+            editing: "Menyunting soalan anda",
+            sources: "Sumber",
+            networkError: "Tidak dapat menghubungi UTARCHAT. Semak sambungan anda dan cuba lagi.",
         },
         helpful: "Membantu",
         report: "Laporkan masalah",
@@ -227,6 +289,14 @@ export const STRINGS: Record<Lang, Strings> = {
             { emoji: "💰", text: "计算机科学的学费是多少？" },
             { emoji: "🎓", text: "我可以申请哪些奖学金？" },
             { emoji: "🧠", text: "哪里可以找辅导咨询？" },
+            { emoji: "📚", text: "图书馆几点开？" },
+            { emoji: "🏠", text: "怎么申请宿舍？" },
+            { emoji: "🗓️", text: "期末考试时间表什么时候公布？" },
+            { emoji: "🔄", text: "怎么转换课程？" },
+            { emoji: "💳", text: "怎么在线缴付学费？" },
+            { emoji: "💼", text: "怎么申请工业实习？" },
+            { emoji: "🌏", text: "我可以参加交换生计划吗？" },
+            { emoji: "🩺", text: "校园诊所在哪里？" },
         ],
         placeholder: "问任何关于 UTAR 的问题…",
         send: "发送",
@@ -246,6 +316,21 @@ export const STRINGS: Record<Lang, Strings> = {
             staffDirectory: "查询职员名录",
             webFallback: "查看 UTAR 网站",
             reasoning: "正在回答",
+        },
+        ui: {
+            newChat: "新对话",
+            newChatStarted: "已开始新对话",
+            undo: "撤销",
+            copy: "复制答案",
+            copied: "已复制",
+            copyFailed: "无法复制，请手动选择文字。",
+            tryAgain: "重试",
+            jumpToLatest: "跳到最新",
+            newAnswer: "新回答",
+            edit: "编辑问题",
+            editing: "正在编辑你的问题",
+            sources: "来源",
+            networkError: "无法连接 UTARCHAT。请检查网络后重试。",
         },
         helpful: "有帮助",
         report: "报告问题",

@@ -156,9 +156,62 @@ But if you’re asking who I stan… I love Avo more than EXO. 🥑
 `.trim();
 
 // ---------------------------------------------------------------------------
+// 3b. "Who is Avo?" / "Who is Aun Yichiet?" (the creator easter eggs).
+// ---------------------------------------------------------------------------
+
+// Shown as a tappable chip (the "Official Links" section of an answer).
+const INSTAGRAM_LINK = `
+### 🔗 Official Links
+
+- [📸 Follow @yichiet on Instagram](https://www.instagram.com/yichiet/)
+`;
+
+export const AVO_WHO_REPLY = `
+You know, I know la. 😏🥑
+
+Avo is the one behind UTARCHAT. Follow him for more financial advice (and the occasional avocado).
+${INSTAGRAM_LINK}`.trim();
+
+export const AUN_YICHIET_REPLY = `
+Aun Yichiet, also known as Avo. 🥑
+
+### 👨‍🏫 Who he is
+
+- Associate Professor at FICT (Faculty of Information and Communication Technology), UTAR
+- Co-founder of ABLEs
+- The brain (and caffeine) behind UTARCHAT
+${INSTAGRAM_LINK}`.trim();
+
+const AVO_NAME = /\b(avo|avocado)\b/;
+const AVO_WHO = [
+    /^(who|whos|who s|who is|who r|who are)\s+(is\s+|this\s+|that\s+)?(avo|avocado)\b/,
+    /^(avo|avocado)\s+(is\s+)?(who|siapa)\b/,
+    /^siapa\s+(itu\s+)?avo\b/,
+    /^(do\s+)?(you|u)\s+know\s+avo\b/,
+    /^(tell\s+me\s+about|what\s+about)\s+avo\b/,
+];
+const AVO_WHO_CJK = /(avo|Avo|AVO)\s*(是谁|是誰)|谁是\s*(avo|Avo|AVO)/;
+const AUN_NAME = /\b(aun\s*yi\s*chiet|yichiet|yi\s*chiet|(dr|prof|professor|ts|assoc prof)\s+aun)\b/;
+// "Aun Yichiet's email / office" is a real directory question: let the pipeline answer it.
+const CONTACT = /\b(email|e mail|phone|tel|office|room|contact|consultation|ext|extension|block|where)\b/;
+
+export function isAvoQuestion(message: string): boolean {
+    const raw = String(message || "");
+    if (AVO_WHO_CJK.test(raw)) return true;
+    const text = smallTalkText(raw);
+    return Boolean(text) && AVO_NAME.test(text) && AVO_WHO.some((p) => p.test(text));
+}
+
+export function isAunYichietQuestion(message: string): boolean {
+    const text = normalize(message);
+    if (!text || text.length > 70 || CONTACT.test(text)) return false;
+    return AUN_NAME.test(text) || /(殷|aun)\s*(亦|yi)\s*(杰|chiet)/i.test(String(message || ""));
+}
 
 /** Instant reply for small talk about the bot, or null to run the pipeline. */
 export function trySmallTalkReply(message: string): string | null {
+    if (isAunYichietQuestion(message)) return AUN_YICHIET_REPLY;
+    if (isAvoQuestion(message)) return AVO_WHO_REPLY;
     if (isCreatorQuestion(message)) {
         return DADDY.test(String(message || "").toLowerCase()) ? AVO_DADDY_REPLY : CREATOR_REPLY;
     }
