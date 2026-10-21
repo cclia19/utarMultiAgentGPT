@@ -21,7 +21,10 @@ export type AbuseLimits = {
     minUniqueWordRatio: number;
     /** The unique-word check only applies to messages with at least this many words. */
     uniqueWordMinWords: number;
+    /** Same question again while its answer is still in the conversation. */
     repeatWindowSec: number;
+    /** Same question again in a fresh chat (after a refresh): only a short pause. */
+    repeatFreshWindowSec: number;
     clientPerMinute: number;
     clientPerDay: number;
     ipPerMinute: number;
@@ -45,6 +48,7 @@ export function abuseLimits(): AbuseLimits {
         minUniqueWordRatio: num("MIN_UNIQUE_WORD_RATIO", 0.3),
         uniqueWordMinWords: num("UNIQUE_WORD_MIN_WORDS", 12),
         repeatWindowSec: num("REPEAT_WINDOW_SEC", 600),
+        repeatFreshWindowSec: num("REPEAT_FRESH_WINDOW_SEC", 120),
         clientPerMinute: num("RATE_CLIENT_PER_MIN", 5),
         clientPerDay: num("RATE_CLIENT_PER_DAY", 40),
         ipPerMinute: num("RATE_IP_PER_MIN", 20),

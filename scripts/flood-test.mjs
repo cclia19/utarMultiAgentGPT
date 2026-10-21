@@ -82,7 +82,7 @@ if (geminiCalls !== 0) failures.push(`expected 0 Gemini calls, got ${geminiCalls
 if (blocked.length !== 99) failures.push(`expected 99 refusals, got ${blocked.length}`);
 const longRefused = results.filter((r) => r.label.startsWith("long") && (r.blocked === "too_long" || r.blocked === "body_too_large")).length;
 if (longRefused !== 50) failures.push(`expected all 50 long messages refused for size, got ${longRefused}`);
-const repeatsRefused = results.filter((r) => r.label.startsWith("repeat") && r.blocked === "repeat").length;
+const repeatsRefused = results.filter((r) => r.label.startsWith("repeat") && (r.blocked === "repeat" || r.blocked === "repeat_recent")).length;
 if (repeatsRefused !== 49) failures.push(`expected 49 repeats refused, got ${repeatsRefused}`);
 if (results.some((r) => r.status !== 200)) failures.push("some requests did not return HTTP 200");
 

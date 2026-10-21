@@ -16,6 +16,7 @@ export type BlockReason =
     | "junk"
     | "jailbreak"
     | "repeat"
+    | "repeat_recent"
     | "blocked_client"
     | "rate_minute"
     | "rate_day"

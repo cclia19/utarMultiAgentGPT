@@ -106,10 +106,17 @@ export async function runGuards(params: {
     const day = malaysiaDay(now);
 
     try {
-        const { blocked, lastFingerprint } = await store.lookup({ clientKey, ipHash, repeatWindowSec: limits.repeatWindowSec });
+        const { blocked, lastFingerprint, lastAgeSec } = await store.lookup({ clientKey, ipHash, repeatWindowSec: limits.repeatWindowSec });
         if (blocked) return refuse("blocked_client");
         // Layer 3 (cont.): the same message as this client's last answered one.
-        if (lastFingerprint && lastFingerprint === fingerprint) return refuse("repeat");
+        // If that answer is still in the conversation, say so; after a refresh
+        // (fresh chat, answer gone) only ask for a short pause.
+        if (lastFingerprint && lastFingerprint === fingerprint) {
+            const earlierUserTurns = body.history.slice(0, -1).filter((h: any) => h.role === "user");
+            const askedInThisChat = earlierUserTurns.some((h: any) => messageFingerprint(h.parts?.[0]?.text || "") === fingerprint);
+            if (askedInThisChat) return refuse("repeat");
+            if (lastAgeSec !== null && lastAgeSec <= limits.repeatFreshWindowSec) return refuse("repeat_recent");
+        }
 
         // Layer 4: rate limits, per browser ID and per IP (hash).
         const minute = minuteWindow(now);

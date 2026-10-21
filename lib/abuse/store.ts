@@ -22,7 +22,7 @@ export type SpendToday = {
 
 export interface AbuseStore {
     /** Manual block, and the client's last answered message (only if within the repeat window). */
-    lookup(params: { clientKey: string; ipHash: string; repeatWindowSec: number }): Promise<{ blocked: boolean; lastFingerprint: string | null }>;
+    lookup(params: { clientKey: string; ipHash: string; repeatWindowSec: number }): Promise<{ blocked: boolean; lastFingerprint: string | null; lastAgeSec: number | null }>;
     /** Adds one to each counter atomically; returns the new counts in the same order. */
     hit(counters: CounterHit[]): Promise<number[]>;
     spendToday(malaysiaDay: string): Promise<SpendToday>;
@@ -97,8 +97,14 @@ class NeonAbuseStore implements AbuseStore {
                 ) AS blocked,
                 (SELECT fingerprint FROM client_last_message
                   WHERE client_key = ${clientKey}
-                    AND updated_at > now() - make_interval(secs => ${repeatWindowSec})) AS last_fingerprint`;
-        return { blocked: Boolean(row?.blocked), lastFingerprint: row?.last_fingerprint ?? null };
+                    AND updated_at > now() - make_interval(secs => ${repeatWindowSec})) AS last_fingerprint,
+                (SELECT extract(epoch FROM now() - updated_at)::float FROM client_last_message
+                  WHERE client_key = ${clientKey}) AS last_age_sec`;
+        return {
+            blocked: Boolean(row?.blocked),
+            lastFingerprint: row?.last_fingerprint ?? null,
+            lastAgeSec: row?.last_age_sec == null ? null : Number(row.last_age_sec),
+        };
     }
 
     async hit(counters: CounterHit[]) {
@@ -180,6 +186,7 @@ export class MemoryAbuseStore implements AbuseStore {
         return {
             blocked: this.blockedClients.has(clientKey) || this.blockedClients.has(ipHash),
             lastFingerprint: fresh ? last.fingerprint : null,
+            lastAgeSec: last ? (Date.now() - last.at) / 1000 : null,
         };
     }
 
