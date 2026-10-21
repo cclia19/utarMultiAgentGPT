@@ -10,15 +10,27 @@ import { hideFollowUpLine } from "@/lib/followUps";
  * "Next step" callout, and the official links as chips.
  */
 
+/** A link whose visible text is the URL itself reads as its site name instead ("utar.edu.my"). */
+function linkText(href: string | undefined, children: React.ReactNode): React.ReactNode {
+    const text = typeof children === "string" ? children : Array.isArray(children) && children.length === 1 && typeof children[0] === "string" ? children[0] : null;
+    if (!href || !text || !/^https?:\/\//i.test(text.trim())) return children;
+    if (/google\.com\/maps\//i.test(href)) return "📍 Open in Maps";
+    try {
+        return new URL(href).hostname.replace(/^www\./, "");
+    } catch {
+        return children;
+    }
+}
+
 const markdownComponents: Components = {
     a: ({ href, children }) => (
         <a
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 font-medium hover:text-indigo-800 break-words dark:text-indigo-300 dark:decoration-indigo-500/50 dark:hover:text-indigo-200"
+            className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 font-medium hover:text-indigo-800 [overflow-wrap:anywhere] dark:text-indigo-300 dark:decoration-indigo-500/50 dark:hover:text-indigo-200"
         >
-            {children} ↗
+            {linkText(href, children)} ↗
         </a>
     ),
     p: ({ children }) => <p className="my-2 leading-relaxed">{children}</p>,
@@ -45,8 +57,9 @@ const markdownComponents: Components = {
     ),
 };
 
+// [overflow-wrap:anywhere]: a long word or code never pushes past its card.
 const PROSE =
-    "max-w-none text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 [&_strong]:font-semibold [&_strong]:text-zinc-900 dark:[&_strong]:text-white";
+    "max-w-none [overflow-wrap:anywhere] text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 [&_strong]:font-semibold [&_strong]:text-zinc-900 dark:[&_strong]:text-white";
 
 function Markdown({ text }: { text: string }) {
     return (
