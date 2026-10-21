@@ -55,3 +55,15 @@ BOTH CAMPUSES RULE: The user did not say which campus, so you have the Kampar an
 - If you only have evidence for one campus, answer for that campus and say so.
 - Do not ask which campus.
 `;
+
+/**
+ * For every answer: UTAR has two campuses, so a place, office, hours or
+ * service must say which campus it is on, and both are shown when the
+ * student didn't say which ("Main Library" alone left Kampar students guessing).
+ */
+export const CAMPUS_LABEL_RULE = `
+CAMPUS RULE: UTAR has two campuses, Kampar and Sungai Long.
+- When the answer is about a place, facility, office, opening hours, contact or service and the user did not say which campus, give it for both campuses, labelled "Kampar" and "Sungai Long": one small table if the details are the same or similar, short separate sections if they differ.
+- Always say which campus a named place is on, e.g. "Main Library (Kampar)".
+- Never present one campus's detail as if it applies to all of UTAR. If you only have one campus's detail, say which campus it is for.
+`;

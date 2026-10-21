@@ -13,7 +13,9 @@ import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
 import { trySmallTalkReply, tryGreetingReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { tryBusScheduleReply } from "@/lib/busSchedule";
-import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
+import { BOTH_CAMPUSES_RULE, CAMPUS_LABEL_RULE, campusFamily } from "@/lib/campusOffices";
+import { formatLiveEvidence, isInternshipQuestion, livePagesFor } from "@/lib/livePages";
+import { malaysiaDay } from "@/lib/abuse/checks";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
 import { kbAnswerHasGap, isWeakWebAnswer } from "@/lib/answerGaps";
@@ -1923,6 +1925,9 @@ ${selectedAgent.label}
 Important:
 - Search for current Universiti Tunku Abdul Rahman (UTAR) information.
 - Avoid other universities.
+- OFFICIAL SOURCES ONLY: state facts and figures (fees, dates, names, requirements) only from UTAR's own websites (utar.edu.my and its subdomains). Never quote numbers from education portals, agents, forums or news aggregators, even if they mention UTAR.
+- Answer only for the programme, office or campus asked about; never mix in figures for a different programme.
+- If the official figure cannot be found, say so plainly and point to the official UTAR page instead of guessing.
 - For leadership/position queries, perform targeted search across UTAR portals (utar.edu.my, rgo.utar.edu.my, news.utar.edu.my, staff directory) to verify current active post-holders and list all active Vice Presidents across all portfolios.
 - For complaint/misconduct questions, give practical safe guidance even if exact policy text is unavailable.
 - For profile/contact questions, provide role, background, contact, office, and official profile link if available.
@@ -3240,9 +3245,40 @@ async function handleChat(
         const answerRules =
             correctionInstruction +
             (calendarQuestion ? buildCalendarFormatInstruction() : "") +
-            (bothCampuses ? BOTH_CAMPUSES_RULE : "") +
+            (bothCampuses ? BOTH_CAMPUSES_RULE : CAMPUS_LABEL_RULE) +
             FOLLOW_UPS_RULE +
             chosenLanguageRule;
+
+        // Industrial training is arranged per faculty (own coordinators; LKC FES
+        // has its own page). Without a faculty, ask for it instead of answering
+        // with a generic central-office reply.
+        const isFaculty = (id?: string) => Boolean(id) && getOrgUnitById(id).type === "faculty";
+        if (
+            isInternshipQuestion(rawMessage) &&
+            !isFaculty(selectedAgent.id) &&
+            !isFaculty(previousAgent.id) &&
+            !(hasSecondary && isFaculty(secondaryAgent!.id))
+        ) {
+            const ask =
+                body?.language === "ms"
+                    ? "Latihan industri diuruskan oleh setiap fakulti. Anda dari fakulti atau program apa? (contoh: FICT, LKC FES, FAM)"
+                    : body?.language === "zh"
+                        ? "工业实习由各学院安排。你是哪个学院或课程的学生？（例如 FICT、LKC FES、FAM）"
+                        : "Industrial training is arranged by each faculty. Which faculty or programme are you in? (e.g. FICT, LKC FES, FAM)";
+            return NextResponse.json({
+                text: ask,
+                citations: [],
+                sourceMode: "none",
+                storeDisplayName: "",
+                selectedAgentId: selectedAgent.id,
+                selectedAgentLabel: selectedAgent.label,
+                needsClarification: true,
+                pendingQuestion: rawMessage,
+                lastResolvedTopic,
+                contextSummary: updatedContextSummary,
+                routeType: routerResult.routeType,
+            });
+        }
 
         const profileMode = isProfileQuestion(effectiveMessage);
         const sensitiveMode =
@@ -3452,12 +3488,27 @@ LANGUAGE RULE:
             calendarQuestion && selectedAgent.id === "dace" && pageUrls.length === 0
                 ? await fetchOfficialUtarPageCached(DACE_INTAKE_CALENDAR_URL)
                 : null;
+        // Pages read live because their content changes or the KB only half
+        // covers it (library hours, postgraduate fees, industrial training).
+        const liveDefs = pageUrls.length === 0 ? livePagesFor(`${rawMessage}\n${effectiveMessage}`) : [];
+        const livePages = (
+            await Promise.all(
+                liveDefs.flatMap((page) =>
+                    page.urls.map(async (url) => {
+                        const fetched = await fetchOfficialUtarPageCached(url).catch(() => null);
+                        return fetched?.kind === "html" ? { page, title: fetched.title, url: fetched.url, text: fetched.text } : null;
+                    })
+                )
+            )
+        ).filter((p): p is NonNullable<typeof p> => p !== null);
+        if (liveDefs.length > 0) console.warn(`[livePages] ${liveDefs.map((p) => p.id).join(", ")}: ${livePages.length} page(s) read`);
+
         // In the system instruction, not the user turn: page text in the user
         // turn made Gemini write fake tool_code / "thought" text into the answer.
         const officialPageEvidence =
-            calendarPage?.kind === "html"
+            (calendarPage?.kind === "html"
                 ? `\nOFFICIAL UTAR PAGE (evidence you may use alongside File Search; authoritative over documents):\n${calendarPage.title}\nURL: ${calendarPage.url}\n<<<PAGE\n${calendarPage.text}\nPAGE>>>\n`
-                : "";
+                : "") + formatLiveEvidence(livePages, malaysiaDay());
 
         const buildFileSearchReq = (storeList: string[], instruction: string) => ({
             model: MODEL_NAME,
