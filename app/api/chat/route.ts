@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { metricsStore, newMetrics, markPipelineError } from "@/lib/analytics/metrics";
-import { logChatEvent } from "@/lib/analytics/logEvent";
+import { metricsStore, newMetrics, markPipelineError, markTimeout, isTimeoutError, geminiErrorInfo, type RequestMetrics } from "@/lib/analytics/metrics";
+import { finishChatEvent, logBlockedEvent, startChatEvent } from "@/lib/analytics/logEvent";
+import { abuseLimits, maintenanceOn } from "@/lib/abuse/config";
+import { clientIp, hashIp, runGuards } from "@/lib/abuse/guard";
+import { getAbuseStore } from "@/lib/abuse/store";
+import { refusalPayload, unavailableText } from "@/lib/abuse/replies";
+import { sendAlert } from "@/lib/abuse/alert";
+import type { BlockReason } from "@/lib/abuse/checks";
 import { ai, MODEL_NAME } from "@/lib/gemini";
 import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
-import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
+import { trySmallTalkReply, tryGreetingReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { tryBusScheduleReply } from "@/lib/busSchedule";
 import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
@@ -1181,7 +1187,14 @@ function tryHandleOffTopic(message: string): string | null {
         !isLikelyUtarQuestion(message) &&
         signals.some((signal) => lower.includes(normalize(signal)))
     ) {
-        return `
+        return OFF_TOPIC_REPLY;
+    }
+
+    return null;
+}
+
+// Fixed reply for off-topic messages: costs no Gemini call (abuse protection).
+const OFF_TOPIC_REPLY = `
 I’m mainly here to help with UTAR-related questions. 😊
 
 ### 📌 I can help with
@@ -1194,10 +1207,6 @@ I’m mainly here to help with UTAR-related questions. 😊
 
 Ask me something UTAR-related and I’ll help route it properly.
 `.trim();
-    }
-
-    return null;
-}
 
 function tryHandleEmotionalCasualSupport(message: string): string | null {
     const lower = normalize(message);
@@ -2443,7 +2452,8 @@ Return ONLY valid JSON:
 
         return validateContextResolverResult(parsed, latestMessage);
     } catch (error) {
-        console.error("Context resolver error:", error);
+        const apiError = geminiErrorInfo(error);
+        console.error("Context resolver error:", apiError ? `Gemini ${apiError.status} ${apiError.message}` : error);
 
         return {
             relation: "new_standalone_question",
@@ -2794,6 +2804,25 @@ async function executeFileSearchAttempt(params: {
     }
 }
 
+/**
+ * If Gemini refused for a reason that lasts (no credit, quota, key), the
+ * fallbacks that caught the error wrote a misleading answer ("trouble checking
+ * official sources"). Replace it with a plain "temporarily unavailable".
+ */
+function finalizePayload(payload: any, metrics: RequestMetrics, language: unknown) {
+    if (!metrics.providerError) return payload;
+    metrics.pipelineError = true;
+    return {
+        ...(payload || {}),
+        text: unavailableText(language),
+        citations: [],
+        sourceMode: "none",
+        followUps: [],
+        needsClarification: false,
+        pendingQuestion: null,
+    };
+}
+
 /** Moves Gemini's "FOLLOW-UPS:" line out of the answer into followUps (chips on the chat page). */
 function withFollowUps(payload: any) {
     if (!payload || typeof payload.text !== "string") return payload;
@@ -2801,28 +2830,100 @@ function withFollowUps(payload: any) {
     return { ...payload, text, followUps };
 }
 
-export async function POST(req: NextRequest) {
-    let body: any;
+const NDJSON_HEADERS = {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "X-Accel-Buffering": "no",
+};
 
-    try {
-        body = await req.json();
-    } catch (err) {
-        // Preserve the previous behaviour: an unparseable body produced the friendly
-        // error payload from the catch-all, not a pipeline run on an empty message.
-        return handleChat(null, null, err);
+/**
+ * A refusal as one NDJSON "done" frame. The streaming chat page reads it like
+ * any answer, and a non-streaming caller can still res.json() it.
+ */
+function refusalResponse(payload: Record<string, unknown>) {
+    const res = new Response(JSON.stringify({ type: "done", ...payload }) + "\n", { status: 200, headers: NDJSON_HEADERS });
+    if (process.env.NODE_ENV !== "production") {
+        res.headers.set("x-chat-metrics", JSON.stringify({ ...newMetrics(), latencyMs: 0, blocked: payload.blocked }));
     }
+    return res;
+}
 
-    // Usage analytics: count Gemini calls/tokens for this request and log one row
-    // after the response has been sent (see lib/analytics). Logging never blocks
-    // or breaks the chat.
-    const metrics = newMetrics();
+/** The body as text, or null once it passes maxBytes (stops reading there). */
+async function readBodyCapped(req: NextRequest, maxBytes: number): Promise<string | null> {
+    if (!req.body) return "";
+    const reader = req.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxBytes) {
+            await reader.cancel().catch(() => {});
+            return null;
+        }
+        chunks.push(value);
+    }
+    return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+export async function POST(req: NextRequest) {
     const startedAt = Date.now();
+    const limits = abuseLimits();
+    const ipHash = hashIp(clientIp(req.headers));
+
+    // Every refusal is logged (status "blocked:<reason>") and costs no Gemini call.
+    const refuse = (reason: BlockReason, opts: { body?: any; detail?: string; rawChars?: number } = {}) => {
+        const latencyMs = Date.now() - startedAt;
+        after(() => logBlockedEvent({ body: opts.body ?? null, ipHash, reason, detail: opts.detail, rawChars: opts.rawChars, latencyMs }));
+        return refusalResponse(refusalPayload(reason, opts.body?.language, limits.maxMessageChars));
+    };
+
+    // Maintenance mode (CHAT_MAINTENANCE=on): the incident runbook's off switch.
+    if (maintenanceOn()) return refuse("maintenance");
+
+    // Layer 2, raw size: refuse oversized bodies before reading or parsing them.
+    const declaredBytes = Number(req.headers.get("content-length") || 0);
+    if (declaredBytes > limits.maxBodyBytes) {
+        return refuse("body_too_large", { detail: `${declaredBytes} bytes`, rawChars: declaredBytes });
+    }
+    const rawBody = await readBodyCapped(req, limits.maxBodyBytes);
+    if (rawBody === null) return refuse("body_too_large", { detail: `over ${limits.maxBodyBytes} bytes` });
+
+    let parsed: any;
+    try {
+        parsed = JSON.parse(rawBody);
+    } catch {
+        return refuse("bad_request", { detail: "invalid JSON" });
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return refuse("bad_request", { detail: "not an object" });
+
+    // Layers 2-5: message size, junk, repeats, manual blocks, rate limits, daily budget.
+    const store = getAbuseStore();
+    const guard = await runGuards({ body: parsed, ipHash, store, limits });
+    if (guard.alerts.length > 0) {
+        after(() => Promise.all(guard.alerts.map((a) => sendAlert(a.subject, a.text, { escalate: a.escalate }))));
+    }
+    if (!guard.ok) return refuse(guard.reason, { body: parsed, detail: guard.detail });
+
+    // Only now can the request cost money. Log it as "started" first, so a
+    // request the platform kills still leaves a row behind.
+    const body = guard.body;
+    const eventId = await startChatEvent({ body, ipHash });
+    const metrics = newMetrics();
+    const finish = async (payload: any, latencyMs: number, streamFailed: boolean) => {
+        await finishChatEvent({ id: eventId, body, ipHash, payload, metrics, latencyMs, streamFailed });
+        // Remember the answered message for the repeat check (failed ones may be retried).
+        if (!streamFailed && !metrics.pipelineError && store) {
+            await store.rememberMessage(guard.clientKey, guard.fingerprint).catch(() => {});
+        }
+    };
 
     if (body?.stream !== true) {
         const raw = await metricsStore.run(metrics, () => handleChat(body));
         const latencyMs = Date.now() - startedAt;
-        const payload = withFollowUps(await raw.json().catch(() => null));
-        after(() => logChatEvent({ body, payload, metrics, latencyMs }));
+        const payload = finalizePayload(withFollowUps(await raw.json().catch(() => null)), metrics, body?.language);
+        after(() => finish(payload, latencyMs, false));
         const res = NextResponse.json(payload, { status: raw.status });
         // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
         // Gemini cost of a test run. Vercel builds run with NODE_ENV=production.
@@ -2838,7 +2939,7 @@ export async function POST(req: NextRequest) {
     });
     after(async () => {
         const result = await logResult;
-        await logChatEvent({ body, metrics, ...result });
+        await finish(result.payload, result.latencyMs, result.streamFailed);
     });
 
     const stream = new ReadableStream<Uint8Array>({
@@ -2848,7 +2949,8 @@ export async function POST(req: NextRequest) {
             let streamFailed = false;
             try {
                 const res = await metricsStore.run(metrics, () => handleChat(body, sink));
-                payload = withFollowUps(await res.json());
+                payload = finalizePayload(withFollowUps(await res.json()), metrics, body?.language);
+                if (metrics.providerError) sink.reset();
                 sink.done(payload);
             } catch (err: any) {
                 streamFailed = true;
@@ -2861,13 +2963,7 @@ export async function POST(req: NextRequest) {
         },
     });
 
-    return new Response(stream, {
-        headers: {
-            "Content-Type": "application/x-ndjson; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            "X-Accel-Buffering": "no",
-        },
-    });
+    return new Response(stream, { headers: NDJSON_HEADERS });
 }
 
 async function handleChat(
@@ -2921,6 +3017,7 @@ async function handleChat(
 
         const directPreReplies = [
             tryHandleVulgarity(rawMessage),
+            tryGreetingReply(rawMessage, body?.language),
             trySmallTalkReply(rawMessage),
             tryHandlePlayfulStudentChat(rawMessage),
             tryHandleEmotionalCasualSupport(rawMessage),
@@ -3045,7 +3142,11 @@ async function handleChat(
         }
 
         if (!routerResult.needsClarification && modelSaysNoRetrieval && !retrievalForcedBySafetyNet) {
-            const directText = await generateDirectNoRetrievalResponse(rawMessage, history, chosenLanguageRule);
+            // Off-topic messages get a fixed reply instead of a second Gemini call.
+            const offTopic = String((routerResult as any).intentCategory || "") === "casual_or_offtopic";
+            const directText = offTopic
+                ? OFF_TOPIC_REPLY
+                : await generateDirectNoRetrievalResponse(rawMessage, history, chosenLanguageRule);
 
             return NextResponse.json({
                 text: directText,
@@ -3564,13 +3665,17 @@ LANGUAGE RULE:
             routeType: routerResult.routeType,
         });
     } catch (error: any) {
-        console.error("Chat Error:", error);
+        const apiError = geminiErrorInfo(error);
+        console.error("Chat Error:", apiError ? `Gemini ${apiError.status} ${apiError.message}` : error);
         markPipelineError();
+        if (isTimeoutError(error)) markTimeout();
 
         const agent = getAgentById(fallbackAgentId || "general");
 
         return NextResponse.json({
-            text: `
+            text: apiError
+                ? unavailableText(body?.language)
+                : `
 I hit a temporary issue while processing that. 🔧
 
 Please try again in a moment. If it keeps happening, try asking the question in a slightly more specific way, such as including the faculty, department, or programme.

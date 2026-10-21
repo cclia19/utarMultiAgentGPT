@@ -21,9 +21,14 @@ export async function GET(req: NextRequest) {
                       WHERE question_masked IS NOT NULL AND created_at < now() - ${RETENTION}::interval`;
         }
 
-        const where = sql`env = ${env}
+        const inRange = sql`env = ${env}
             AND created_at >= (${from}::date::timestamp AT TIME ZONE ${TIMEZONE})
             AND created_at < ((${to}::date + 1)::timestamp AT TIME ZONE ${TIMEZONE})`;
+        // Requests refused by the abuse checks are counted separately, not as questions.
+        const where = sql`${inRange} AND status NOT LIKE 'blocked:%'`;
+
+        const [{ blocked }] = await sql`
+            SELECT count(*)::int AS blocked FROM chat_events WHERE ${inRange} AND status LIKE 'blocked:%'`;
 
         const [totals] = await sql`
             SELECT
@@ -33,7 +38,10 @@ export async function GET(req: NextRequest) {
                 count(*) FILTER (WHERE source_mode = 'webFallback')::int AS web,
                 count(*) FILTER (WHERE source_mode = 'staffDirectory')::int AS directory,
                 count(*) FILTER (WHERE source_mode = 'none' OR source_mode IS NULL)::int AS direct,
-                count(*) FILTER (WHERE status = 'error')::int AS errors,
+                count(*) FILTER (
+                    WHERE status IN ('error', 'failed', 'timeout')
+                       OR (status = 'started' AND created_at < now() - interval '2 minutes')
+                )::int AS errors,
                 count(*) FILTER (WHERE is_follow_up)::int AS follow_ups,
                 count(*) FILTER (WHERE needs_clarification)::int AS clarifications,
                 coalesce(round(percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms)), 0)::int AS p50_ms,
@@ -69,6 +77,7 @@ export async function GET(req: NextRequest) {
             range: { from, to, env, timezone: TIMEZONE },
             totals: {
                 ...totals,
+                blocked,
                 input_tokens: Number(totals.input_tokens),
                 output_tokens: Number(totals.output_tokens),
             },

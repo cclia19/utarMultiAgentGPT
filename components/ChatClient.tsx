@@ -14,6 +14,14 @@ const LANG_KEY = "utarchat_lang";
 
 // Anonymous per-browser ID for usage stats (no login). Random, holds no personal data.
 const SESSION_KEY = "utarchat_anon_id";
+
+// Kept in step with the server's abuse limits (lib/abuse/config.ts). The server
+// enforces them; these only stop a normal long chat from being refused.
+const MAX_MESSAGE_CHARS = 1000;
+const HISTORY_TURNS = 6;
+const HISTORY_CHARS = 6000;
+// The server refuses bodies over 16 KB; Chinese text is 3 bytes a character.
+const HISTORY_BYTES = 9000;
 function getAnonymousSessionId(): string {
     try {
         let id = localStorage.getItem(SESSION_KEY);
@@ -269,13 +277,22 @@ export default function ChatClient() {
         el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
     }, [input]);
 
-    const buildHistory = (msgs: Message[]): HistoryEntry[] =>
-        msgs
-            .filter((m) => m !== WELCOME)
-            .map((m) => ({
-                role: m.role,
-                parts: [{ text: m.text }],
-            }));
+    /** The last few messages, newest first in priority, within the size the server accepts. */
+    const buildHistory = (msgs: Message[]): HistoryEntry[] => {
+        const encoder = new TextEncoder();
+        const recent = msgs.filter((m) => m !== WELCOME).slice(-HISTORY_TURNS);
+        const out: HistoryEntry[] = [];
+        let chars = HISTORY_CHARS;
+        let bytes = HISTORY_BYTES;
+        for (let i = recent.length - 1; i >= 0 && chars > 0 && bytes > 0; i--) {
+            let text = recent[i].text.slice(0, chars);
+            while (text && encoder.encode(text).length > bytes) text = text.slice(0, Math.floor(text.length * 0.8));
+            chars -= text.length;
+            bytes -= encoder.encode(text).length;
+            out.unshift({ role: recent[i].role, parts: [{ text }] });
+        }
+        return out;
+    };
 
     const handleSend = async (override?: string) => {
         const trimmed = (override ?? input).trim();
@@ -777,6 +794,7 @@ export default function ChatClient() {
                             className="max-h-[140px] min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-base leading-6 text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:text-[15px]"
                             placeholder={t.placeholder}
                             value={input}
+                            maxLength={MAX_MESSAGE_CHARS}
                             onChange={(e) => setInput(e.target.value)}
                             onFocus={() => setTimeout(() => scrollToBottom(false), 250)}
                             onKeyDown={(e) => {
@@ -797,7 +815,13 @@ export default function ChatClient() {
                             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" strokeWidth={2.5} />}
                         </motion.button>
                     </form>
-                    <p className="mt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">{t.footer}</p>
+                    {input.length > MAX_MESSAGE_CHARS * 0.8 ? (
+                        <p className={`mt-2 text-center text-[11px] font-medium ${input.length >= MAX_MESSAGE_CHARS ? "text-rose-500" : "text-zinc-500 dark:text-zinc-400"}`} aria-live="polite">
+                            {input.length.toLocaleString("en")} / {MAX_MESSAGE_CHARS.toLocaleString("en")}
+                        </p>
+                    ) : (
+                        <p className="mt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">{t.footer}</p>
+                    )}
                 </div>
             </footer>
 
