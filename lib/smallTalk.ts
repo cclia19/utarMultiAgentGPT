@@ -172,3 +172,84 @@ export function trySmallTalkReply(message: string): string | null {
     if (INTRO.test(text)) return INTRO_REPLY;
     return null;
 }
+
+// ---------------------------------------------------------------------------
+// 4. Plain greetings, thanks and goodbyes: a fixed reply, no Gemini call and
+//    never a web search. Only when the whole message is the greeting, so
+//    "hi, when is the exam?" still reaches the pipeline.
+// ---------------------------------------------------------------------------
+
+type GreetingKind = "hello" | "morning" | "afternoon" | "evening" | "night" | "thanks" | "bye" | "ok";
+type Lang = "en" | "ms" | "zh";
+
+const GREETING_TAIL = "(\\s+(there|all|everyone|utarchat|utargpt|bot|ai|buddy|bro|sis|friend|ah|lah|la|leh))*";
+const GREETINGS: [GreetingKind, RegExp][] = [
+    ["morning", new RegExp(`^(good\\s*morning|morning|gm|selamat\\s+pagi|pagi)${GREETING_TAIL}$`)],
+    ["afternoon", new RegExp(`^(good\\s*afternoon|afternoon|selamat\\s+(petang|tengah\\s*hari))${GREETING_TAIL}$`)],
+    ["evening", new RegExp(`^(good\\s*evening|evening|selamat\\s+malam)${GREETING_TAIL}$`)],
+    ["night", new RegExp(`^(good\\s*night|gn|nite|night)${GREETING_TAIL}$`)],
+    ["hello", new RegExp(`^(hi+|hello+|hey+|helo+|hai+|hiya|yo+|howdy|greetings|sup|wassup|whats up|how are you|how r u|hi how are you|apa khabar|hai apa khabar)${GREETING_TAIL}$`)],
+    ["thanks", new RegExp(`^((thank\\s*(you|u)|thanks|thx|tq|ty|tqvm|terima\\s+kasih|tq\\s+so\\s+much|thanks\\s+a\\s+lot)(\\s+(so|very)\\s+much)?)${GREETING_TAIL}$`)],
+    ["bye", new RegExp(`^(bye+|bye bye|goodbye|see\\s+(you|ya|u)|cya|ttyl|jumpa\\s+lagi|selamat\\s+tinggal)${GREETING_TAIL}$`)],
+    ["ok", new RegExp(`^(ok+|okay|okie|k|noted|got\\s+it|alright|cool|nice|great|awesome|baik|faham)${GREETING_TAIL}$`)],
+];
+const GREETINGS_CJK: [GreetingKind, RegExp][] = [
+    ["morning", /^(早安|早上好|早)[!！~～。.]*$/],
+    ["afternoon", /^(午安|下午好)[!！~～。.]*$/],
+    ["evening", /^(晚上好)[!！~～。.]*$/],
+    ["night", /^(晚安)[!！~～。.]*$/],
+    ["hello", /^(你好|您好|哈喽|哈囉|嗨|你好吗)[!！~～。.呀啊]*$/],
+    ["thanks", /^(谢谢|謝謝|多谢|多謝|感谢|感謝|谢谢你|謝謝你)[!！~～。.啦]*$/],
+    ["bye", /^(再见|再見|拜拜|下次见)[!！~～。.]*$/],
+    ["ok", /^(好的|好|明白|知道了|收到)[!！~～。.]*$/],
+];
+
+const GREETING_REPLIES: Record<Lang, Record<GreetingKind, string>> = {
+    en: {
+        hello: "Hi! 👋 What would you like to know about UTAR? I can help with courses, fees, exams, buses and campus services.",
+        morning: "Good morning! ☀️ What can I help you with today?",
+        afternoon: "Good afternoon! 🌤️ What would you like to know about UTAR?",
+        evening: "Good evening! 🌙 What can I help you with?",
+        night: "Good night! 🌙 Come back anytime you have a UTAR question.",
+        thanks: "You're welcome! 😊 Anything else I can help with?",
+        bye: "Bye! 👋 Come back anytime.",
+        ok: "👍 Anything else you'd like to know?",
+    },
+    ms: {
+        hello: "Hai! 👋 Apa yang anda ingin tahu tentang UTAR? Saya boleh bantu soal kursus, yuran, peperiksaan, bas dan perkhidmatan kampus.",
+        morning: "Selamat pagi! ☀️ Apa yang boleh saya bantu hari ini?",
+        afternoon: "Selamat petang! 🌤️ Apa yang anda ingin tahu tentang UTAR?",
+        evening: "Selamat malam! 🌙 Apa yang boleh saya bantu?",
+        night: "Selamat malam! 🌙 Datang lagi bila ada soalan tentang UTAR.",
+        thanks: "Sama-sama! 😊 Ada apa-apa lagi yang boleh saya bantu?",
+        bye: "Jumpa lagi! 👋",
+        ok: "👍 Ada apa-apa lagi yang anda ingin tahu?",
+    },
+    zh: {
+        hello: "你好！👋 想了解 UTAR 的什么？课程、学费、考试、巴士和校园服务我都可以帮你。",
+        morning: "早上好！☀️ 今天有什么可以帮你？",
+        afternoon: "下午好！🌤️ 想了解 UTAR 的什么？",
+        evening: "晚上好！🌙 有什么可以帮你？",
+        night: "晚安！🌙 有 UTAR 的问题随时回来问我。",
+        thanks: "不客气！😊 还有什么可以帮你？",
+        bye: "拜拜！👋 随时回来。",
+        ok: "👍 还有什么想了解的吗？",
+    },
+};
+
+export function greetingKind(message: string): GreetingKind | null {
+    const raw = String(message || "").trim();
+    if (!raw || raw.length > 40) return null;
+    for (const [kind, pattern] of GREETINGS_CJK) if (pattern.test(raw)) return kind;
+    const text = normalize(raw);
+    for (const [kind, pattern] of GREETINGS) if (pattern.test(text)) return kind;
+    return null;
+}
+
+/** Fixed reply for a plain greeting / thanks / goodbye, in the language picked on the chat page. */
+export function tryGreetingReply(message: string, language?: unknown): string | null {
+    const kind = greetingKind(message);
+    if (!kind) return null;
+    const lang: Lang = language === "ms" || language === "zh" ? language : "en";
+    return GREETING_REPLIES[lang][kind];
+}

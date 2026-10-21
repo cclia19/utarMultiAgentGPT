@@ -1,4 +1,5 @@
 import { ai, MODEL_NAME } from "./gemini";
+import { geminiErrorInfo } from "./analytics/metrics";
 import {
     getChatEnabledOrgUnits,
     getOrgUnitById,
@@ -730,6 +731,14 @@ JSON schema:
             acronymPrimaryAgentId,
         });
     } catch (error) {
+        // A Gemini API failure (no credit, quota, key, outage) must not be
+        // disguised as a web-search question: let the chat route reply
+        // "temporarily unavailable". Only a malformed router reply falls back.
+        const apiError = geminiErrorInfo(error);
+        if (apiError) {
+            console.error(`Semantic Router Error: Gemini ${apiError.status} ${apiError.message}`);
+            throw error;
+        }
         console.error("Semantic Router Error:", error);
 
         return fallbackRoute({

@@ -59,6 +59,7 @@ export function ensureSchema(sql: Sql): Promise<void> {
             await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS ip_hash TEXT`;
             await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS block_reason TEXT`;
             await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`;
+            await sql`ALTER TABLE chat_events ADD COLUMN IF NOT EXISTS error_detail TEXT`;
             await sql`CREATE INDEX IF NOT EXISTS chat_events_created_idx ON chat_events (created_at)`;
         })().catch((err) => {
             schemaReady = null; // retry on the next request

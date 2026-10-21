@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { trySmallTalkReply, isCreatorQuestion, isLecturerRankingQuestion, AVO_DADDY_REPLY } = await import("./smallTalk.ts");
+const { trySmallTalkReply, isCreatorQuestion, isLecturerRankingQuestion, AVO_DADDY_REPLY, tryGreetingReply, greetingKind } = await import("./smallTalk.ts");
 
 test("creator questions reach the Avo easter egg, however they are phrased", () => {
     for (const q of [
@@ -76,5 +76,32 @@ test("real UTAR questions still go through the pipeline", () => {
         "who is the most handsome lecturer",
     ]) {
         assert.equal(trySmallTalkReply(q), null, q);
+    }
+});
+
+test("plain greetings, thanks and goodbyes get a fixed reply in the chosen language", () => {
+    for (const [msg, kind] of [
+        ["good morning", "morning"], ["Good Morning!", "morning"], ["morning utarchat", "morning"], ["selamat pagi", "morning"], ["早上好", "morning"],
+        ["hi", "hello"], ["Hello there", "hello"], ["hey!", "hello"], ["你好", "hello"], ["apa khabar", "hello"],
+        ["thanks", "thanks"], ["thank you so much", "thanks"], ["tq", "thanks"], ["terima kasih", "thanks"], ["谢谢", "thanks"],
+        ["bye", "bye"], ["see you", "bye"], ["ok", "ok"], ["noted", "ok"], ["good night", "night"],
+    ] as const) {
+        assert.equal(greetingKind(msg), kind, msg);
+    }
+    assert.match(tryGreetingReply("good morning", "en") ?? "", /^Good morning/);
+    assert.match(tryGreetingReply("good morning", "ms") ?? "", /^Selamat pagi/);
+    assert.match(tryGreetingReply("good morning", "zh") ?? "", /^早上好/);
+});
+
+test("a greeting with a real question still goes to the pipeline", () => {
+    for (const msg of [
+        "hi, when is the exam?",
+        "good morning, how much is the CS fee",
+        "thanks, and where is block N?",
+        "ok so when does the trimester start",
+        "Hello, I want to ask about scholarships",
+        "你好，请问学费多少？",
+    ]) {
+        assert.equal(tryGreetingReply(msg, "en"), null, msg);
     }
 });

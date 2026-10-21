@@ -66,6 +66,9 @@ export async function finishChatEvent(params: {
     // A timed-out call that a later fallback recovered from still counts as answered.
     const failed = Boolean(streamFailed || metrics.pipelineError);
     const status: ChatStatus = failed ? (metrics.timedOut ? "timeout" : "failed") : "answered";
+    // Why it failed, e.g. "402: Your prepayment credits are depleted…", shown on the dashboard.
+    const err = metrics.providerError || metrics.lastError;
+    const errorDetail = failed && err ? `${err.status}: ${err.message}`.slice(0, 200) : null;
     try {
         const sql = getSql();
         if (!sql) return;
@@ -84,6 +87,7 @@ export async function finishChatEvent(params: {
                     web_search_calls = ${metrics.webSearchCalls},
                     input_tokens = ${metrics.inputTokens},
                     output_tokens = ${metrics.outputTokens},
+                    error_detail = ${errorDetail},
                     finished_at = now()
                 WHERE id = ${id}`;
             return;
@@ -95,7 +99,7 @@ export async function finishChatEvent(params: {
                 env, session_id, turn_index, is_follow_up, agent_id, agent_label,
                 source_mode, route_type, needs_clarification, status, latency_ms,
                 gemini_calls, web_search_calls, input_tokens, output_tokens,
-                question_chars, question_masked, ip_hash, finished_at
+                question_chars, question_masked, ip_hash, error_detail, finished_at
             ) VALUES (
                 ${currentEnv()}, ${sessionId}, ${turnIndex}, ${turnIndex > 1},
                 ${payload?.selectedAgentId ?? null}, ${payload?.selectedAgentLabel ?? null},
@@ -103,7 +107,7 @@ export async function finishChatEvent(params: {
                 ${Boolean(payload?.needsClarification)}, ${status}, ${Math.round(latencyMs)},
                 ${metrics.geminiCalls}, ${metrics.webSearchCalls},
                 ${metrics.inputTokens}, ${metrics.outputTokens},
-                ${message.length}, ${maskPersonalData(message)}, ${ipHash}, now()
+                ${message.length}, ${maskPersonalData(message)}, ${ipHash}, ${errorDetail}, now()
             )`;
     } catch (err) {
         console.warn("[analytics] failed to finish chat event:", (err as any)?.message || err);

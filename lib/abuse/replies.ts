@@ -75,3 +75,10 @@ export function refusalPayload(reason: BlockReason, language: unknown, maxChars:
         blocked: reason,
     };
 }
+
+/** When Gemini itself is unavailable (no credit, quota, key or outage): say so plainly, never blame the sources. */
+export function unavailableText(language: unknown): string {
+    if (language === "ms") return "UTARCHAT tidak dapat menjawab buat sementara waktu. Sila cuba lagi dalam beberapa minit. 🔧";
+    if (language === "zh") return "UTARCHAT 暂时无法回答。请几分钟后再试。🔧";
+    return "UTARCHAT is temporarily unavailable. Please try again in a few minutes. 🔧";
+}

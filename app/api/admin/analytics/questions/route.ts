@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         const [{ total }] = await sql`SELECT count(*)::int AS total FROM chat_events WHERE ${where}`;
         const rows = await sql`
             SELECT id::text, created_at, agent_label, source_mode, is_follow_up, status,
-                latency_ms, question_masked
+                latency_ms, question_masked, error_detail, block_reason
             FROM chat_events WHERE ${where}
             ORDER BY created_at DESC
             LIMIT ${PAGE_SIZE} OFFSET ${page * PAGE_SIZE}`;

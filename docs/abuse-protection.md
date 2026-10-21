@@ -72,3 +72,20 @@ INSERT INTO blocked_clients (ip_hash, reason, expires_at) VALUES ('<ip hash>', '
 - `pnpm test` runs the unit tests for every layer (`lib/abuse/abuse.test.ts`).
 - `node scripts/flood-test.mjs` runs against a local `pnpm dev`. It sends 50 long and 50 repeated messages and asserts zero Gemini calls and 99 refusals. The first copy of the repeated message is answered from bus data, at no cost. With `DATABASE_URL` set it also checks the rows in `chat_events`.
 - Local runs without Neon: start the dev server with `ABUSE_STORE=memory` (ignored in production builds); otherwise every request is refused (fail closed).
+
+## When Gemini itself fails
+
+If Gemini refuses for a reason that won't change within the request, the rest of that request makes no more Gemini calls. The reasons:
+
+- 401, or 400 "API key not valid": bad key;
+- 402: prepaid credit used up;
+- 403: key restricted or blocked;
+- 429: quota.
+
+The student sees "UTARCHAT is temporarily unavailable", not a misleading "trouble checking official sources".
+
+- A failed router call no longer falls back silently to web search.
+- The usage dashboard shows the row as **error** with the reason, e.g. `402: Your prepayment credits are depleted…` (column `error_detail`).
+- Plain greetings, thanks and goodbyes ("good morning", "terima kasih", "谢谢") get a fixed reply in the chosen language, with no Gemini call and no web search.
+
+`node scripts/smoke-chat.mjs [--base <preview url>]` asks four questions: a greeting, a KB question, a follow-up and a web question. It refuses to run against production.

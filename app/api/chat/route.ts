@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { metricsStore, newMetrics, markPipelineError, markTimeout, isTimeoutError } from "@/lib/analytics/metrics";
+import { metricsStore, newMetrics, markPipelineError, markTimeout, isTimeoutError, geminiErrorInfo, type RequestMetrics } from "@/lib/analytics/metrics";
 import { finishChatEvent, logBlockedEvent, startChatEvent } from "@/lib/analytics/logEvent";
 import { abuseLimits, maintenanceOn } from "@/lib/abuse/config";
 import { clientIp, hashIp, runGuards } from "@/lib/abuse/guard";
 import { getAbuseStore } from "@/lib/abuse/store";
-import { refusalPayload } from "@/lib/abuse/replies";
+import { refusalPayload, unavailableText } from "@/lib/abuse/replies";
 import { sendAlert } from "@/lib/abuse/alert";
 import type { BlockReason } from "@/lib/abuse/checks";
 import { ai, MODEL_NAME } from "@/lib/gemini";
 import { getAgentById } from "@/lib/agents";
 import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
-import { trySmallTalkReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
+import { trySmallTalkReply, tryGreetingReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { tryBusScheduleReply } from "@/lib/busSchedule";
 import { BOTH_CAMPUSES_RULE, campusFamily } from "@/lib/campusOffices";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
@@ -2452,7 +2452,8 @@ Return ONLY valid JSON:
 
         return validateContextResolverResult(parsed, latestMessage);
     } catch (error) {
-        console.error("Context resolver error:", error);
+        const apiError = geminiErrorInfo(error);
+        console.error("Context resolver error:", apiError ? `Gemini ${apiError.status} ${apiError.message}` : error);
 
         return {
             relation: "new_standalone_question",
@@ -2803,6 +2804,25 @@ async function executeFileSearchAttempt(params: {
     }
 }
 
+/**
+ * If Gemini refused for a reason that lasts (no credit, quota, key), the
+ * fallbacks that caught the error wrote a misleading answer ("trouble checking
+ * official sources"). Replace it with a plain "temporarily unavailable".
+ */
+function finalizePayload(payload: any, metrics: RequestMetrics, language: unknown) {
+    if (!metrics.providerError) return payload;
+    metrics.pipelineError = true;
+    return {
+        ...(payload || {}),
+        text: unavailableText(language),
+        citations: [],
+        sourceMode: "none",
+        followUps: [],
+        needsClarification: false,
+        pendingQuestion: null,
+    };
+}
+
 /** Moves Gemini's "FOLLOW-UPS:" line out of the answer into followUps (chips on the chat page). */
 function withFollowUps(payload: any) {
     if (!payload || typeof payload.text !== "string") return payload;
@@ -2902,7 +2922,7 @@ export async function POST(req: NextRequest) {
     if (body?.stream !== true) {
         const raw = await metricsStore.run(metrics, () => handleChat(body));
         const latencyMs = Date.now() - startedAt;
-        const payload = withFollowUps(await raw.json().catch(() => null));
+        const payload = finalizePayload(withFollowUps(await raw.json().catch(() => null)), metrics, body?.language);
         after(() => finish(payload, latencyMs, false));
         const res = NextResponse.json(payload, { status: raw.status });
         // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
@@ -2929,7 +2949,8 @@ export async function POST(req: NextRequest) {
             let streamFailed = false;
             try {
                 const res = await metricsStore.run(metrics, () => handleChat(body, sink));
-                payload = withFollowUps(await res.json());
+                payload = finalizePayload(withFollowUps(await res.json()), metrics, body?.language);
+                if (metrics.providerError) sink.reset();
                 sink.done(payload);
             } catch (err: any) {
                 streamFailed = true;
@@ -2996,6 +3017,7 @@ async function handleChat(
 
         const directPreReplies = [
             tryHandleVulgarity(rawMessage),
+            tryGreetingReply(rawMessage, body?.language),
             trySmallTalkReply(rawMessage),
             tryHandlePlayfulStudentChat(rawMessage),
             tryHandleEmotionalCasualSupport(rawMessage),
@@ -3643,14 +3665,17 @@ LANGUAGE RULE:
             routeType: routerResult.routeType,
         });
     } catch (error: any) {
-        console.error("Chat Error:", error);
+        const apiError = geminiErrorInfo(error);
+        console.error("Chat Error:", apiError ? `Gemini ${apiError.status} ${apiError.message}` : error);
         markPipelineError();
         if (isTimeoutError(error)) markTimeout();
 
         const agent = getAgentById(fallbackAgentId || "general");
 
         return NextResponse.json({
-            text: `
+            text: apiError
+                ? unavailableText(body?.language)
+                : `
 I hit a temporary issue while processing that. 🔧
 
 Please try again in a moment. If it keeps happening, try asking the question in a slightly more specific way, such as including the faculty, department, or programme.

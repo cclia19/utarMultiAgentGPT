@@ -3,6 +3,7 @@ import {
   recordGeminiCall,
   recordGeminiError,
   recordUsage,
+  throwIfProviderUnavailable,
 } from "./analytics/metrics.ts";
 import { withChatCallLimits } from "./abuse/callLimits.ts";
 
@@ -18,7 +19,10 @@ export const ai = new GoogleGenAI({
 const originalGenerateContent = ai.models.generateContent.bind(ai.models);
 const originalGenerateContentStream = ai.models.generateContentStream.bind(ai.models);
 
+// After a no-credit / quota / key error, the rest of the request fails at once
+// instead of making more calls that cannot succeed.
 ai.models.generateContent = (async (rawParams: any) => {
+  throwIfProviderUnavailable();
   const params = withChatCallLimits(rawParams);
   const m = recordGeminiCall(params);
   try {
@@ -32,6 +36,7 @@ ai.models.generateContent = (async (rawParams: any) => {
 }) as typeof ai.models.generateContent;
 
 ai.models.generateContentStream = (async (rawParams: any) => {
+  throwIfProviderUnavailable();
   const params = withChatCallLimits(rawParams);
   const m = recordGeminiCall(params);
   let stream: AsyncGenerator<any>;

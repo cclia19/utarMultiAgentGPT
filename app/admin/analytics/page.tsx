@@ -27,6 +27,7 @@ type Summary = {
 type QuestionRow = {
     id: string; created_at: string; agent_label: string | null; source_mode: string | null;
     is_follow_up: boolean; status: string; latency_ms: number | null; question_masked: string | null;
+    error_detail?: string | null; block_reason?: string | null;
 };
 
 const LAUNCH_DATE = "2026-08-04";
@@ -412,7 +413,17 @@ export default function AnalyticsPage() {
                                         <td className="py-2 pr-3 text-zinc-800">
                                             {r.question_masked ?? <span className="text-zinc-400">(text expired)</span>}
                                             {r.is_follow_up && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-500">follow-up</span>}
-                                            {r.status === "error" && <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">error</span>}
+                                            {(r.status === "error" || r.status === "failed" || r.status === "timeout") && (
+                                                <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600" title={r.error_detail || undefined}>
+                                                    {r.status === "timeout" ? "timed out" : "error"}
+                                                    {r.error_detail ? ` · ${r.error_detail.slice(0, 60)}` : ""}
+                                                </span>
+                                            )}
+                                            {r.status?.startsWith("blocked:") && (
+                                                <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700" title={r.block_reason || undefined}>
+                                                    blocked · {r.status.slice("blocked:".length).replace(/_/g, " ")}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="py-2 pr-3 text-xs text-zinc-600">{r.agent_label || "–"}</td>
                                         <td className="py-2 pr-3 text-xs">
