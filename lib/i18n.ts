@@ -89,7 +89,7 @@ export type Strings = {
 
 export const STRINGS: Record<Lang, Strings> = {
     en: {
-        tagline: "Ask me anything related to UTAR and your campus life",
+        tagline: "Ask me anything about UTAR",
         greetingTitle: "Hi 👋, I’m UTARCHAT",
         greetingBody: "Your UTAR buddy for courses, fees, exams, buses, offices and student life.",
         startersTitle: "Try asking",

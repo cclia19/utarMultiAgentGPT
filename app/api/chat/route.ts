@@ -20,6 +20,7 @@ import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
 import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, isMapsSearchLink } from "@/lib/answerGaps";
 import { isStudentLifeQuestion, CAMPUS_FOOD_FACTS } from "@/lib/studentLife";
+import { normalizeMapsLinks } from "@/lib/mapsLinks";
 import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
@@ -607,7 +608,7 @@ function finalCleanWebAnswer(
     allowedLinks: OfficialLink[]
 ): string {
     const cleaned = cleanUserFacingText(text);
-    const markdownSafe = sanitizeMarkdownLinksAgainstAllowed(cleaned, allowedLinks);
+    const markdownSafe = sanitizeMarkdownLinksAgainstAllowed(normalizeMapsLinks(cleaned), allowedLinks);
     const rawSafe = stripRawUnverifiedUrls(markdownSafe, allowedLinks);
 
     const base = removeEmptyOfficialLinksSection(rawSafe)
@@ -617,7 +618,7 @@ function finalCleanWebAnswer(
 }
 
 function finalClean(text: string): string {
-    const base = dropRepeatedAnswer(cleanUserFacingText(text)).replace(/\n{3,}/g, "\n\n").trim();
+    const base = normalizeMapsLinks(dropRepeatedAnswer(cleanUserFacingText(text))).replace(/\n{3,}/g, "\n\n").trim();
     return linkifyRawUrls(base);
 }
 

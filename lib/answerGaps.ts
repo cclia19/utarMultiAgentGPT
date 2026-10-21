@@ -50,7 +50,7 @@ export function kbAnswerHasGap(text: string): boolean {
 /** For every answer: solve the question; a document or map is extra, never the answer. */
 export const ANSWER_DIRECTLY_RULE = `
 ANSWER DIRECTLY: Solve the question with the details in your evidence (block, floor and room; steps; names and contacts; dates; amounts). Never answer only by telling the user to refer to a handbook section, website or document; you may mention one after the actual answer.
-PLACES: When the answer names a place on or near a UTAR campus (a block, lab, office, hall, cafe), add a Google Maps link in exactly this form, with + for spaces: [📍 Open in Google Maps](https://www.google.com/maps/search/?api=1&query=Place+Name+UTAR+Kampar+Campus). Use the campus the place is on.
+PLACES: When the answer names a place on or near a UTAR campus (a block, lab, office, hall, cafe), add a Google Maps link in exactly this form, with + for spaces and only the place name and campus in the query: [📍 Open in Maps](https://www.google.com/maps/search/?api=1&query=Place+Name+UTAR+Kampar+Campus). Use the campus the place is on.
 `;
 
 /** Google Maps search links are safe to keep in answers (a search, not an invented address). */
