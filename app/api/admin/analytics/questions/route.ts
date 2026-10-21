@@ -4,7 +4,7 @@ import { readRange, TIMEZONE } from "@/lib/analytics/query";
 
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 25;
-const SOURCES = new Set(["fileSearch", "webFallback", "staffDirectory", "none"]);
+const SOURCES = new Set(["fileSearch", "webFallback", "generalWeb", "staffDirectory", "none"]);
 
 export async function GET(req: NextRequest) {
     const guard = await dashboardGuard(req);

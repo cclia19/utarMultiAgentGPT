@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { admitsMissingAnswer, kbAnswerHasGap, isWeakWebAnswer } = await import("./answerGaps.ts");
+const { admitsMissingAnswer, kbAnswerHasGap, isWeakWebAnswer, onlyRedirects, isMapsSearchLink } = await import("./answerGaps.ts");
 
 test("the Master in Data Science fee answer (21 Oct 2026) is a gap worth a web search", () => {
     const answer =
@@ -45,4 +45,23 @@ test("the web fallback's own not-found replies are recognised", () => {
     assert.equal(isWeakWebAnswer("I couldn’t verify this from public UTAR information yet. 🔎"), true);
     assert.equal(isWeakWebAnswer("I’m having trouble checking official UTAR public sources right now. 🔎"), true);
     assert.equal(isWeakWebAnswer("The Master in Data Science fee is RM 38,000."), false);
+});
+
+test("a short answer that only points to a handbook is a gap (21 Oct 2026, FICT lab location)", () => {
+    const a = 'For specific locations within the campus, you may refer to the "Maps of Faculty" section in the UTAR FICT Handbook 2026, which includes ground and first-floor map layouts.';
+    assert.equal(onlyRedirects(a), true);
+    assert.equal(kbAnswerHasGap(a), true);
+    assert.equal(onlyRedirects("Please refer to the DSA website for the hostel application form."), true);
+});
+
+test("a real answer that also mentions a document is not a redirect", () => {
+    const a = "The Networking Lab is in Block N, Level 1, Room N101 (Kampar). " + "It has 40 workstations and opens 8 am to 6 pm on weekdays. ".repeat(8) + "You may refer to the FICT Handbook for the floor map.";
+    assert.equal(onlyRedirects(a), false);
+    assert.equal(onlyRedirects("The lab is in Block N, Room N101."), false);
+});
+
+test("only Google Maps search links are allowed through", () => {
+    assert.equal(isMapsSearchLink("https://www.google.com/maps/search/?api=1&query=Block+N+UTAR+Kampar+Campus"), true);
+    assert.equal(isMapsSearchLink("https://maps.google.com/?q=somewhere"), false);
+    assert.equal(isMapsSearchLink("https://evil.example.com/maps/search/?api=1&query=x"), false);
 });

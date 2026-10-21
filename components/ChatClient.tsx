@@ -48,7 +48,7 @@ interface Message {
     thought?: string;
     isStreaming?: boolean;
     citations?: string[];
-    sourceMode?: "fileSearch" | "webFallback" | "staffDirectory" | "officialSchedule" | "none";
+    sourceMode?: "fileSearch" | "webFallback" | "generalWeb" | "staffDirectory" | "officialSchedule" | "none";
     storeDisplayName?: string;
     selectedAgentId?: AgentId;
     selectedAgentLabel?: string;
@@ -758,7 +758,7 @@ export default function ChatClient() {
                                     Beta
                                 </span>
                             </div>
-                            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{t.tagline}</p>
+                            <p className="line-clamp-2 text-xs leading-snug text-zinc-500 dark:text-zinc-400">{t.tagline}</p>
                         </div>
                     </div>
 

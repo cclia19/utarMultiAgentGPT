@@ -18,7 +18,8 @@ import { formatLiveEvidence, isInternshipQuestion, livePagesFor } from "@/lib/li
 import { malaysiaDay } from "@/lib/abuse/checks";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
-import { kbAnswerHasGap, isWeakWebAnswer } from "@/lib/answerGaps";
+import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, isMapsSearchLink } from "@/lib/answerGaps";
+import { isStudentLifeQuestion, CAMPUS_FOOD_FACTS } from "@/lib/studentLife";
 import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
 import { routeWithLLM } from "@/lib/intentRouter";
 import {
@@ -504,7 +505,7 @@ function sanitizeMarkdownLinksAgainstAllowed(
         /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/gi,
         (match, label, url) => {
             const normalized = normalizeUrlForCompare(url);
-            return allowed.has(normalized) ? match : label;
+            return allowed.has(normalized) || isMapsSearchLink(url) ? match : label;
         }
     );
 }
@@ -521,7 +522,7 @@ function stripRawUnverifiedUrls(
         const cleaned = url.replace(/[.,;:!?]+$/, "");
         const normalized = normalizeUrlForCompare(cleaned);
 
-        return allowed.has(normalized) ? cleaned : "";
+        return allowed.has(normalized) || isMapsSearchLink(cleaned) ? cleaned : "";
     });
 }
 
@@ -1137,81 +1138,6 @@ Either way, welcome to the grind. We make it work. 💪
     return null;
 }
 
-function tryHandleFoodQuestion(message: string): string | null {
-    const lower = message.toLowerCase();
-
-    const signals = [
-        "i am hungry",
-        "im hungry",
-        "i m hungry",
-        "hungry",
-        "where to eat",
-        "what to eat",
-        "lunch",
-        "dinner",
-        "food",
-        "cafeteria",
-    ];
-
-    if (!signals.some((signal) => lower.includes(signal))) return null;
-
-    return `
-Hungry mode detected. 🍽️
-
-### 😋 Quick food ideas around Kampar campus
-
-- **Olive Places** — convenient if you are around the FICT side.
-- **Student Pavilion I (Block C)** — near the FICT area, with local food options.
-- **Student Pavilion II (Block K)** — another cafeteria option further inside campus.
-- **Heritage Hall (Block A)** — also has cafeteria-style food options.
-
-### 🥑 Avo tip
-
-If you are rushing between classes, go for the nearest option first. Food now, deep life decision later. 😄
-`.trim();
-}
-
-function tryHandleOffTopic(message: string): string | null {
-    const lower = normalize(message);
-
-    const signals = [
-        "weather",
-        "football score",
-        "stock price",
-        "bitcoin",
-        "recipe",
-        "movie",
-        "song",
-        "celebrity",
-        "random joke",
-        "tell me a joke",
-    ];
-
-    if (
-        !isLikelyUtarQuestion(message) &&
-        signals.some((signal) => lower.includes(normalize(signal)))
-    ) {
-        return OFF_TOPIC_REPLY;
-    }
-
-    return null;
-}
-
-// Fixed reply for off-topic messages: costs no Gemini call (abuse protection).
-const OFF_TOPIC_REPLY = `
-I’m mainly here to help with UTAR-related questions. 😊
-
-### 📌 I can help with
-
-- Courses and programmes
-- Fees, exams, admissions, and scholarships
-- Faculty/department contacts
-- Campus services and student support
-- UTAR staff, offices, and official information
-
-Ask me something UTAR-related and I’ll help route it properly.
-`.trim();
-
 function tryHandleEmotionalCasualSupport(message: string): string | null {
     const lower = normalize(message);
 
@@ -1308,6 +1234,82 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
     }
+}
+
+/**
+ * Questions outside the knowledge base that are safe and relatable (food and
+ * things to do near the campuses, getting around, laptops, study tips,
+ * everyday questions) get a helpful answer from the general web instead of
+ * "not available from official UTAR sources". One search call.
+ */
+async function generateGeneralWebAnswer(params: { message: string; history: any[]; extraRules: string }): Promise<string> {
+    const { message, history, extraRules } = params;
+    const recent = formatRecentConversation(history.slice(0, -1), 4, 1000);
+    const foodFacts = /food|eat|makan|cafe|canteen|cafeteria|lunch|dinner|breakfast|supper|吃|美食/i.test(message) ? CAMPUS_FOOD_FACTS : "";
+    const system = `
+You are UTARCHAT, a friendly assistant for students of Universiti Tunku Abdul Rahman (UTAR). Today is ${malaysiaDay()}.
+
+This question is not an official UTAR matter (for example food, places and things to do, getting around, off-campus living, study gear and tips, everyday questions). Answer it with Google Search; general sources such as maps listings, food and travel guides, tech reviews and brands' own websites are fine.
+
+BE A COMPANION, NOT A LOOKUP: warm, lively and honest, like a well-informed senior who wants the student to do well. Give a real opinion and the practical next step, not a neutral list. Example: for "is the MacBook Air OK for computer science?", say plainly whether the base RAM is enough for their kind of work and what to pick instead, mention that Apple has student / education pricing, and link Apple's education store.
+
+- UTAR has two campuses: Kampar (Perak) and Sungai Long (Bandar Sungai Long, Kajang, Selangor). When the answer depends on location and the user did not say which campus, give a short list for each campus.
+- Be specific: concrete suggestions, each with one line on why (what it is known for, rough price, how far from campus). Useful tips such as student discounts, best times to go or what to avoid are welcome.
+- Start with any UTAR-specific fact that helps.${foodFacts ? "\n" + foodFacts.trim() : ""}
+- Do not state UTAR rules, fees or dates here; if the user needs those, say which UTAR office to check with.
+- When you recommend places or products, end with one short line saying these are general suggestions, not official UTAR information (in the reply language).
+- Links: you may link the official website of a brand, shop or service that came up in your search (put them under "### 🔗 Official Links"), and Google Maps links in the form below. Never invent a URL.
+- Safety: decline anything harmful, illegal, sexual or hateful. Never do assignments, exams or graded work for the student; offer to explain the topic instead.
+${ANSWER_DIRECTLY_RULE}
+${RESPONSE_STYLE}
+${extraRules}
+`;
+    const userText = recent ? `Recent conversation (for reference only):\n${recent}\n\nLatest question:\n${message}` : message;
+    const response = await withTimeout(
+        ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: [{ role: "user", parts: [{ text: userText }] }],
+            config: { systemInstruction: { parts: [{ text: system }] }, tools: [{ googleSearch: {} }], temperature: 0.4 },
+        }),
+        30000,
+        "General web answer"
+    );
+    // Keep only links to sites the search actually returned (plus Google Maps searches).
+    const chunks: any[] = (response as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+    const hosts = new Set<string>();
+    const hostOf = (u: string) => {
+        try {
+            return new URL(u).hostname.replace(/^www\./, "").toLowerCase();
+        } catch {
+            return "";
+        }
+    };
+    await Promise.all(
+        chunks.slice(0, 8).map(async (chunk) => {
+            const title = String(chunk?.web?.title || "").toLowerCase();
+            if (/^[a-z0-9.-]+\.[a-z]{2,}$/.test(title)) hosts.add(title.replace(/^www\./, ""));
+            const uri = String(chunk?.web?.uri || "");
+            const resolved = uri && isGroundingRedirectUri(uri) ? await resolveRedirectUrl(uri).catch(() => null) : uri;
+            const host = resolved ? hostOf(resolved) : "";
+            if (host) hosts.add(host);
+        })
+    );
+    const allowedHost = (url: string) => {
+        const host = hostOf(url);
+        return Boolean(host) && [...hosts].some((h) => host === h || host.endsWith(`.${h}`) || h.endsWith(`.${host}`));
+    };
+    const keepLinks = (md: string) =>
+        md
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/gi, (m, label, url) => (allowedHost(url) || isMapsSearchLink(url) ? m : label))
+            .replace(/(^|[^(])\bhttps?:\/\/[^\s)]+/gi, (m, pre) => {
+                const url = m.slice(pre.length).replace(/[.,;:!?]+$/, "");
+                return allowedHost(url) || isMapsSearchLink(url) ? m : pre;
+            });
+    const text = removeEmptyOfficialLinksSection(keepLinks(finalClean(extractResponseText(response)))).trim();
+    if (!text || text === "No response generated." || text.length < 20) {
+        return "I couldn't find good suggestions for that right now. 🔎 Try asking in a slightly different way, or tell me which campus you're at.";
+    }
+    return text;
 }
 
 async function generateDirectNoRetrievalResponse(message: string, history: any[] = [], extraRules = ""): Promise<string> {
@@ -3047,8 +3049,6 @@ async function handleChat(
             trySmallTalkReply(rawMessage),
             tryHandlePlayfulStudentChat(rawMessage),
             tryHandleEmotionalCasualSupport(rawMessage),
-            tryHandleFoodQuestion(rawMessage),
-            tryHandleOffTopic(rawMessage),
         ];
 
         const preReply = directPreReplies.find(Boolean);
@@ -3102,6 +3102,36 @@ async function handleChat(
         const resolvedMessage = contextResolution.resolvedQuestion || rawMessage;
         const updatedContextSummary = contextResolution.updatedContextSummary || "";
         const resolverSaysNoRetrieval = contextResolution.needsRetrieval === false;
+
+        // Safe, relatable questions outside the knowledge base: answer from the general web.
+        const generalAnswer = async () => {
+            sink?.status("generalWeb", "Searching the web...");
+            const general = getAgentById("general");
+            const text = await generateGeneralWebAnswer({
+                message: resolvedMessage,
+                history,
+                extraRules: CAMPUS_LABEL_RULE + FOLLOW_UPS_RULE + chosenLanguageRule,
+            });
+            return NextResponse.json({
+                text,
+                citations: [],
+                sourceMode: "generalWeb",
+                storeDisplayName: "",
+                selectedAgentId: general.id,
+                selectedAgentLabel: general.label,
+                needsClarification: false,
+                pendingQuestion: null,
+                lastResolvedTopic,
+                contextSummary: updatedContextSummary,
+                routeType: "general_public",
+            });
+        };
+
+        // Fast lane: food and things to do near the campuses, getting around,
+        // renting off campus, laptops, study tips. No router or KB step needed.
+        if (isStudentLifeQuestion(rawMessage) || isStudentLifeQuestion(resolvedMessage)) {
+            return await generalAnswer();
+        }
 
 
 
@@ -3170,12 +3200,18 @@ async function handleChat(
             );
         }
 
+        // Questions the router sees as outside UTAR's own business (off-topic,
+        // general recommendations) are answered from the general web when safe;
+        // jailbreaks never get here (abuse filter) and the answer step refuses
+        // harmful requests and graded work.
+        const intentCategory = String((routerResult as any).intentCategory || "");
+        const generalTopic =
+            (intentCategory === "casual_or_offtopic" || intentCategory === "recommendation") &&
+            !isSupervisorRecommendationQuestion(resolvedMessage);
+
         if (!routerResult.needsClarification && modelSaysNoRetrieval && !retrievalForcedBySafetyNet) {
-            // Off-topic messages get a fixed reply instead of a second Gemini call.
-            const offTopic = String((routerResult as any).intentCategory || "") === "casual_or_offtopic";
-            const directText = offTopic
-                ? OFF_TOPIC_REPLY
-                : await generateDirectNoRetrievalResponse(rawMessage, history, chosenLanguageRule);
+            if (generalTopic) return await generalAnswer();
+            const directText = await generateDirectNoRetrievalResponse(rawMessage, history, chosenLanguageRule);
 
             return NextResponse.json({
                 text: directText,
@@ -3246,6 +3282,7 @@ async function handleChat(
             correctionInstruction +
             (calendarQuestion ? buildCalendarFormatInstruction() : "") +
             (bothCampuses ? BOTH_CAMPUSES_RULE : CAMPUS_LABEL_RULE) +
+            ANSWER_DIRECTLY_RULE +
             FOLLOW_UPS_RULE +
             chosenLanguageRule;
 
@@ -3350,6 +3387,7 @@ async function handleChat(
             });
             if (staffDirResponse) return staffDirResponse;
 
+            if (generalTopic) return await generalAnswer();
             sink?.status("webFallback", "Searching official UTAR web sources...");
             const webFallback = await generatePublicWebFallback({
                 effectiveMessage,
@@ -3719,6 +3757,8 @@ LANGUAGE RULE:
             routeType: routerResult.routeType,
         });
         if (staffDirResponse) return staffDirResponse;
+
+        if (generalTopic && !kbPartial) return await generalAnswer();
 
         const webFallback = await generatePublicWebFallback({
             effectiveMessage,

@@ -22,6 +22,7 @@ const STAGE_ICONS: Record<string, LucideIcon> = {
     officialPage: FileText,
     staffDirectory: Users,
     webFallback: Globe,
+    generalWeb: Globe,
     reasoning: Sparkles,
 };
 
@@ -35,6 +36,7 @@ const STAGE_MOTION: Record<string, TargetAndTransition> = {
     officialPage: { y: [0, -1.5, 0], transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } },
     staffDirectory: { scale: [1, 1.08, 1], transition: { duration: 1.4, repeat: Infinity, ease: "easeInOut" } },
     webFallback: { rotate: [0, 360], transition: { duration: 5, repeat: Infinity, ease: "linear" } },
+    generalWeb: { rotate: [0, 360], transition: { duration: 5, repeat: Infinity, ease: "linear" } },
     reasoning: { opacity: [0.45, 1, 0.45], scale: [0.95, 1.05, 0.95], transition: { duration: 1.3, repeat: Infinity, ease: "easeInOut" } },
 };
 

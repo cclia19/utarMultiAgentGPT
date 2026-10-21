@@ -89,7 +89,7 @@ export type Strings = {
 
 export const STRINGS: Record<Lang, Strings> = {
     en: {
-        tagline: "Ask naturally. I’ll find the right UTAR office.",
+        tagline: "Ask me anything related to UTAR and your campus life",
         greetingTitle: "Hi 👋, I’m UTARCHAT",
         greetingBody: "Your UTAR buddy for courses, fees, exams, buses, offices and student life.",
         startersTitle: "Try asking",
@@ -126,6 +126,7 @@ export const STRINGS: Record<Lang, Strings> = {
             searching: "Checking {office} documents",
             staffDirectory: "Checking the staff directory",
             webFallback: "Checking UTAR websites",
+            generalWeb: "Searching the web",
             reasoning: "Answering",
         },
         ui: {
@@ -219,6 +220,7 @@ export const STRINGS: Record<Lang, Strings> = {
             searching: "Menyemak dokumen {office}",
             staffDirectory: "Menyemak direktori staf",
             webFallback: "Menyemak laman web UTAR",
+            generalWeb: "Mencari di web",
             reasoning: "Menjawab",
         },
         ui: {
@@ -312,6 +314,7 @@ export const STRINGS: Record<Lang, Strings> = {
             searching: "查阅 {office} 文件",
             staffDirectory: "查询职员名录",
             webFallback: "查看 UTAR 网站",
+            generalWeb: "正在搜索网络",
             reasoning: "正在回答",
         },
         ui: {
