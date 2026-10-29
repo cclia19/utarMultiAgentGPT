@@ -19,6 +19,7 @@ import { malaysiaDay } from "@/lib/abuse/checks";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
 import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, VERDICT_FIRST_RULE, isMapsSearchLink } from "@/lib/answerGaps";
+import { isStudentWorkQuestion, STUDENT_WORK_RULE_EVIDENCE } from "@/lib/utarRules";
 import { isStudentLifeQuestion, CAMPUS_FOOD_FACTS } from "@/lib/studentLife";
 import { normalizeMapsLinks } from "@/lib/mapsLinks";
 import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
@@ -3285,6 +3286,7 @@ async function handleChat(
             (bothCampuses ? BOTH_CAMPUSES_RULE : CAMPUS_LABEL_RULE) +
             ANSWER_DIRECTLY_RULE +
             VERDICT_FIRST_RULE +
+            (isStudentWorkQuestion(rawMessage) || isStudentWorkQuestion(effectiveMessage) ? STUDENT_WORK_RULE_EVIDENCE : "") +
             FOLLOW_UPS_RULE +
             chosenLanguageRule;
 
