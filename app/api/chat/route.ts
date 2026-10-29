@@ -18,7 +18,7 @@ import { formatLiveEvidence, isInternshipQuestion, livePagesFor } from "@/lib/li
 import { malaysiaDay } from "@/lib/abuse/checks";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
-import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, isMapsSearchLink } from "@/lib/answerGaps";
+import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, VERDICT_FIRST_RULE, isMapsSearchLink } from "@/lib/answerGaps";
 import { isStudentLifeQuestion, CAMPUS_FOOD_FACTS } from "@/lib/studentLife";
 import { normalizeMapsLinks } from "@/lib/mapsLinks";
 import { FOLLOW_UPS_RULE, extractFollowUps, languageRule } from "@/lib/followUps";
@@ -3284,6 +3284,7 @@ async function handleChat(
             (calendarQuestion ? buildCalendarFormatInstruction() : "") +
             (bothCampuses ? BOTH_CAMPUSES_RULE : CAMPUS_LABEL_RULE) +
             ANSWER_DIRECTLY_RULE +
+            VERDICT_FIRST_RULE +
             FOLLOW_UPS_RULE +
             chosenLanguageRule;
 

@@ -62,3 +62,13 @@ export function isMapsSearchLink(url: string): boolean {
 export function isWeakWebAnswer(text: string): boolean {
     return /couldn[’']t verify|could not verify|having trouble checking official/i.test(String(text || ""));
 }
+
+/**
+ * "Can I / am I allowed to …" questions: the verdict comes first, then the rule.
+ * The bot used to quote Rule XX s.15 and then say "there isn't an outright ban".
+ */
+export const VERDICT_FIRST_RULE = `
+VERDICT FIRST: When the user asks whether they can, may or are allowed to do something (work or take a job, defer, take two programmes, bring or use something, and so on), start with a one-line verdict in bold: **Yes**, **No**, **Only with approval** or **It depends**, based on UTAR's rules in your evidence. Then name the rule and section (e.g. "Rule XX – Student Code of Conduct, Section 15") and quote or paraphrase it, then give the practical next step.
+- When a rule restricts something, the verdict must reflect the restriction. Never soften it into "there is no outright ban".
+- Apply the rule to the user's situation. Example: Rule XX Section 15 bars any employment, full-time or part-time, that conflicts with a student's position, so a full-time job while studying full-time is **No**; part-time work may be acceptable only if it does not conflict with studies (check with DSA).
+`;
