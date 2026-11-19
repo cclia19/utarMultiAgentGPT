@@ -42,5 +42,9 @@ const LANGUAGE_NAMES: Record<ChatLanguage, string> = { en: "English", ms: "Bahas
 export function languageRule(language: unknown): string {
     const lang = String(language || "") as ChatLanguage;
     if (!LANGUAGE_NAMES[lang]) return "";
-    return `\nLANGUAGE CHOSEN BY THE STUDENT: Reply in ${LANGUAGE_NAMES[lang]}, whatever language the question is in. Keep official names, course codes and form numbers as they are.\n`;
+    const noSourceTalk =
+        lang === "en"
+            ? ""
+            : " Never mention your documents, files or sources, or what they do not say (no \"文件中没有明确说明\" / \"dokumen tidak menyatakan\"), and do not guess: when a detail is missing, tell the student which office to ask.";
+    return `\nLANGUAGE CHOSEN BY THE STUDENT: Reply in ${LANGUAGE_NAMES[lang]}, whatever language the question is in. Keep official names, course codes and form numbers as they are.${noSourceTalk}\n`;
 }

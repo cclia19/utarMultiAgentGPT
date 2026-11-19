@@ -18,7 +18,7 @@ import { formatLiveEvidence, isInternshipQuestion, livePagesFor } from "@/lib/li
 import { malaysiaDay } from "@/lib/abuse/checks";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
-import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, VERDICT_FIRST_RULE, isMapsSearchLink } from "@/lib/answerGaps";
+import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, VERDICT_FIRST_RULE, isMapsSearchLink, stripSourceTalk } from "@/lib/answerGaps";
 import { isStudentWorkQuestion, STUDENT_WORK_RULE_EVIDENCE } from "@/lib/utarRules";
 import { isStudentLifeQuestion, CAMPUS_FOOD_FACTS } from "@/lib/studentLife";
 import { normalizeMapsLinks } from "@/lib/mapsLinks";
@@ -35,6 +35,7 @@ import {
 import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
 import { DIRECT_LINKS_RULE, contactRule, verifiedLinks } from "@/lib/utarLinks";
+import { CLARIFY_LANGUAGE_NAMES, clarificationNeedsTranslation } from "@/lib/clarifyLanguage";
 import {
     isAnswerChallenge,
     isIntakeOrCalendarQuestion,
@@ -227,7 +228,7 @@ function getAgentShortLabel(agent: any): string {
 }
 
 function cleanUserFacingText(text: string): string {
-    return String(text || "")
+    return stripSourceTalk(String(text || ""))
         .replaceAll(NO_KB_ANSWER, "")
         // A link wrapped in backticks shows as code, not a link.
         .replace(/`(\[[^\]\n]+\]\([^)\s]+\))`/g, "$1")
@@ -625,6 +626,22 @@ function finalCleanWebAnswer(
 function finalClean(text: string): string {
     const base = normalizeMapsLinks(dropRepeatedAnswer(cleanUserFacingText(text))).replace(/\n{3,}/g, "\n\n").trim();
     return linkifyRawUrls(base);
+}
+
+/** Translate a short clarifying question into the chosen language when it isn't already (one small call; falls back to the original). */
+async function inChosenLanguage(text: string, language: unknown): Promise<string> {
+    if (!clarificationNeedsTranslation(text, language)) return text;
+    try {
+        const r = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: [{ role: "user", parts: [{ text: `Translate this question for a UTAR student into ${CLARIFY_LANGUAGE_NAMES[String(language)]}. Keep names, acronyms and course codes as they are. Reply with the translation only.\n\n${text}` }] }],
+            config: { temperature: 0, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
+        });
+        const out = (r.text ?? "").trim();
+        return out || text;
+    } catch {
+        return text;
+    }
 }
 
 function extractResponseText(response: any): string {
@@ -3154,6 +3171,7 @@ async function handleChat(
             rawMessage: rawMessage,
             currentAgentId: fallbackAgentId,
             pendingQuestion: pendingForRouter,
+            language: body?.language,
         });
 
         const selectedAgent = getAgentById(routerResult.agentId);
@@ -3251,9 +3269,10 @@ async function handleChat(
 
         if (routerResult.needsClarification) {
             return NextResponse.json({
-                text:
-                    routerResult.clarificationQuestion ||
-                    "May I know which faculty, programme, department, or campus this is related to?",
+                text: await inChosenLanguage(
+                    routerResult.clarificationQuestion || "May I know which faculty, programme, department, or campus this is related to?",
+                    body?.language
+                ),
                 citations: [],
                 sourceMode: "none",
                 storeDisplayName: selectedAgent.storeDisplayName || "",
