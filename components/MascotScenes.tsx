@@ -81,6 +81,8 @@ export type SceneCtl = {
     hop: () => Promise<void>;
     sleep: (ms: number) => Promise<void>;
     alive: () => boolean;
+    /** The screen edges, in his units (x = 0 is his left edge, 582 his right). */
+    screen: () => { left: number; right: number };
 };
 
 const spring = (stiffness = 220, damping = 20) => ({ type: "spring" as const, stiffness, damping });
@@ -374,45 +376,51 @@ export async function runScene(id: SceneId, c: SceneCtl) {
     }
 
     if (id === "chase") {
-        // A little avocado hops in from the left...
-        c.runner.x.set(-700);
+        const edge = c.screen();
+        // A little avocado hops in from the left edge of the screen...
+        c.runner.x.set(edge.left - 160);
         c.runner.y.set(0);
         c.patchFx({ runner: "run" });
-        animate(c.runner.y, [0, -50, 0, -50, 0, -50, 0], { duration: 1.2 });
-        await animate(c.runner.x, -150, { duration: 1.2, ease: "easeOut" });
+        const hopIn = Math.min(2, Math.max(1, (-150 - edge.left) / 1600));
+        animate(c.runner.y, [0, -50, 0, -50, 0, -50, 0, -50, 0], { duration: hopIn });
+        await animate(c.runner.x, -150, { duration: hopIn, ease: "easeOut" });
         if (!alive()) return;
         c.setFace({ eyes: "open", look: { x: -4, y: 1 }, mouth: "o" });
         c.patchFx({ runner: "wink" });
         await sleep(900);
         if (!alive()) return;
-        // ...and dashes off to the right, past him.
+        // ...and dashes off past him, out of the right edge.
         c.patchFx({ runner: "run" });
         c.setFace({ eyes: "open", look: { x: 4, y: 1 }, mouth: "o" });
-        animate(c.runner.y, [0, -40, 0, -40, 0, -40, 0], { duration: 1 });
-        await animate(c.runner.x, 1350, { duration: 1, ease: "easeIn" });
+        const dash = Math.min(1.6, Math.max(0.9, (edge.right + 200) / 2600));
+        animate(c.runner.y, [0, -40, 0, -40, 0, -40, 0, -40, 0], { duration: dash });
+        await animate(c.runner.x, edge.right + 200, { duration: dash, ease: "easeIn" });
         if (!alive()) return;
-        // He gives chase.
+        // He gives chase, all the way off the screen.
         c.setFace({ eyes: "open", look: { x: 4, y: 0 }, mouth: "open" });
         await animate(c.body.rot, 9, { duration: 0.2 });
         const run = (dur: number) =>
             Promise.all([
-                animate(c.body.y, [0, -4, 0, -4, 0, -4, 0, -4, 0], { duration: dur }),
-                animate(c.legL, [0, 18, -14, 18, -14, 0], { duration: dur }),
-                animate(c.legR, [0, -14, 18, -14, 18, 0], { duration: dur }),
-                animate(c.arm, [0, -40, 20, -40, 20, 0], { duration: dur }),
+                animate(c.body.y, [0, -4, 0, -4, 0, -4, 0, -4, 0, -4, 0], { duration: dur }),
+                animate(c.legL, [0, 18, -14, 18, -14, 18, 0], { duration: dur }),
+                animate(c.legR, [0, -14, 18, -14, 18, -14, 0], { duration: dur }),
+                animate(c.arm, [0, -40, 20, -40, 20, -40, 0], { duration: dur }),
             ]);
-        await Promise.all([animate(c.body.x, 1500, { duration: 1.1, ease: "easeIn" }), run(1.1)]);
+        const out = edge.right + 80;
+        const runOut = Math.min(1.8, Math.max(1, out / 2400));
+        await Promise.all([animate(c.body.x, out, { duration: runOut, ease: "easeIn" }), run(runOut)]);
         if (!alive()) return;
         c.patchFx({ runner: undefined });
         await sleep(700);
         if (!alive()) return;
-        // Back from the left, avocado in hand.
-        c.body.x.set(-1500);
+        // Back in from the left edge, avocado in hand.
+        c.body.x.set(edge.left - 660);
         c.body.rot.set(0);
         c.setHeld("avo");
         c.arm.set(-100);
         c.setFace({ eyes: "happy", mouth: "open", blush: true });
-        await Promise.all([animate(c.body.x, 0, { duration: 1.3, ease: "easeOut" }), animate(c.body.y, [0, -4, 0, -4, 0, -4, 0], { duration: 1.3 })]);
+        const back = Math.min(2, Math.max(1.2, (660 - edge.left) / 1800));
+        await Promise.all([animate(c.body.x, 0, { duration: back, ease: "easeOut" }), animate(c.body.y, [0, -4, 0, -4, 0, -4, 0, -4, 0], { duration: back })]);
         if (!alive()) return;
         c.boing(1);
         await animate(c.arm, [-100, -120, -96, -116, -100], { duration: 1 });
