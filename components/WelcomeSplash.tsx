@@ -155,7 +155,7 @@ export default function WelcomeSplash({
                         {tile(
                             "col-span-2 flex min-h-[300px] flex-col items-center justify-center overflow-hidden rounded-[30px] p-6 text-white sm:col-span-4 xl:min-h-0 xl:[grid-area:hero] bg-[radial-gradient(120%_90%_at_85%_100%,rgba(227,24,55,0.85)_0%,rgba(227,24,55,0)_55%),linear-gradient(150deg,#1b1a4a_0%,#1e3a8a_55%,#2347a8_100%)]",
                             <>
-                                <Mascot entrance hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="w-[104px] drop-shadow-[0_18px_30px_rgba(10,12,40,0.45)] xl:w-[112px] 2xl:w-[150px]" />
+                                <Mascot entrance lively hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="w-[104px] drop-shadow-[0_18px_30px_rgba(10,12,40,0.45)] xl:w-[112px] 2xl:w-[150px]" />
                                 <h1 className="mt-5 whitespace-nowrap text-6xl font-extrabold tracking-[-0.04em] sm:text-7xl xl:text-[min(6rem,calc(5.2vw-8px))]">UTARCHAT</h1>
                                 <button
                                     onClick={() => setNoticeOpen(true)}
