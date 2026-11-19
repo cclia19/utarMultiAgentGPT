@@ -317,6 +317,15 @@ export function matchQualifier(records: StaffRecord[], terms: string[]): StaffRe
 }
 
 const SEARCH_URL = `${DIRECTORY_ORIGIN}/staffListSearchV2.jsp`;
+/** Safety cap: the largest department is well under this many pages. */
+const MAX_PAGES = 25;
+
+/** The highest "iPage=N" link on a results page (1 when there is only one page). */
+export function lastPageNumber(html: string): number {
+    let max = 1;
+    for (const m of String(html || "").matchAll(/iPage=(\d+)/g)) max = Math.max(max, Number(m[1]));
+    return max;
+}
 
 /**
  * 8s was chosen against a development machine sitting a few hundred ms from
@@ -339,15 +348,12 @@ const MAX_STAFF_CACHE_ENTRIES = 100;
 const staffCache = new Map<string, { at: number; records: StaffRecord[] }>();
 let catalogCache: { at: number; options: DeptOption[] } | null = null;
 
-async function fetchDirectoryHtml(params: { dept: string; name: string }): Promise<string> {
-    const query = new URLSearchParams({
-        searchDept: params.dept,
-        searchDiv: "All",
-        searchName: params.name,
-        searchExpertise: "",
-        submit: "Search",
-        searchResult: "Y",
-    });
+async function fetchDirectoryHtml(params: { dept: string; name: string; page?: number }): Promise<string> {
+    const query = new URLSearchParams(
+        params.page && params.page > 1
+            ? { iPage: String(params.page), searchDept: params.dept, searchSurname: "All", searchName: params.name, searchOrder: "name", searchResult: "Y", searchDiv: "All" }
+            : { searchDept: params.dept, searchDiv: "All", searchName: params.name, searchExpertise: "", submit: "Search", searchResult: "Y" }
+    );
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -403,9 +409,17 @@ export async function lookupStaff(q: {
     const cached = staffCache.get(key);
     if (cached && Date.now() - cached.at < STAFF_CACHE_TTL) return cached.records;
 
-    const pages = await Promise.all(
-        deptCodes.map((dept) => fetchDirectoryHtml({ dept, name }))
-    );
+    // The directory shows about 30 staff per page ("Page 1 | 2 | 3"); read them all.
+    const pages = (
+        await Promise.all(
+            deptCodes.map(async (dept) => {
+                const first = await fetchDirectoryHtml({ dept, name });
+                const more = Math.min(lastPageNumber(first), MAX_PAGES);
+                const rest = await Promise.all(Array.from({ length: Math.max(0, more - 1) }, (_, i) => fetchDirectoryHtml({ dept, name, page: i + 2 })));
+                return [first, ...rest];
+            })
+        )
+    ).flat();
 
     const pageRecords = await Promise.all(
         pages.map(async (html) => {

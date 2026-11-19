@@ -129,3 +129,10 @@ test("real questions mentioning avocado or Dr Aun's contact still go to the pipe
         assert.equal(trySmallTalkReply(q), null, q);
     }
 });
+
+test("research questions about Aun Yichiet go to the pipeline", async () => {
+    const { isAunYichietQuestion } = await import("./smallTalk.ts");
+    assert.equal(isAunYichietQuestion("what does Dr Aun Yichiet research"), false);
+    assert.equal(isAunYichietQuestion("Aun Yichiet area of expertise"), false);
+    assert.equal(isAunYichietQuestion("who is aun yichiet"), true);
+});

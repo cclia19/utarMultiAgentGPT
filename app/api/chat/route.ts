@@ -3306,7 +3306,8 @@ async function handleChat(
             });
         }
 
-        if (routerResult.needsClarification) {
+        // "Who works on X" needs no faculty: the expertise answer covers all of UTAR.
+        if (routerResult.needsClarification && routerResult.agentId !== "staff-expertise") {
             return NextResponse.json({
                 text: await inChosenLanguage(
                     routerResult.clarificationQuestion || "May I know which faculty, programme, department, or campus this is related to?",

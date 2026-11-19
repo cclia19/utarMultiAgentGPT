@@ -288,3 +288,9 @@ test("qualifier: which holder of a role the question means", async () => {
     assert.deepEqual(pick("who is the head of department of student affairs kampar", "head of department", dsa), ["Chiang Jeng Fong"]);
     assert.deepEqual(pick("who is the head of DSA Sungai Long", "head of department", dsa), []);
 });
+
+test("directory pagination: the last page number", async () => {
+    const { lastPageNumber } = await import("./staffDirectory.ts");
+    assert.equal(lastPageNumber("<a href=staffListSearchV2.jsp?iPage=2&x>2</a> <a href=staffListSearchV2.jsp?iPage=4&x>4</a>"), 4);
+    assert.equal(lastPageNumber("<table>no pages</table>"), 1);
+});
