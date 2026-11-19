@@ -27,6 +27,8 @@ import { routeWithLLM } from "@/lib/intentRouter";
 import {
     getDeptCatalog,
     lookupStaff,
+    matchQualifier,
+    qualifierTerms,
     matchRole,
     resolveDeptCodes,
     findDeptCodesForRole,
@@ -1737,8 +1739,10 @@ function formatStaffRecords(records: StaffRecord[]): string {
 async function answerFromStaffDirectory(params: {
     effectiveMessage: string;
     selectedAgent: any;
+    /** Directory first: return null (and let the documents answer) instead of refusing when nobody matches. */
+    nullIfNotFound?: boolean;
 }): Promise<WebFallbackResult | null> {
-    const { effectiveMessage, selectedAgent } = params;
+    const { effectiveMessage, selectedAgent, nullIfNotFound = false } = params;
     const { isRoleQuestion, rolePhrase } = isPersonRoleQuestion(effectiveMessage);
 
     if (!isRoleQuestion) return null;
@@ -1760,10 +1764,11 @@ I can't confirm who currently holds that position from UTAR's official staff dir
         needsClarification: false,
         pendingQuestion: null,
     };
+    const notFound = nullIfNotFound ? null : refusal;
 
     try {
         const catalog = await getDeptCatalog();
-        if (!catalog.length) return refusal;
+        if (!catalog.length) return notFound;
 
         // A role like "vice president" names its own offices; anything else is
         // scoped to the unit routing already selected.
@@ -1774,12 +1779,13 @@ I can't confirm who currently holds that position from UTAR's official staff dir
             deptCodes = resolveDeptCodes(unit, catalog);
         }
 
-        if (!deptCodes.length) return refusal;
+        if (!deptCodes.length) return notFound;
 
         const records = await lookupStaff({ deptCodes });
-        const matched = matchRole(records, rolePhrase);
+        // The role, then which one ("VP of research", "head of programme for software engineering").
+        const matched = matchQualifier(matchRole(records, rolePhrase), qualifierTerms(effectiveMessage));
 
-        if (!matched.length) return refusal;
+        if (!matched.length) return notFound;
 
         const text = [
             "### 📌 Summary",
@@ -1795,7 +1801,7 @@ I can't confirm who currently holds that position from UTAR's official staff dir
         };
     } catch (error) {
         console.error("answerFromStaffDirectory failed:", error);
-        return refusal;
+        return notFound;
     }
 }
 
@@ -2860,10 +2866,24 @@ function finalizePayload(payload: any, metrics: RequestMetrics, language: unknow
 }
 
 /** A profile tile (name, title, photo) when the answer is about someone with a photo (lib/people.ts). */
-function withPerson(payload: any, question: unknown) {
+/**
+ * The profile tile. For UTAR staff the name and positions come from the live
+ * Staff Directory; if the directory can't confirm the person, no tile.
+ */
+async function withPerson(payload: any, question: unknown) {
     if (!payload || typeof payload.text !== "string" || payload.retryable) return payload;
     const person = findPerson(String(question || ""), payload.text);
-    return person ? { ...payload, person } : payload;
+    if (!person) return payload;
+    if (!person.directoryName) return { ...payload, person: { name: person.name, title: person.title, photo: person.photo } };
+    try {
+        const records = await lookupStaff({ deptCodes: ["ALL"], name: person.directoryName });
+        if (records.length !== 1) return payload;
+        const r = records[0];
+        const title = r.adminPositions.length ? r.adminPositions.join(" · ") : r.jobTitle || "";
+        return title ? { ...payload, person: { name: r.name, title, photo: person.photo } } : payload;
+    } catch {
+        return payload;
+    }
 }
 
 /** Moves Gemini's "FOLLOW-UPS:" line out of the answer into followUps (chips on the chat page). */
@@ -2965,7 +2985,7 @@ export async function POST(req: NextRequest) {
     if (body?.stream !== true) {
         const raw = await metricsStore.run(metrics, () => handleChat(body));
         const latencyMs = Date.now() - startedAt;
-        const payload = withPerson(finalizePayload(withFollowUps(await raw.json().catch(() => null)), metrics, body?.language), body?.message);
+        const payload = await withPerson(finalizePayload(withFollowUps(await raw.json().catch(() => null)), metrics, body?.language), body?.message);
         after(() => finish(payload, latencyMs, false));
         const res = NextResponse.json(payload, { status: raw.status });
         // Local runs only (next dev): lets scripts/prelaunch-check.mjs add up the
@@ -2992,7 +3012,7 @@ export async function POST(req: NextRequest) {
             let streamFailed = false;
             try {
                 const res = await metricsStore.run(metrics, () => handleChat(body, sink));
-                payload = withPerson(finalizePayload(withFollowUps(await res.json()), metrics, body?.language), body?.message);
+                payload = await withPerson(finalizePayload(withFollowUps(await res.json()), metrics, body?.language), body?.message);
                 if (metrics.providerError) sink.reset();
                 sink.done(payload);
             } catch (err: any) {
@@ -3395,6 +3415,30 @@ async function handleChat(
                     needsClarification: false,
                     pendingQuestion: null,
                     lastResolvedTopic: newTopic,
+                    contextSummary: updatedContextSummary,
+                    routeType: routerResult.routeType,
+                });
+            }
+        }
+
+        // Who holds a position: the live UTAR Staff Directory (what the UTAR
+        // website shows) comes first. Uploaded documents such as handbooks can
+        // be older than the latest appointments, so they only answer when the
+        // directory has no match.
+        if (isPersonRoleQuestion(effectiveMessage).isRoleQuestion) {
+            sink?.status("staffDirectory", "Checking UTAR Staff Directory...");
+            const fromDirectory = await answerFromStaffDirectory({ effectiveMessage, selectedAgent, nullIfNotFound: true });
+            if (fromDirectory) {
+                return NextResponse.json({
+                    text: fromDirectory.text,
+                    citations: fromDirectory.citations,
+                    sourceMode: "staffDirectory",
+                    storeDisplayName: selectedAgent.storeDisplayName || "",
+                    selectedAgentId: selectedAgent.id,
+                    selectedAgentLabel: selectedAgent.label,
+                    needsClarification: false,
+                    pendingQuestion: null,
+                    lastResolvedTopic,
                     contextSummary: updatedContextSummary,
                     routeType: routerResult.routeType,
                 });

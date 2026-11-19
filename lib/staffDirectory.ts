@@ -256,6 +256,66 @@ export function matchRole(records: StaffRecord[], rolePhrase: string): StaffReco
     return held.filter((r) => positions(r).some((p) => p.includes(wanted)));
 }
 
+/**
+ * The words that say WHICH holder of a role the user means: "research" in
+ * "who is the VP of research", "software engineering" in "head of programme
+ * for software engineering", "FICT" in "dean of FICT". Matching a role alone
+ * returned the first Vice President or any Head of Programme.
+ */
+const QUALIFIER_STOP = new Set([
+    "who", "is", "s", "are", "whos", "the", "a", "an", "of", "for", "in", "at", "on", "to", "and", "&", "our", "my", "your",
+    "current", "currently", "now", "present", "new", "utar", "university", "tunku", "abdul", "rahman", "universiti",
+    "vp", "vps", "vice", "president", "presidents", "deputy", "dean", "deans", "head", "heads", "hod", "hods", "hop", "hops",
+    "department", "departments", "programme", "programmes", "program", "programs", "registrar", "registrars", "rgo",
+    "director", "directors", "chairperson", "chairman", "chairmen", "person", "in-charge", "charge", "pic", "please", "pls",
+]);
+const QUALIFIER_SYNONYMS: Record<string, string[]> = {
+    research: ["research", "r&d", "r & d", "rnd"],
+    rnd: ["research", "r&d", "r & d", "rnd"],
+    students: ["student"],
+    international: ["internation"],
+};
+
+export function qualifierTerms(question: string): string[] {
+    return String(question || "")
+        .toLowerCase()
+        .replace(/[\u2018\u2019']/g, "")
+        .replace(/r\s*&\s*d/g, "rnd")
+        .split(/[^a-z0-9&-]+/)
+        .filter((w) => w && !QUALIFIER_STOP.has(w) && !/^\d+$/.test(w));
+}
+
+/** "Faculty of Information and Communication Technology" → "fict" (small words skipped). */
+function acronym(label: string): string {
+    return label
+        .replace(/\(.*?\)/g, " ")
+        .split(/[^A-Za-z]+/)
+        .filter((w) => w && !/^(of|and|the|for|in|&)$/i.test(w))
+        .map((w) => w[0].toLowerCase())
+        .join("");
+}
+
+function termMatches(term: string, haystack: string, acronyms: string[]): boolean {
+    if (acronyms.includes(term)) return true;
+    const forms = QUALIFIER_SYNONYMS[term] ?? [term.length > 6 ? term.slice(0, 6) : term];
+    return forms.some((f) => new RegExp(`(^|[^a-z])${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(haystack));
+}
+
+/**
+ * Keeps the records whose positions, department, unit or division mention every
+ * qualifier term. No terms: all records. Nobody left: an empty list (the
+ * caller then lets the documents answer rather than naming the wrong person).
+ */
+export function matchQualifier(records: StaffRecord[], terms: string[]): StaffRecord[] {
+    if (!terms.length) return records;
+    return records.filter((r) => {
+        const parts = [...r.adminPositions, r.department, r.division ?? ""].filter(Boolean);
+        const haystack = parts.join(" ").toLowerCase();
+        const acronyms = parts.flatMap((p) => [acronym(p), acronym(p.replace(/\(.*?\)/g, ""))]);
+        return terms.every((t) => termMatches(t, haystack, acronyms));
+    });
+}
+
 const SEARCH_URL = `${DIRECTORY_ORIGIN}/staffListSearchV2.jsp`;
 
 /**
@@ -269,7 +329,8 @@ const SEARCH_URL = `${DIRECTORY_ORIGIN}/staffListSearchV2.jsp`;
  * inside the route's 60s maxDuration with room to spare.
  */
 const FETCH_TIMEOUT_MS = 15000;
-const STAFF_CACHE_TTL = 6 * 60 * 60 * 1000;
+// Staff records are kept for a week (UTAR asked for weekly; appointments change rarely).
+const STAFF_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const CATALOG_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 // Maximum cached staff lookup queries to prevent unbounded Map memory growth over process lifetime.
