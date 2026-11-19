@@ -819,10 +819,10 @@ export default function ChatClient() {
                 </div>
             </header>
 
-            <main ref={scrollRef} onScroll={onMainScroll} className="relative flex-1 overflow-y-auto overscroll-contain">
+            <main ref={scrollRef} onScroll={onMainScroll} className="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
                 <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
                     {showWelcome && (
-                        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="overflow-x-clip pt-10 text-center sm:pt-14">
+                        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="pt-10 text-center sm:pt-14">
                             {splashOpen === false ? (
                                 <Mascot entrance scenes hop={mascotHop} mood={mascotReaction ?? "idle"} onClick={() => setMascotWave((w) => w + 1)} className="mx-auto w-[112px] sm:w-[128px]" />
                             ) : (

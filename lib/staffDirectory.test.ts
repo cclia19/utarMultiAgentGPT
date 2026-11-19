@@ -258,3 +258,33 @@ test("visible text stays small enough to extract cheaply", () => {
 
 
 
+
+test("qualifier: which holder of a role the question means", async () => {
+    const { qualifierTerms, matchQualifier, matchRole } = await import("./staffDirectory.ts");
+    const rec = (name: string, adminPositions: string[], department: string, division?: string) => ({ name, adminPositions, department, division });
+    const vps = [
+        rec("Goi Bok Min", ["Sungai Long Campus Administration Director", "Vice President (Internationalisation and Academic Development)"], "Lee Kong Chian Faculty of Engineering and Science"),
+        rec("Zuraidah", ["Vice President (R&D and Commercialisation)"], "Faculty of Accountancy and Management"),
+        rec("Choong Chee Keong", ["Vice President (Student Development and Alumni Relations)"], "Teh Hong Piow Faculty of Business and Finance"),
+    ];
+    const pick = (q: string, role: string, list: any[]) => matchQualifier(matchRole(list as any, role), qualifierTerms(q)).map((r: any) => r.name);
+
+    assert.deepEqual(pick("who is the VP of research", "vice president", vps), ["Zuraidah"]);
+    assert.deepEqual(pick("who is the vp for student development", "vice president", vps), ["Choong Chee Keong"]);
+    assert.deepEqual(pick("who is the VP of internationalisation", "vice president", vps), ["Goi Bok Min"]);
+    assert.equal(pick("who are the VPs of UTAR", "vice president", vps).length, 3);
+
+    const fict = [
+        rec("Liew Soung Yue", ["Dean"], "Faculty of Information and Communication Technology"),
+        rec("Aun Yichiet", ["Head of Programme (Master in Data Science & Postgraduate Diploma in Data Science)"], "Faculty of Information and Communication Technology"),
+    ];
+    assert.deepEqual(pick("who is the dean of FICT", "dean", fict), ["Liew Soung Yue"]);
+    // Asked for a programme nobody here heads: nobody (the documents answer instead).
+    assert.deepEqual(pick("who is the head of programme for software engineering", "head of programme", fict), []);
+    assert.deepEqual(pick("who is the head of programme for data science", "head of programme", fict), ["Aun Yichiet"]);
+
+    const dsa = [rec("Chiang Jeng Fong", ["Head of Department (Student Affairs (Kampar Campus))"], "Department of Student Affairs (Kampar Campus)")];
+    assert.deepEqual(pick("who is the head of DSA Kampar", "head of department", dsa), ["Chiang Jeng Fong"]);
+    assert.deepEqual(pick("who is the head of department of student affairs kampar", "head of department", dsa), ["Chiang Jeng Fong"]);
+    assert.deepEqual(pick("who is the head of DSA Sungai Long", "head of department", dsa), []);
+});

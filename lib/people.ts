@@ -3,8 +3,11 @@
  * tile (name and title on the left, photo on the right). Photos live in
  * public/people/ (400×500 JPEG, cropped to the person only).
  *
- * To add someone: drop a 400×500 photo in public/people/ and add an entry
- * with the name and title exactly as UTAR writes them.
+ * To add someone: drop a 400×500 photo in public/people/ and add an entry.
+ * For UTAR staff, set `directoryName`: the tile then shows the name and
+ * positions from the live UTAR Staff Directory (the `name` and `title` here
+ * are only the search key and a description), and no tile at all when the
+ * directory can't confirm the person.
  *
  * Pure functions, unit tested.
  */
@@ -16,11 +19,14 @@ export type PersonProfile = {
     photo: string;
     /** Matched against the question, then the answer. */
     patterns: RegExp[];
+    /** Name to look up in the UTAR Staff Directory; the tile's name and title come from there. */
+    directoryName?: string;
 };
 
 export const PEOPLE: PersonProfile[] = [
     {
         id: "ewe-hong-tat",
+        directoryName: "Ewe Hong Tat",
         name: "Ir. Prof. Dato' Dr. Ewe Hong Tat",
         title: "President / CEO",
         photo: "/people/ewe-hong-tat.jpg",
@@ -28,6 +34,7 @@ export const PEOPLE: PersonProfile[] = [
     },
     {
         id: "goi-bok-min",
+        directoryName: "Goi Bok Min",
         name: "Ir. Prof. Dr. Goi Bok Min",
         title: "Vice President (Internationalisation and Academic Development)",
         photo: "/people/goi-bok-min.jpg",
@@ -35,6 +42,7 @@ export const PEOPLE: PersonProfile[] = [
     },
     {
         id: "zuraidah-abd-manaf",
+        directoryName: "Zuraidah",
         name: "Professor Dr. Zuraidah Binti Abd Manaf",
         title: "Vice President (Research, Development and Commercialisation)",
         photo: "/people/zuraidah-abd-manaf.jpg",
@@ -49,6 +57,7 @@ export const PEOPLE: PersonProfile[] = [
     },
     {
         id: "choong-chee-keong",
+        directoryName: "Choong Chee Keong",
         name: "Prof. Dr Choong Chee Keong",
         title: "Vice President (Student Development and Alumni Relations)",
         photo: "/people/choong-chee-keong.jpg",
@@ -56,7 +65,7 @@ export const PEOPLE: PersonProfile[] = [
     },
 ];
 
-export type PersonCard = Pick<PersonProfile, "name" | "title" | "photo">;
+export type PersonCard = Pick<PersonProfile, "name" | "title" | "photo" | "directoryName">;
 
 function matches(person: PersonProfile, text: string): boolean {
     return person.patterns.some((p) => p.test(text));
@@ -78,5 +87,5 @@ export function findPerson(question: string, answer: string): PersonCard | null 
                       return inAnswer.length === 1 ? inAnswer[0] : null;
                   })()
                 : null;
-    return chosen ? { name: chosen.name, title: chosen.title, photo: chosen.photo } : null;
+    return chosen ? { name: chosen.name, title: chosen.title, photo: chosen.photo, directoryName: chosen.directoryName } : null;
 }
