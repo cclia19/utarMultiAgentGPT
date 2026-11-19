@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from "react";
  * with the face painted out, plus separate eyes, mouth and sprout layers, so
  * he can blink, glance, wiggle his sprout, hop and change expression. His
  * right arm is its own layer too (the body side behind it is painted in), so
- * he can wave. A shoulder cap hides the joint, and his head is drawn again
- * over the arm so a raised hand tucks behind it.
+ * he can wave. A shoulder cap hides the joint; the hand waves in front of
+ * the edge of his head, kept low enough not to cover his face.
  * Coordinates are pixels in the 582 × 812 cut-out.
  *
  * crop "full" is the whole figure (with a floor shadow), "bust" a square from
@@ -29,7 +29,6 @@ const LAYERS = {
     mouth: { x: 254, y: 362, w: 87, h: 30 },
     arm: { x: 355, y: 469, w: 102, h: 153 },
     shoulder: { x: 372, y: 473, w: 41, h: 23 },
-    headfront: { x: 300, y: 120, w: 282, h: 346 },
 };
 // The arm pivots at the shoulder.
 const ARM_ORIGIN = `${((395 - 355) / 102) * 100}% ${((471 - 469) / 153) * 100}%`;
@@ -54,6 +53,7 @@ export default function Mascot({
     wave = 0,
     lively = false,
     float = crop === "full",
+    shadow = crop === "full",
     onClick,
     alt = "",
     className = "",
@@ -69,6 +69,8 @@ export default function Mascot({
     /** Now and then, on his own: wave, smile, hop or look around. */
     lively?: boolean;
     float?: boolean;
+    /** Floor shadow under his feet (off when he sits on something). */
+    shadow?: boolean;
     onClick?: () => void;
     alt?: string;
     className?: string;
@@ -93,8 +95,8 @@ export default function Mascot({
         busy.current = true;
         setBeaming(true);
         const arm = armRef.current;
-        await animate(arm, { rotate: -96 }, { type: "spring", stiffness: 210, damping: 17 });
-        await animate(arm, { rotate: [-96, -114, -86, -114, -92] }, { duration: 1.15, ease: "easeInOut" });
+        await animate(arm, { rotate: -94 }, { type: "spring", stiffness: 210, damping: 17 });
+        await animate(arm, { rotate: [-94, -108, -84, -108, -90] }, { duration: 1.15, ease: "easeInOut" });
         setBeaming(false);
         await animate(arm, { rotate: 0 }, { type: "spring", stiffness: 170, damping: 19 });
         busy.current = false;
@@ -215,7 +217,7 @@ export default function Mascot({
 
     const figure = (
         <div className="relative w-full" style={{ aspectRatio: `${W} / ${viewH}` }}>
-            {crop === "full" && (
+            {shadow && (
                 <motion.div
                     aria-hidden
                     className="absolute bottom-[-2.5%] left-1/2 h-[5%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(closest-side,rgba(15,23,42,0.28),rgba(15,23,42,0))] dark:bg-[radial-gradient(closest-side,rgba(0,0,0,0.6),rgba(0,0,0,0))]"
@@ -240,7 +242,6 @@ export default function Mascot({
                         style={{ ...box(LAYERS.arm), transformOrigin: ARM_ORIGIN }}
                     />
                     <img src="/mascot/shoulder.webp" alt="" draggable={false} className="absolute select-none" style={box(LAYERS.shoulder)} />
-                    <img src="/mascot/headfront.webp" alt="" draggable={false} className="absolute select-none" style={box(LAYERS.headfront)} />
                     {/* Sprout: the wrapper sways, the image boings (on landing and hops). */}
                     <motion.div className="absolute" style={{ ...box(LAYERS.sprout), transformOrigin: SPROUT_ORIGIN }} animate={sproutIdle}>
                         <motion.img

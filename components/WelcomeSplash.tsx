@@ -68,6 +68,15 @@ export default function WelcomeSplash({
     const [isOpen, setIsOpen] = useState(false);
     const [noticeOpen, setNoticeOpen] = useState(false);
     const [heroHop, setHeroHop] = useState(0);
+    // Wide screens: the mascot sits on the Hello tile with his legs over the hero; smaller screens keep him in the hero.
+    const [wide, setWide] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia("(min-width: 1280px)");
+        const update = () => setWide(mq.matches);
+        update();
+        mq.addEventListener("change", update);
+        return () => mq.removeEventListener("change", update);
+    }, []);
     const [agreed, setAgreed] = useState(false);
     const reduce = useReducedMotion();
     const t = STRINGS[lang];
@@ -155,8 +164,10 @@ export default function WelcomeSplash({
                         {tile(
                             "col-span-2 flex min-h-[300px] flex-col items-center justify-center overflow-hidden rounded-[30px] p-6 text-white sm:col-span-4 xl:min-h-0 xl:[grid-area:hero] bg-[radial-gradient(120%_90%_at_85%_100%,rgba(227,24,55,0.85)_0%,rgba(227,24,55,0)_55%),linear-gradient(150deg,#1b1a4a_0%,#1e3a8a_55%,#2347a8_100%)]",
                             <>
-                                <Mascot entrance lively hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="w-[104px] drop-shadow-[0_18px_30px_rgba(10,12,40,0.45)] xl:w-[112px] 2xl:w-[150px]" />
-                                <h1 className="mt-5 whitespace-nowrap text-6xl font-extrabold tracking-[-0.04em] sm:text-7xl xl:text-[min(6rem,calc(5.2vw-8px))]">UTARCHAT</h1>
+                                {!wide && (
+                                    <Mascot entrance lively hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="mb-5 w-[104px] drop-shadow-[0_18px_30px_rgba(10,12,40,0.45)]" />
+                                )}
+                                <h1 className=" whitespace-nowrap text-6xl font-extrabold tracking-[-0.04em] sm:text-7xl xl:text-[min(6rem,calc(5.2vw-8px))]">UTARCHAT</h1>
                                 <button
                                     onClick={() => setNoticeOpen(true)}
                                     className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-b from-white/30 to-white/10 px-7 py-3 text-lg font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.55),inset_0_0_0_1px_rgba(255,255,255,0.28),0_12px_30px_rgba(10,12,40,0.28)] backdrop-blur-xl backdrop-saturate-150 transition hover:from-white/40 active:scale-[0.98]"
@@ -203,13 +214,22 @@ export default function WelcomeSplash({
 
                         {/* LANGUAGES */}
                         {tile(
-                            `${TILE} gap-0 xl:[grid-area:langs]`,
+                            `${TILE} gap-0 xl:items-start xl:pl-[9%] xl:text-left xl:[grid-area:langs]`,
                             <>
                                 <div className="text-4xl font-extrabold leading-[1.05] tracking-tight text-[#1b1a4a] dark:text-white 2xl:text-5xl">Hello</div>
                                 <div className="text-4xl font-extrabold leading-[1.05] tracking-tight text-[#1e3a8a] dark:text-sky-300 2xl:text-5xl">Hai</div>
                                 <div className="text-4xl font-extrabold leading-[1.15] text-[#e31837] 2xl:text-5xl">你好</div>
                             </>,
                             "langs",
+                        )}
+
+                        {/* The mascot, in front: sitting on the Hello tile, legs over the hero */}
+                        {wide && (
+                            <div key="mascot" className="pointer-events-none relative z-30 flex items-end justify-end pr-[5%] [grid-area:langs]">
+                                <div className="pointer-events-auto mb-[-30%] w-[54%] max-w-[190px]">
+                                    <Mascot entrance lively float={false} shadow={false} hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="drop-shadow-[0_14px_22px_rgba(10,12,40,0.35)]" />
+                                </div>
+                            </div>
                         )}
 
                         {/* UTAR VERIFIED */}
