@@ -822,11 +822,11 @@ export default function ChatClient() {
             <main ref={scrollRef} onScroll={onMainScroll} className="relative flex-1 overflow-y-auto overscroll-contain">
                 <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
                     {showWelcome && (
-                        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="pt-6 text-center sm:pt-12">
+                        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="overflow-x-clip pt-10 text-center sm:pt-14">
                             {splashOpen === false ? (
-                                <Mascot entrance lively hop={mascotHop} mood={mascotReaction ?? "idle"} onClick={() => setMascotWave((w) => w + 1)} className="mx-auto w-[96px] sm:w-[112px]" />
+                                <Mascot entrance scenes hop={mascotHop} mood={mascotReaction ?? "idle"} onClick={() => setMascotWave((w) => w + 1)} className="mx-auto w-[112px] sm:w-[128px]" />
                             ) : (
-                                <div aria-hidden className="mx-auto aspect-[582/812] w-[96px] sm:w-[112px]" />
+                                <div aria-hidden className="mx-auto aspect-[582/812] w-[112px] sm:w-[128px]" />
                             )}
                             <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{t.greetingTitle}</h1>
                             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 dark:text-zinc-400">{t.greetingBody}</p>

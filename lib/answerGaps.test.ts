@@ -65,3 +65,13 @@ test("only Google Maps search links are allowed through", () => {
     assert.equal(isMapsSearchLink("https://maps.google.com/?q=somewhere"), false);
     assert.equal(isMapsSearchLink("https://evil.example.com/maps/search/?api=1&query=x"), false);
 });
+
+test("source talk is dropped from Chinese and Malay answers", async () => {
+    const { stripSourceTalk } = await import("./answerGaps.ts");
+    assert.equal(
+        stripSourceTalk("虽然文件中没有明确说明豁免/内部学分转移表格的获取地点，但通常这类表格可以从学院总办公室获取。"),
+        "通常这类表格可以从学院总办公室获取。"
+    );
+    assert.equal(stripSourceTalk("Walaupun dokumen tidak menyatakan lokasi borang, anda boleh mendapatkannya di Pejabat Am."), "anda boleh mendapatkannya di Pejabat Am.");
+    assert.equal(stripSourceTalk("The fee is not specified in the available documents."), "The fee is not specified in the available documents.");
+});

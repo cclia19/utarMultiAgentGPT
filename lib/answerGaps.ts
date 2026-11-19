@@ -72,3 +72,17 @@ VERDICT FIRST: When the user asks whether they can, may or are allowed to do som
 - When a rule restricts something, the verdict must reflect the restriction. Never soften it into "there is no outright ban".
 - Apply the rule to the user's situation. Example: Rule XX Section 15 bars any employment, full-time or part-time, that conflicts with a student's position, so a full-time job while studying full-time is **No**; part-time work may be acceptable only if it does not conflict with studies (check with DSA).
 `;
+
+/**
+ * "虽然文件中没有明确说明表格的获取地点，但…" / "Walaupun dokumen tidak menyatakan…, …":
+ * the model talking about its documents in Chinese or Malay answers. These
+ * clauses are dropped (the English ones are kept, because they trigger the
+ * web search for the missing detail and are reworded elsewhere).
+ */
+export function stripSourceTalk(text: string): string {
+    return String(text || "")
+        .replace(/虽然(?:在)?(?:所提供的|现有的|相关的)?(?:文件|文档|资料|文献)(?:中|里)?(?:并)?(?:没有|未|没)(?:明确)?(?:说明|提到|列出|指出|提及|注明)[^，,。]*[，,]\s*(?:但(?:是)?)?/g, "")
+        .replace(/(?:所提供的|现有的|相关的)?(?:文件|文档|资料)(?:中|里)(?:并)?(?:没有|未|没)(?:明确)?(?:说明|提到|列出|指出|提及|注明)[^。\n]*。\s*/g, "")
+        .replace(/\b(?:Walaupun|Walau bagaimanapun|Meskipun)\s+dokumen(?:\s+yang\s+(?:diberikan|tersedia))?\s+tidak\s+(?:menyatakan|menyebut|menjelaskan)[^,.\n]*,\s*/gi, "")
+        .replace(/\bDokumen(?:\s+yang\s+(?:diberikan|tersedia))?\s+tidak\s+(?:menyatakan|menyebut|menjelaskan)[^.\n]*\.\s*/gi, "");
+}

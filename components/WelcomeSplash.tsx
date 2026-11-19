@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import Mascot from "./Mascot";
+import Mascot, { MASCOT_SEAT } from "./Mascot";
 import {
     ArrowUp,
     Award,
@@ -165,7 +165,7 @@ export default function WelcomeSplash({
                             "col-span-2 flex min-h-[300px] flex-col items-center justify-center overflow-hidden rounded-[30px] p-6 text-white sm:col-span-4 xl:min-h-0 xl:[grid-area:hero] bg-[radial-gradient(120%_90%_at_85%_100%,rgba(227,24,55,0.85)_0%,rgba(227,24,55,0)_55%),linear-gradient(150deg,#1b1a4a_0%,#1e3a8a_55%,#2347a8_100%)]",
                             <>
                                 {!wide && (
-                                    <Mascot entrance lively hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="mb-5 w-[104px] drop-shadow-[0_18px_30px_rgba(10,12,40,0.45)]" />
+                                    <Mascot entrance lively={!noticeOpen} still={noticeOpen} hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="mb-5 w-[104px]" />
                                 )}
                                 <h1 className=" whitespace-nowrap text-6xl font-extrabold tracking-[-0.04em] sm:text-7xl xl:text-[min(6rem,calc(5.2vw-8px))]">UTARCHAT</h1>
                                 <button
@@ -223,11 +223,15 @@ export default function WelcomeSplash({
                             "langs",
                         )}
 
-                        {/* The mascot, in front: sitting on the Hello tile, legs over the hero */}
+                        {/* The mascot, in front: sitting on the top edge of the hero, below the Hello tile, legs hanging over the hero */}
                         {wide && (
-                            <div key="mascot" className="pointer-events-none relative z-30 flex items-end justify-end pr-[5%] [grid-area:langs]">
-                                <div className="pointer-events-auto mb-[-30%] w-[54%] max-w-[190px]">
-                                    <Mascot entrance lively float={false} shadow={false} hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="drop-shadow-[0_14px_22px_rgba(10,12,40,0.35)]" />
+                            <div key="mascot" className="pointer-events-none relative z-30 flex justify-end self-start [grid-area:hero]">
+                                <div className="relative flex w-1/2 justify-end pr-[5%]">
+                                    {/* contact shadow where he sits */}
+                                    <div aria-hidden className="absolute right-[5%] top-0 h-5 w-[46%] max-w-[190px] rounded-[50%] bg-[radial-gradient(closest-side,rgba(5,8,30,0.5),rgba(5,8,30,0))]" />
+                                    <div className="pointer-events-auto w-[46%] max-w-[190px]" style={{ transform: `translateY(-${MASCOT_SEAT * 100}%)` }}>
+                                        <Mascot entrance lively={!noticeOpen} still={noticeOpen} pose="sit" shadow={false} hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" />
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -426,7 +430,7 @@ export default function WelcomeSplash({
                                     <div className="relative max-h-[85dvh] overflow-y-auto px-6 pb-6 pt-7">
                                         <div className="flex flex-col items-center text-center">
                                             <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/70 bg-white/70 shadow-sm dark:border-white/10 dark:bg-white/10">
-                                                <Mascot crop="bust" float={false} className="w-12" />
+                                                <Mascot crop="bust" float={false} still className="w-12" />
                                             </div>
                                             <h2 id="notice-title" className="flex items-center gap-2 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                                                 {n.title}

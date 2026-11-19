@@ -9,6 +9,7 @@ import { detectAgentFromText, routeQuestion, resolveControlledAcronym } from "./
 import { isPersonRoleQuestion } from "./personRoleQuestion";
 import { isIntakeOrCalendarQuestion } from "./conversationSignals";
 import { bothCampusOffices } from "./campusOffices";
+import { CLARIFY_LANGUAGE_NAMES } from "./clarifyLanguage";
 
 export interface IntentRouteResult {
     agentId: string;
@@ -533,6 +534,8 @@ export async function routeWithLLM(params: {
     rawMessage?: string;
     currentAgentId?: string;
     pendingQuestion?: string | null;
+    /** The language the student chose (en / ms / zh), for the clarification question. */
+    language?: string;
 }): Promise<IntentRouteResult> {
     const message = String(params.message || "").trim();
     const rawMessage = String(params.rawMessage || message).trim();
@@ -700,7 +703,7 @@ JSON schema:
   "conversationRelation": "none" | "clarification_for_pending" | "follow_up_same_topic" | "new_standalone_question",
   "usePendingQuestion": true or false,
   "needsClarification": true or false,
-  "clarificationQuestion": "one concise follow-up question, or empty string",
+  "clarificationQuestion": "one concise follow-up question written in ${CLARIFY_LANGUAGE_NAMES[params.language || ""] || "the language of the question"}, or empty string",
   "rewrittenQuestion": "clear self-contained retrieval query with known context included",
   "allowWebFallback": true or false,
   "routeType": "general_public" | "faculty_specific" | "admin_specific" | "private_sensitive" | "unclear" | "context_setting",
