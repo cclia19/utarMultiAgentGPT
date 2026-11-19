@@ -192,8 +192,9 @@ const AVO_WHO = [
 ];
 const AVO_WHO_CJK = /(avo|Avo|AVO)\s*(是谁|是誰)|谁是\s*(avo|Avo|AVO)/;
 const AUN_NAME = /\b(aun\s*yi\s*chiet|yichiet|yi\s*chiet|(dr|prof|professor|ts|assoc prof)\s+aun)\b/;
-// "Aun Yichiet's email / office" is a real directory question: let the pipeline answer it.
-const CONTACT = /\b(email|e mail|phone|tel|office|room|contact|consultation|ext|extension|block|where)\b/;
+// "Aun Yichiet's email / office" or "what does Dr Aun Yichiet research" is a real
+// question: let the pipeline answer it (his photo tile still shows).
+const CONTACT = /\b(email|e mail|phone|tel|office|room|contact|consultation|ext|extension|block|where|research|researches|expertise|expert|areas?|publications?|papers?|projects?|supervis\w*|interests?|specialis\w*|specializ\w*)\b/;
 
 export function isAvoQuestion(message: string): boolean {
     const raw = String(message || "");

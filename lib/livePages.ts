@@ -25,6 +25,7 @@ const HOURS = /\b(hours?|open|opening|opens|close|closing|closed|time|times|when
 const FEE = /\b(fee|fees|yuran|tuition|cost|costs|how much|berapa|price)\b|学费|费用|多少钱/i;
 const POSTGRAD = /\b(master|masters|phd|ph\.d|doctor(ate)?|postgraduate|post-graduate|pg|mba|msc|sarjana|pascasiswazah|doktor falsafah)\b|硕士|博士|研究生/i;
 const MOBILITY = /\b(student exchange|exchange (programme|program|student)|study abroad|outbound|inbound|mobility|study tour|semester abroad|pertukaran pelajar)\b|交换生|交流生|海外学习/i;
+const ACCOMMODATION = /\b(hostels?|accommodations?|asrama|room rental|rent(ing)? a room|rooms? (near|for rent)|where (to|can i) stay|place to stay|housing|tempat tinggal|penginapan|bilik sewa)\b|宿舍|住宿|租房/i;
 const INTERNSHIP = /\b(intern|interns|internship|internships|industrial training|industrial attachment|practical training|placement|latihan industri|praktikal)\b|实习|工业实习/i;
 
 export const LIVE_PAGES: LivePage[] = [
@@ -60,6 +61,14 @@ export const LIVE_PAGES: LivePage[] = [
         note:
             "The Office of International Affairs (OIA) handles student mobility: exchange, study abroad, outbound and inbound programmes. " +
             "For whom to contact, give OIA's e-mail and phone numbers from this page (Kampar and Sungai Long) and its website https://oia.utar.edu.my/.",
+    },
+    {
+        id: "accommodation",
+        urls: ["https://study.utar.edu.my/Student-Accommodation.php", "https://dsa.kpr.utar.edu.my/Accommodation-Listing.php"],
+        matches: (q) => ACCOMMODATION.test(q),
+        note:
+            "Student accommodation for both campuses. UTAR does not run its own hostels; it works with hostel management companies and keeps a listing of nearby options. " +
+            "Answer for the campus asked about; if none is given, cover Kampar and Sungai Long. Name the listed companies with distance and phone numbers, and point to the DSA listing for more options and living costs.",
     },
 ];
 

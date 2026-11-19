@@ -176,6 +176,23 @@ export const ORG_UNITS: OrgUnit[] = [
         studentFacing: true,
     },
     {
+        id: "staff-expertise",
+        name: "Staff research expertise (who works on what)",
+        shortLabel: "Staff Expertise",
+        type: "office",
+        website: "https://www2.utar.edu.my/staffListSearchV2.jsp",
+        aliases: [
+            "research expertise", "area of expertise", "areas of expertise", "research area", "research areas", "research interest", "research interests",
+            "who works on", "who researches", "who is working on", "expert in", "expert on", "specialises in", "specializes in", "lecturer who knows",
+            "what does dr", "what is the research of", "find a supervisor", "potential supervisor", "supervisor for my research",
+        ],
+        fileStoreDisplayName: "UTAR Staff Expertise",
+        storeResourceIds: ["fileSearchStores/utar-staff-expertise-zs7i8nzpmoya"],
+        enabledForChat: true,
+        enabledForUpload: false,
+        studentFacing: true,
+    },
+    {
         id: "oia",
         name: "Office of International Affairs",
         shortLabel: "OIA",
