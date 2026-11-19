@@ -47,7 +47,11 @@ export type Fx = {
     pageFlip?: boolean;
 };
 
-// The arm: shoulder pivot and the glove's centre at rest.
+// The arm: shoulder pivot and the glove's centre at rest. His arm is short and
+// his head big: past about -110° the glove lands on his face, so raised poses
+// stay at wave height (RAISED / RAISED_HIGH).
+export const RAISED = -96;
+const RAISED_HIGH = -110;
 export const PIVOT = { x: 395, y: 471 };
 const HAND = { x: 420, y: 590 };
 
@@ -184,16 +188,16 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         }
         // Wind up overhead, then shoot.
         c.setFace({ eyes: "open", look: { x: -3, y: -3 }, mouth: "o" });
-        await animate(c.arm, -150, spring(170, 16));
+        await animate(c.arm, RAISED_HIGH, spring(170, 16));
         if (!alive()) return;
         await sleep(250);
-        const h = handAt(-150);
+        const h = handAt(RAISED_HIGH);
         c.ball.x.set(h.x);
         c.ball.y.set(h.y - 38);
         c.ball.r.set(0);
         c.patchFx({ ballFree: true });
         c.setHeld(null);
-        animate(c.arm, -170, { duration: 0.2 });
+        animate(c.arm, -86, { duration: 0.2 });
         // Arc to the rim (on the left), through the net, then bounce away.
         await Promise.all([
             animate(c.ball.x, -250, { duration: 1.05, ease: "linear" }),
@@ -209,7 +213,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         animate(c.ball.y, [250, 812 - 34, 640, 812 - 34, 740, 812 - 34], { duration: 0.9, ease: "easeIn" });
         await c.hop();
         if (!alive()) return;
-        await animate(c.arm, [-100, -120, -90, -110, -100], { duration: 0.9 });
+        await animate(c.arm, [-100, -110, -88, -108, -96], { duration: 0.9 });
         await animate(c.ball.o, 0, { duration: 0.3 });
         c.patchFx({ ballFree: false, score: false, hoop: false });
         await animate(c.arm, 0, spring(150, 18));
@@ -237,7 +241,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         c.patchFx({ deployed: true });
         c.setFace({ eyes: "open", look: { x: -2, y: -2 }, mouth: "open", shades: true });
         await animate(c.arm, -100, spring(170, 14));
-        await animate(c.arm, [-100, -118, -96], { duration: 0.6 });
+        await animate(c.arm, [-100, -110, -94], { duration: 0.6 });
         await sleep(900);
         if (!alive()) return;
         c.patchFx({ laptop: false, code: false, deployed: false });
@@ -298,7 +302,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
             animate(c.body.y, [0, -4, 0], { duration: beat });
             animate(c.body.rot, side * 7, { duration: beat, ease: "easeInOut" });
             animate(side > 0 ? c.legL : c.legR, [0, side * 16, 0], { duration: beat });
-            animate(c.arm, i % 4 < 2 ? -150 : -120, { duration: beat * 0.8 });
+            animate(c.arm, i % 4 < 2 ? RAISED_HIGH : -86, { duration: beat * 0.8 });
             if (i === 3) c.boing(1);
             await sleep(beat * 1000);
         }
@@ -310,7 +314,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         if (!alive()) return;
         // Freeze pose.
         animate(c.body.rot, -6, spring(300, 14));
-        await animate(c.arm, -165, spring(260, 12));
+        await animate(c.arm, RAISED_HIGH, spring(260, 12));
         sparkle(300, 200);
         await sleep(1000);
         if (!alive()) return;
@@ -331,7 +335,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         // Up, flip, down.
         animate(c.body.sy, [1.08, 1], { duration: 0.3 });
         animate(c.body.sx, [0.94, 1], { duration: 0.3 });
-        animate(c.arm, -150, { duration: 0.3 });
+        animate(c.arm, RAISED, { duration: 0.3 });
         await Promise.all([
             animate(c.body.y, [0, -42, -42, 0], { duration: 0.95, times: [0, 0.35, 0.6, 1], ease: ["easeOut", "linear", "easeIn"] }),
             animate(c.body.rot, [0, 0, -360], { duration: 0.95, times: [0, 0.12, 0.85], ease: "easeInOut" }),
@@ -344,7 +348,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         animate(c.body.sx, 1, spring(500, 12));
         sparkle(291, 760);
         c.setFace({ eyes: "happy", mouth: "open", blush: true });
-        await animate(c.arm, -160, spring(260, 12));
+        await animate(c.arm, RAISED_HIGH, spring(260, 12));
         c.boing(1);
         await sleep(1500);
         if (!alive()) return;
@@ -423,7 +427,7 @@ export async function runScene(id: SceneId, c: SceneCtl) {
         await Promise.all([animate(c.body.x, 0, { duration: back, ease: "easeOut" }), animate(c.body.y, [0, -4, 0, -4, 0, -4, 0, -4, 0], { duration: back })]);
         if (!alive()) return;
         c.boing(1);
-        await animate(c.arm, [-100, -120, -96, -116, -100], { duration: 1 });
+        await animate(c.arm, [-100, -110, -90, -108, -98], { duration: 1 });
         await sleep(500);
         if (!alive()) return;
         sparkle(handAt(-100).x, handAt(-100).y - 40);

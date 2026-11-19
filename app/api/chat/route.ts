@@ -36,6 +36,7 @@ import {
 } from "@/lib/staffDirectory";
 import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
+import { staffNameFromQuestion } from "@/lib/staffNameQuestion";
 import { DIRECT_LINKS_RULE, contactRule, verifiedLinks } from "@/lib/utarLinks";
 import { CLARIFY_LANGUAGE_NAMES, clarificationNeedsTranslation } from "@/lib/clarifyLanguage";
 import {
@@ -1805,6 +1806,24 @@ I can't confirm who currently holds that position from UTAR's official staff dir
     }
 }
 
+/**
+ * A question about a named staff member, from the live directory: their
+ * current admin positions, department and contacts. Null (documents answer)
+ * when nobody or too many people match the name.
+ */
+async function answerStaffByName(name: string): Promise<WebFallbackResult | null> {
+    try {
+        const records = await lookupStaff({ deptCodes: ["ALL"], name });
+        if (records.length < 1 || records.length > 3) return null;
+        const directoryLink = { title: "UTAR Staff Directory", uri: "https://www2.utar.edu.my/staffListSearchV2.jsp" };
+        const text = ["### 📌 Summary", "", formatStaffRecords(records)].join("\n");
+        return { text: appendOfficialLinks(text, [directoryLink]), citations: [directoryLink.uri], needsClarification: false, pendingQuestion: null };
+    } catch (error) {
+        console.error("answerStaffByName failed:", error);
+        return null;
+    }
+}
+
 async function tryStaffDirectoryFallback(params: {
     effectiveMessage: string;
     selectedAgent: any;
@@ -3425,9 +3444,12 @@ async function handleChat(
         // website shows) comes first. Uploaded documents such as handbooks can
         // be older than the latest appointments, so they only answer when the
         // directory has no match.
-        if (isPersonRoleQuestion(effectiveMessage).isRoleQuestion) {
+        const staffName = staffNameFromQuestion(rawMessage) || staffNameFromQuestion(effectiveMessage);
+        if (isPersonRoleQuestion(effectiveMessage).isRoleQuestion || staffName) {
             sink?.status("staffDirectory", "Checking UTAR Staff Directory...");
-            const fromDirectory = await answerFromStaffDirectory({ effectiveMessage, selectedAgent, nullIfNotFound: true });
+            const fromDirectory = isPersonRoleQuestion(effectiveMessage).isRoleQuestion
+                ? await answerFromStaffDirectory({ effectiveMessage, selectedAgent, nullIfNotFound: true })
+                : await answerStaffByName(staffName!);
             if (fromDirectory) {
                 return NextResponse.json({
                     text: fromDirectory.text,
