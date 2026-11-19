@@ -184,6 +184,7 @@ export default function ChatClient() {
     // The mascot in the header reacts: thinking while we answer, happy on a 👍, sheepish when an answer fails.
     const [mascotReaction, setMascotReaction] = useState<MascotMood | null>(null);
     const [mascotHop, setMascotHop] = useState(0);
+    const [mascotWave, setMascotWave] = useState(0);
     // null until the splash says whether it is showing; the mascot drops in once it is gone.
     const [splashOpen, setSplashOpen] = useState<boolean | null>(null);
     const reactionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -283,7 +284,7 @@ export default function ChatClient() {
         msg: Message,
         rating: "like" | "dislike"
     ) => {
-        if (rating === "like") react("happy", 1800, true);
+        if (rating === "like") setMascotWave((w) => w + 1);
         const userMsg = messages[index - 1];
         const userQuery = userMsg?.role === "user" ? userMsg.text : "";
         let screenshotBase64 = "";
@@ -558,6 +559,8 @@ export default function ChatClient() {
 
     const handleSend = async (override?: string, base?: Message[]) => {
         const trimmed = (override ?? input).trim();
+        // Say hi and he waves back.
+        if (/^(hi|hello|hey|hai|helo|hallo|yo|salam|assalamualaikum|你好|嗨|哈喽|哈囉)\b/i.test(trimmed) || /^(你好|嗨|哈喽)/.test(trimmed)) setMascotWave((w) => w + 1);
 
         if (!trimmed || loading) return;
         // A light tap on phones that support it (Android); iOS ignores it.
@@ -765,7 +768,7 @@ export default function ChatClient() {
                     <div className="flex min-w-0 items-center gap-2.5">
                         <button onClick={newChat} aria-label={t.ui.newChat} title={t.ui.newChat} className="shrink-0 rounded-xl transition active:scale-95">
                             <span className="block h-10 w-10 overflow-hidden rounded-full bg-gradient-to-b from-sky-100 to-indigo-100 ring-1 ring-black/5 dark:from-sky-900/50 dark:to-indigo-900/50 dark:ring-white/10">
-                                <Mascot crop="bust" float={false} mood={loading ? "thinking" : mascotReaction ?? "idle"} hop={mascotHop} alt="UTARCHAT" className="mx-auto mt-[4px] w-[92%]" />
+                                <Mascot crop="bust" float={false} mood={loading ? "thinking" : mascotReaction ?? "idle"} hop={mascotHop} wave={mascotWave} alt="UTARCHAT" className="mx-auto mt-[4px] w-[92%]" />
                             </span>
                         </button>
                         <div className="min-w-0">
@@ -821,7 +824,7 @@ export default function ChatClient() {
                     {showWelcome && (
                         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="pt-6 text-center sm:pt-12">
                             {splashOpen === false ? (
-                                <Mascot entrance hop={mascotHop} mood={mascotReaction ?? "idle"} onClick={() => react("happy", 1200, true)} className="mx-auto w-[96px] sm:w-[112px]" />
+                                <Mascot entrance lively hop={mascotHop} mood={mascotReaction ?? "idle"} onClick={() => setMascotWave((w) => w + 1)} className="mx-auto w-[96px] sm:w-[112px]" />
                             ) : (
                                 <div aria-hidden className="mx-auto aspect-[582/812] w-[96px] sm:w-[112px]" />
                             )}

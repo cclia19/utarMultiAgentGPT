@@ -6,7 +6,10 @@ import { useEffect, useRef, useState } from "react";
 /**
  * The UTARCHAT mascot, rigged from one illustration (public/mascot/): a body
  * with the face painted out, plus separate eyes, mouth and sprout layers, so
- * he can blink, glance, wiggle his sprout, hop and change expression.
+ * he can blink, glance, wiggle his sprout, hop and change expression. His
+ * right arm is its own layer too (the body side behind it is painted in), so
+ * he can wave. A shoulder cap hides the joint, and his head is drawn again
+ * over the arm so a raised hand tucks behind it.
  * Coordinates are pixels in the 582 × 812 cut-out.
  *
  * crop "full" is the whole figure (with a floor shadow), "bust" a square from
@@ -24,7 +27,12 @@ const LAYERS = {
     eyeL: { x: 170, y: 283, w: 47, h: 62 },
     eyeR: { x: 368, y: 281, w: 48, h: 62 },
     mouth: { x: 254, y: 362, w: 87, h: 30 },
+    arm: { x: 355, y: 469, w: 102, h: 153 },
+    shoulder: { x: 372, y: 473, w: 41, h: 23 },
+    headfront: { x: 300, y: 120, w: 282, h: 346 },
 };
+// The arm pivots at the shoulder.
+const ARM_ORIGIN = `${((395 - 355) / 102) * 100}% ${((471 - 469) / 153) * 100}%`;
 // The sprout pivots where its stem meets the head.
 const SPROUT_ORIGIN = `${((372 - 270) / 231) * 100}% ${(110 / 112) * 100}%`;
 
@@ -43,6 +51,8 @@ export default function Mascot({
     mood = "idle",
     entrance = false,
     hop = 0,
+    wave = 0,
+    lively = false,
     float = crop === "full",
     onClick,
     alt = "",
@@ -54,6 +64,10 @@ export default function Mascot({
     entrance?: boolean;
     /** Change this number to make him hop. */
     hop?: number;
+    /** Change this number to make him wave. */
+    wave?: number;
+    /** Now and then, on his own: wave, smile, hop or look around. */
+    lively?: boolean;
     float?: boolean;
     onClick?: () => void;
     alt?: string;
@@ -64,7 +78,37 @@ export default function Mascot({
     const [blink, setBlink] = useState(false);
     const [look, setLook] = useState({ x: 0, y: 0 });
     const [greeting, setGreeting] = useState(entrance && !reduce);
+    const [beaming, setBeaming] = useState(false);
     const sproutRef = useRef<HTMLImageElement>(null);
+    const armRef = useRef<HTMLImageElement>(null);
+    const busy = useRef(false);
+
+    const boing = (amount = 1) => {
+        if (sproutRef.current) animate(sproutRef.current, { rotate: [0, -14 * amount, 9 * amount, -4 * amount, 0] }, { duration: 0.8 });
+    };
+
+    // Raise the arm, wave a few times with a smile, lower it.
+    const doWave = async () => {
+        if (reduce || !armRef.current || busy.current) return;
+        busy.current = true;
+        setBeaming(true);
+        const arm = armRef.current;
+        await animate(arm, { rotate: -96 }, { type: "spring", stiffness: 210, damping: 17 });
+        await animate(arm, { rotate: [-96, -114, -86, -114, -92] }, { duration: 1.15, ease: "easeInOut" });
+        setBeaming(false);
+        await animate(arm, { rotate: 0 }, { type: "spring", stiffness: 170, damping: 19 });
+        busy.current = false;
+    };
+
+    const doHop = async () => {
+        if (reduce || !scope.current) return;
+        await animate(scope.current, { scaleX: 1.08, scaleY: 0.9, y: "0%" }, { duration: 0.08 });
+        await animate(scope.current, { scaleX: 0.95, scaleY: 1.06, y: "-14%" }, { duration: 0.2, ease: [0.2, 0.8, 0.3, 1] });
+        await animate(scope.current, { scaleX: 1, scaleY: 1, y: "0%" }, { duration: 0.22, ease: [0.5, 0, 0.8, 0.4] });
+        await animate(scope.current, { scaleX: 1.08, scaleY: 0.92 }, { duration: 0.07 });
+        animate(scope.current, { scaleX: 1, scaleY: 1 }, { type: "spring", stiffness: 600, damping: 14 });
+        boing();
+    };
 
     // Entrance: drop, squash on landing, spring back, sprout boing.
     useEffect(() => {
@@ -76,7 +120,10 @@ export default function Mascot({
             await animate(scope.current, { scaleX: 1.1, scaleY: 0.88 }, { duration: 0.09, ease: "easeOut" });
             animate(scope.current, { scaleX: 1, scaleY: 1 }, { type: "spring", stiffness: 600, damping: 12 });
             if (sproutRef.current) animate(sproutRef.current, { rotate: [0, -16, 11, -6, 3, 0] }, { duration: 0.9, ease: "easeOut" });
-            setTimeout(() => !cancelled && setGreeting(false), 1500);
+            await new Promise((r) => setTimeout(r, 250));
+            if (cancelled) return;
+            await doWave();
+            if (!cancelled) setGreeting(false);
         })();
         return () => {
             cancelled = true;
@@ -84,19 +131,45 @@ export default function Mascot({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Hop on request: crouch, jump, land with a squash.
+    // Hop or wave on request.
     useEffect(() => {
-        if (!hop || reduce || !scope.current) return;
-        (async () => {
-            await animate(scope.current, { scaleX: 1.08, scaleY: 0.9, y: "0%" }, { duration: 0.08 });
-            await animate(scope.current, { scaleX: 0.95, scaleY: 1.06, y: "-14%" }, { duration: 0.2, ease: [0.2, 0.8, 0.3, 1] });
-            await animate(scope.current, { scaleX: 1, scaleY: 1, y: "0%" }, { duration: 0.22, ease: [0.5, 0, 0.8, 0.4] });
-            await animate(scope.current, { scaleX: 1.08, scaleY: 0.92 }, { duration: 0.07 });
-            animate(scope.current, { scaleX: 1, scaleY: 1 }, { type: "spring", stiffness: 600, damping: 14 });
-            if (sproutRef.current) animate(sproutRef.current, { rotate: [0, -14, 9, -4, 0] }, { duration: 0.8 });
-        })();
+        if (hop) doHop();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hop]);
+    useEffect(() => {
+        if (wave) doWave();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [wave]);
+
+    // Lively: every 8-16 s, one small thing (never while thinking or sheepish).
+    const moodRef = useRef(mood);
+    moodRef.current = mood;
+    useEffect(() => {
+        if (!lively || reduce) return;
+        let t: ReturnType<typeof setTimeout>;
+        const loop = (first = false) => {
+            t = setTimeout(() => {
+                if (moodRef.current === "idle" && !busy.current && document.visibilityState === "visible") {
+                    const r = Math.random();
+                    if (r < 0.35) doWave();
+                    else if (r < 0.7) {
+                        setBeaming(true);
+                        boing(0.6);
+                        setTimeout(() => setBeaming(false), 1500);
+                    } else if (r < 0.85) doHop();
+                    else {
+                        setLook({ x: -3, y: 0 });
+                        setTimeout(() => setLook({ x: 3, y: 0 }), 700);
+                        setTimeout(() => setLook({ x: 0, y: 0 }), 1500);
+                    }
+                }
+                loop();
+            }, (first ? 6000 : 8000) + Math.random() * 8000);
+        };
+        loop(true);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lively, reduce]);
 
     // Blink every few seconds (sometimes twice), and now and then glance around.
     useEffect(() => {
@@ -126,7 +199,7 @@ export default function Mascot({
         };
     }, [reduce]);
 
-    const shownMood: MascotMood = greeting ? "happy" : mood;
+    const shownMood: MascotMood = (greeting || beaming) && (mood === "idle" || mood === "happy") ? "happy" : mood;
     const closedEyes = shownMood === "happy" || shownMood === "sheepish";
     const eyeLook = shownMood === "thinking" ? { x: 3, y: -4 } : look;
     const viewH = crop === "bust" ? BUST : H;
@@ -158,6 +231,16 @@ export default function Mascot({
                     transition={{ y: { duration: 3.4, repeat: Infinity, ease: "easeInOut" }, rotate: SPRING }}
                 >
                     <img src="/mascot/base.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full select-none" />
+                    <motion.img
+                        ref={armRef}
+                        src="/mascot/arm.webp"
+                        alt=""
+                        draggable={false}
+                        className="absolute select-none"
+                        style={{ ...box(LAYERS.arm), transformOrigin: ARM_ORIGIN }}
+                    />
+                    <img src="/mascot/shoulder.webp" alt="" draggable={false} className="absolute select-none" style={box(LAYERS.shoulder)} />
+                    <img src="/mascot/headfront.webp" alt="" draggable={false} className="absolute select-none" style={box(LAYERS.headfront)} />
                     {/* Sprout: the wrapper sways, the image boings (on landing and hops). */}
                     <motion.div className="absolute" style={{ ...box(LAYERS.sprout), transformOrigin: SPROUT_ORIGIN }} animate={sproutIdle}>
                         <motion.img
