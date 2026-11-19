@@ -8,6 +8,7 @@ import ThinkingLine, { type ThinkingStep } from "./ThinkingLine";
 import { ArrowDown, ArrowUp, ArrowUpRight, Check, Copy, Loader2, Pencil, RotateCcw, SquarePen, ThumbsUp, ThumbsDown } from "lucide-react";
 import html2canvas from "html2canvas";
 import WelcomeSplash from "./WelcomeSplash";
+import Mascot, { type MascotMood } from "./Mascot";
 import FeedbackModal from "./FeedbackModal";
 import { LANGS, STRINGS, defaultLang, type Lang } from "@/lib/i18n";
 
@@ -180,6 +181,18 @@ export default function ChatClient() {
     const [messages, setMessages] = useState<Message[]>([WELCOME]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    // The mascot in the header reacts: thinking while we answer, happy on a 👍, sheepish when an answer fails.
+    const [mascotReaction, setMascotReaction] = useState<MascotMood | null>(null);
+    const [mascotHop, setMascotHop] = useState(0);
+    // null until the splash says whether it is showing; the mascot drops in once it is gone.
+    const [splashOpen, setSplashOpen] = useState<boolean | null>(null);
+    const reactionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const react = useCallback((mood: MascotMood, ms: number, hop = false) => {
+        if (reactionTimer.current) clearTimeout(reactionTimer.current);
+        setMascotReaction(mood);
+        if (hop) setMascotHop((h) => h + 1);
+        reactionTimer.current = setTimeout(() => setMascotReaction(null), ms);
+    }, []);
 
     // Steps the server reported for the current question, shown as a timeline.
     // The thinking line: the current step, and the office it is working with (kept across steps).
@@ -270,6 +283,7 @@ export default function ChatClient() {
         msg: Message,
         rating: "like" | "dislike"
     ) => {
+        if (rating === "like") react("happy", 1800, true);
         const userMsg = messages[index - 1];
         const userQuery = userMsg?.role === "user" ? userMsg.text : "";
         let screenshotBase64 = "";
@@ -709,6 +723,7 @@ export default function ChatClient() {
             };
 
             setMessages((prev) => [...prev, botMsg]);
+            if (botMsg.failed) react("sheepish", 3200);
         } catch (e: any) {
             if (e?.name === "AbortError" || gen !== chatGen.current) return;
             const errorMsg: Message = {
@@ -749,7 +764,9 @@ export default function ChatClient() {
                 <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5">
                         <button onClick={newChat} aria-label={t.ui.newChat} title={t.ui.newChat} className="shrink-0 rounded-xl transition active:scale-95">
-                            <img src="/TARo.png" alt="UTARCHAT" className="h-10 w-10 rounded-xl object-contain shadow-sm ring-1 ring-black/5 dark:ring-white/10" />
+                            <span className="block h-10 w-10 overflow-hidden rounded-full bg-gradient-to-b from-sky-100 to-indigo-100 ring-1 ring-black/5 dark:from-sky-900/50 dark:to-indigo-900/50 dark:ring-white/10">
+                                <Mascot crop="bust" float={false} mood={loading ? "thinking" : mascotReaction ?? "idle"} hop={mascotHop} alt="UTARCHAT" className="mx-auto mt-[4px] w-[92%]" />
+                            </span>
                         </button>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -803,14 +820,11 @@ export default function ChatClient() {
                 <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
                     {showWelcome && (
                         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="pt-6 text-center sm:pt-12">
-                            <motion.img
-                                src="/TARo.png"
-                                alt=""
-                                className="mx-auto h-20 w-20 rounded-[22px] object-contain shadow-lg shadow-indigo-500/10 ring-1 ring-black/5 dark:ring-white/10"
-                                initial={{ scale: 0.85, rotate: -6 }}
-                                animate={{ scale: 1, rotate: 0 }}
-                                transition={{ type: "spring", stiffness: 220, damping: 14 }}
-                            />
+                            {splashOpen === false ? (
+                                <Mascot entrance hop={mascotHop} mood={mascotReaction ?? "idle"} onClick={() => react("happy", 1200, true)} className="mx-auto w-[96px] sm:w-[112px]" />
+                            ) : (
+                                <div aria-hidden className="mx-auto aspect-[582/812] w-[96px] sm:w-[112px]" />
+                            )}
                             <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{t.greetingTitle}</h1>
                             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 dark:text-zinc-400">{t.greetingBody}</p>
 
@@ -1074,7 +1088,7 @@ export default function ChatClient() {
                 </div>
             </footer>
 
-            <WelcomeSplash lang={lang} onChooseLang={chooseLang} />
+            <WelcomeSplash lang={lang} onChooseLang={chooseLang} onOpenChange={setSplashOpen} />
             <FeedbackModal
                 isOpen={feedbackModal.isOpen}
                 onClose={() => setFeedbackModal((prev) => ({ ...prev, isOpen: false }))}
