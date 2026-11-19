@@ -190,10 +190,10 @@ test("returns nothing for General UTAR, which is not a department", () => {
     assert.deepEqual(resolveDeptCodes(getOrgUnitById("general"), catalog()), []);
 });
 
-test("resolves every org unit except General UTAR", () => {
+test("resolves every org unit except General UTAR and Staff Expertise (not a department)", () => {
     const options = catalog();
     const unresolved = ORG_UNITS
-        .filter((u) => u.id !== "general")
+        .filter((u) => u.id !== "general" && u.id !== "staff-expertise")
         .filter((u) => resolveDeptCodes(u, options).length === 0)
         .map((u) => u.id);
 
