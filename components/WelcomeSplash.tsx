@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import Mascot from "./Mascot";
 import {
     ArrowUp,
     Award,
@@ -54,9 +55,19 @@ const range = (from: number, to: number, step: number) => {
     return out;
 };
 
-export default function WelcomeSplash({ lang = "en", onChooseLang }: { lang?: Lang; onChooseLang?: (l: Lang) => void }) {
+export default function WelcomeSplash({
+    lang = "en",
+    onChooseLang,
+    onOpenChange,
+}: {
+    lang?: Lang;
+    onChooseLang?: (l: Lang) => void;
+    /** Whether the splash is showing (reported once known, and on close), so the chat can hold its entrance. */
+    onOpenChange?: (open: boolean) => void;
+}) {
     const [isOpen, setIsOpen] = useState(false);
     const [noticeOpen, setNoticeOpen] = useState(false);
+    const [heroHop, setHeroHop] = useState(0);
     const [agreed, setAgreed] = useState(false);
     const reduce = useReducedMotion();
     const t = STRINGS[lang];
@@ -64,11 +75,15 @@ export default function WelcomeSplash({ lang = "en", onChooseLang }: { lang?: La
     const n = t.disclaimer;
 
     useEffect(() => {
+        let open = true;
         try {
-            if (!localStorage.getItem(STORAGE_KEY)) setIsOpen(true);
+            open = !localStorage.getItem(STORAGE_KEY);
         } catch {
-            setIsOpen(true);
+            // storage blocked: show it
         }
+        setIsOpen(open);
+        onOpenChange?.(open);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -87,6 +102,7 @@ export default function WelcomeSplash({ lang = "en", onChooseLang }: { lang?: La
         }
         setNoticeOpen(false);
         setIsOpen(false);
+        onOpenChange?.(false);
     };
 
     let order = 0;
@@ -139,7 +155,7 @@ export default function WelcomeSplash({ lang = "en", onChooseLang }: { lang?: La
                         {tile(
                             "col-span-2 flex min-h-[300px] flex-col items-center justify-center overflow-hidden rounded-[30px] p-6 text-white sm:col-span-4 xl:min-h-0 xl:[grid-area:hero] bg-[radial-gradient(120%_90%_at_85%_100%,rgba(227,24,55,0.85)_0%,rgba(227,24,55,0)_55%),linear-gradient(150deg,#1b1a4a_0%,#1e3a8a_55%,#2347a8_100%)]",
                             <>
-                                <img src="/TARo.png" alt="TARo, the UTARCHAT mascot" className="h-20 w-20 rounded-[24px] bg-white object-contain shadow-[0_18px_40px_rgba(10,12,40,0.4)] 2xl:h-28 2xl:w-28 2xl:rounded-[30px]" />
+                                <Mascot entrance hop={heroHop} onClick={() => setHeroHop((h) => h + 1)} alt="The UTARCHAT mascot" className="w-[104px] drop-shadow-[0_18px_30px_rgba(10,12,40,0.45)] xl:w-[112px] 2xl:w-[150px]" />
                                 <h1 className="mt-5 whitespace-nowrap text-6xl font-extrabold tracking-[-0.04em] sm:text-7xl xl:text-[min(6rem,calc(5.2vw-8px))]">UTARCHAT</h1>
                                 <button
                                     onClick={() => setNoticeOpen(true)}
@@ -390,7 +406,7 @@ export default function WelcomeSplash({ lang = "en", onChooseLang }: { lang?: La
                                     <div className="relative max-h-[85dvh] overflow-y-auto px-6 pb-6 pt-7">
                                         <div className="flex flex-col items-center text-center">
                                             <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/70 bg-white/70 shadow-sm dark:border-white/10 dark:bg-white/10">
-                                                <img src="/TARo.png" alt="" className="h-12 w-12 rounded-xl object-contain" />
+                                                <Mascot crop="bust" float={false} className="w-12" />
                                             </div>
                                             <h2 id="notice-title" className="flex items-center gap-2 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                                                 {n.title}
