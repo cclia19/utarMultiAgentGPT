@@ -268,6 +268,11 @@ export default function Mascot({
                 hop: doHop,
                 sleep,
                 alive: () => !stopped && run === id,
+                screen: () => {
+                    const r = (scope.current as HTMLElement).getBoundingClientRect();
+                    const perUnit = r.width / W || 1;
+                    return { left: -r.left / perUnit, right: (window.innerWidth - r.left) / perUnit };
+                },
             };
             try {
                 await runScene(next(), ctl);
@@ -377,14 +382,6 @@ export default function Mascot({
                         />
                     ))}
                     <img src="/mascot/base.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full select-none" />
-                    <motion.img
-                        src="/mascot/arm.webp"
-                        alt=""
-                        draggable={false}
-                        className="absolute select-none"
-                        style={{ ...box(LAYERS.arm), transformOrigin: ARM_ORIGIN, rotate: armRot }}
-                    />
-                    <img src="/mascot/shoulder.webp" alt="" draggable={false} className="absolute select-none" style={box(LAYERS.shoulder)} />
                     {/* Sprout: the wrapper sways, the image boings (on landing and hops). */}
                     <motion.div className="absolute" style={{ ...box(LAYERS.sprout), transformOrigin: SPROUT_ORIGIN }} animate={sproutIdle}>
                         <motion.img
@@ -470,6 +467,15 @@ export default function Mascot({
                             </filter>
                         </defs>
                     </svg>
+                    {/* The arm comes last: a raised hand is in front of his face */}
+                    <motion.img
+                        src="/mascot/arm.webp"
+                        alt=""
+                        draggable={false}
+                        className="absolute select-none"
+                        style={{ ...box(LAYERS.arm), transformOrigin: ARM_ORIGIN, rotate: armRot }}
+                    />
+                    <img src="/mascot/shoulder.webp" alt="" draggable={false} className="absolute select-none" style={box(LAYERS.shoulder)} />
                   </motion.div>
                 </motion.div>
             </div>
