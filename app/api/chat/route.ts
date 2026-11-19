@@ -34,6 +34,7 @@ import {
 } from "@/lib/staffDirectory";
 import { isPersonRoleQuestion } from "@/lib/personRoleQuestion";
 import { getOrgUnitById } from "@/lib/orgUnits";
+import { DIRECT_LINKS_RULE, contactRule, verifiedLinks } from "@/lib/utarLinks";
 import {
     isAnswerChallenge,
     isIntakeOrCalendarQuestion,
@@ -228,6 +229,8 @@ function getAgentShortLabel(agent: any): string {
 function cleanUserFacingText(text: string): string {
     return String(text || "")
         .replaceAll(NO_KB_ANSWER, "")
+        // A link wrapped in backticks shows as code, not a link.
+        .replace(/`(\[[^\]\n]+\]\([^)\s]+\))`/g, "$1")
         .replace(/in the provided documents/gi, "clearly")
         .replace(/from the provided documents/gi, "clearly")
         .replace(/in the university documents/gi, "clearly")
@@ -235,7 +238,7 @@ function cleanUserFacingText(text: string): string {
         .replace(/provided documents/gi, "available information")
         .replace(/retrieved documents/gi, "available information")
         .replace(/knowledge base/gi, "available information")
-        .replace(/\bKB\b/gi, "available information")
+        .replace(/(?<!Block\s)\bKB\b(?!\s*(?:Block|\d))/g, "available information")
         .replace(/This link is inferred[^.\n]*(\.)?/gi, "")
         .replace(/The exact URL was not explicitly provided[^.\n]*(\.)?/gi, "")
         .replace(/common pattern for such profiles[^.\n]*(\.)?/gi, "")
@@ -595,7 +598,7 @@ function linkifyRawUrls(text: string): string {
         let url = match;
         let trailing = "";
 
-        while (url.length > 0 && /[.,;:!?'")\]]$/.test(url)) {
+        while (url.length > 0 && /[.,;:!?'")\]*_~`]$/.test(url)) {
             trailing = url.slice(-1) + trailing;
             url = url.slice(0, -1);
         }
@@ -609,8 +612,9 @@ function finalCleanWebAnswer(
     allowedLinks: OfficialLink[]
 ): string {
     const cleaned = cleanUserFacingText(text);
-    const markdownSafe = sanitizeMarkdownLinksAgainstAllowed(normalizeMapsLinks(cleaned), allowedLinks);
-    const rawSafe = stripRawUnverifiedUrls(markdownSafe, allowedLinks);
+    const allowed = [...allowedLinks, ...verifiedLinks()];
+    const markdownSafe = sanitizeMarkdownLinksAgainstAllowed(normalizeMapsLinks(cleaned), allowed);
+    const rawSafe = stripRawUnverifiedUrls(markdownSafe, allowed);
 
     const base = removeEmptyOfficialLinksSection(rawSafe)
         .replace(/\n{3,}/g, "\n\n")
@@ -3285,6 +3289,8 @@ async function handleChat(
             (calendarQuestion ? buildCalendarFormatInstruction() : "") +
             (bothCampuses ? BOTH_CAMPUSES_RULE : CAMPUS_LABEL_RULE) +
             ANSWER_DIRECTLY_RULE +
+            DIRECT_LINKS_RULE +
+            contactRule(getOrgUnitById(selectedAgent.id)) +
             VERDICT_FIRST_RULE +
             (isStudentWorkQuestion(rawMessage) || isStudentWorkQuestion(effectiveMessage) ? STUDENT_WORK_RULE_EVIDENCE : "") +
             FOLLOW_UPS_RULE +

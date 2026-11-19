@@ -24,6 +24,7 @@ const LIBRARY = /\b(library|libraries|perpustakaan)\b|图书馆/i;
 const HOURS = /\b(hours?|open|opening|opens|close|closing|closed|time|times|when|weekend|saturday|sunday|holiday|buka|dibuka|tutup|ditutup|pukul|waktu|jam)\b|开|关|几点|时间|营业/i;
 const FEE = /\b(fee|fees|yuran|tuition|cost|costs|how much|berapa|price)\b|学费|费用|多少钱/i;
 const POSTGRAD = /\b(master|masters|phd|ph\.d|doctor(ate)?|postgraduate|post-graduate|pg|mba|msc|sarjana|pascasiswazah|doktor falsafah)\b|硕士|博士|研究生/i;
+const MOBILITY = /\b(student exchange|exchange (programme|program|student)|study abroad|outbound|inbound|mobility|study tour|semester abroad|pertukaran pelajar)\b|交换生|交流生|海外学习/i;
 const INTERNSHIP = /\b(intern|interns|internship|internships|industrial training|industrial attachment|practical training|placement|latihan industri|praktikal)\b|实习|工业实习/i;
 
 export const LIVE_PAGES: LivePage[] = [
@@ -51,6 +52,14 @@ export const LIVE_PAGES: LivePage[] = [
             "UTAR Industrial Training Management Portal (https://indtrng.utar.edu.my), used by most faculties. " +
             "LKC FES students use their faculty page instead: https://lkcfes.utar.edu.my/students/industrial-training/ . " +
             "When the student's faculty or programme is known, answer for that faculty and name its industrial training coordinator(s) with email from the coordinators list.",
+    },
+    {
+        id: "student-mobility-contact",
+        urls: ["https://oia.utar.edu.my/contact_us.php"],
+        matches: (q) => MOBILITY.test(q),
+        note:
+            "The Office of International Affairs (OIA) handles student mobility: exchange, study abroad, outbound and inbound programmes. " +
+            "For whom to contact, give OIA's e-mail and phone numbers from this page (Kampar and Sungai Long) and its website https://oia.utar.edu.my/.",
     },
 ];
 
