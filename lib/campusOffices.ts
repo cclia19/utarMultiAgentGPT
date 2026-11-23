@@ -52,7 +52,7 @@ export const BOTH_CAMPUSES_RULE = `
 BOTH CAMPUSES RULE: The user did not say which campus, so you have the Kampar and the Sungai Long office of the same department.
 - If the answer is the same for both campuses, give it once and say it applies to both.
 - If it differs, use one "### Kampar campus" and one "### Sungai Long campus" section, each short.
-- If you only have evidence for one campus, answer for that campus and say so.
+- If you only have evidence for one campus, answer for that campus, and for the other campus give that campus's office contact or official page instead of leaving it out.
 - Do not ask which campus.
 `;
 
@@ -65,5 +65,12 @@ export const CAMPUS_LABEL_RULE = `
 CAMPUS RULE: UTAR has two campuses, Kampar and Sungai Long.
 - When the answer is about a place, facility, office, opening hours, contact or service and the user did not say which campus, give it for both campuses, labelled "Kampar" and "Sungai Long": one small table if the details are the same or similar, short separate sections if they differ.
 - Always say which campus a named place is on, e.g. "Main Library (Kampar)".
-- Never present one campus's detail as if it applies to all of UTAR. If you only have one campus's detail, say which campus it is for.
+- Never present one campus's detail as if it applies to all of UTAR. If you only have one campus's detail, say which campus it is for, and for the other campus give its office contact or official page.
 `;
+
+/** Tap-to-answer buttons for "which campus?" questions, in the chosen language. */
+export function campusChoices(language: unknown): string[] {
+    if (language === "ms") return ["Kampus Kampar", "Kampus Sungai Long"];
+    if (language === "zh") return ["金宝校区", "双溪龙校区"];
+    return ["Kampar Campus", "Sungai Long Campus"];
+}

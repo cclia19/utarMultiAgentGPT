@@ -75,3 +75,11 @@ test("source talk is dropped from Chinese and Malay answers", async () => {
     assert.equal(stripSourceTalk("Walaupun dokumen tidak menyatakan lokasi borang, anda boleh mendapatkannya di Pejabat Am."), "anda boleh mendapatkannya di Pejabat Am.");
     assert.equal(stripSourceTalk("The fee is not specified in the available documents."), "The fee is not specified in the available documents.");
 });
+
+test("an answer starts with what is true, not with what is missing", async () => {
+    const { dropOpeningGap } = await import("./answerGaps.ts");
+    const body = "UTAR has no on-campus hostels. Students rent nearby accommodation listed by the Department of Student Affairs, for example Danish House (Westlake Homes), 1 km from Kampar Campus.";
+    assert.equal(dropOpeningGap("Based on the available information, there are no details on how to apply for UTAR-provided hostel accommodation. " + body), body);
+    // Nothing useful after it: keep it (the gap check and web search rely on it).
+    assert.equal(dropOpeningGap("Based on the available information, there are no details on this. Contact DSA."), "Based on the available information, there are no details on this. Contact DSA.");
+});
