@@ -190,10 +190,10 @@ test("returns nothing for General UTAR, which is not a department", () => {
     assert.deepEqual(resolveDeptCodes(getOrgUnitById("general"), catalog()), []);
 });
 
-test("resolves every org unit except General UTAR", () => {
+test("resolves every org unit except General UTAR and Staff Expertise (not a department)", () => {
     const options = catalog();
     const unresolved = ORG_UNITS
-        .filter((u) => u.id !== "general")
+        .filter((u) => u.id !== "general" && u.id !== "staff-expertise")
         .filter((u) => resolveDeptCodes(u, options).length === 0)
         .map((u) => u.id);
 
@@ -287,4 +287,10 @@ test("qualifier: which holder of a role the question means", async () => {
     assert.deepEqual(pick("who is the head of DSA Kampar", "head of department", dsa), ["Chiang Jeng Fong"]);
     assert.deepEqual(pick("who is the head of department of student affairs kampar", "head of department", dsa), ["Chiang Jeng Fong"]);
     assert.deepEqual(pick("who is the head of DSA Sungai Long", "head of department", dsa), []);
+});
+
+test("directory pagination: the last page number", async () => {
+    const { lastPageNumber } = await import("./staffDirectory.ts");
+    assert.equal(lastPageNumber("<a href=staffListSearchV2.jsp?iPage=2&x>2</a> <a href=staffListSearchV2.jsp?iPage=4&x>4</a>"), 4);
+    assert.equal(lastPageNumber("<table>no pages</table>"), 1);
 });

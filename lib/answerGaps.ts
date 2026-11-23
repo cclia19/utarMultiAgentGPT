@@ -50,6 +50,7 @@ export function kbAnswerHasGap(text: string): boolean {
 /** For every answer: solve the question; a document or map is extra, never the answer. */
 export const ANSWER_DIRECTLY_RULE = `
 ANSWER DIRECTLY: Solve the question with the details in your evidence (block, floor and room; steps; names and contacts; dates; amounts). Never answer only by telling the user to refer to a handbook section, website or document; you may mention one after the actual answer.
+LEAD WITH WHAT IS TRUE: Start with the useful answer, not with what is missing. If something does not exist at UTAR, say so plainly as the answer (e.g. "UTAR has no on-campus hostels; students rent nearby accommodation. Here are the options…"), never as "there is no information".
 PLACES: When the answer names a place on or near a UTAR campus (a block, lab, office, hall, cafe), add a Google Maps link in exactly this form, with + for spaces and only the place name and campus in the query: [📍 Open in Maps](https://www.google.com/maps/search/?api=1&query=Place+Name+UTAR+Kampar+Campus). Use the campus the place is on.
 `;
 
@@ -85,4 +86,20 @@ export function stripSourceTalk(text: string): string {
         .replace(/(?:所提供的|现有的|相关的)?(?:文件|文档|资料)(?:中|里)(?:并)?(?:没有|未|没)(?:明确)?(?:说明|提到|列出|指出|提及|注明)[^。\n]*。\s*/g, "")
         .replace(/\b(?:Walaupun|Walau bagaimanapun|Meskipun)\s+dokumen(?:\s+yang\s+(?:diberikan|tersedia))?\s+tidak\s+(?:menyatakan|menyebut|menjelaskan)[^,.\n]*,\s*/gi, "")
         .replace(/\bDokumen(?:\s+yang\s+(?:diberikan|tersedia))?\s+tidak\s+(?:menyatakan|menyebut|menjelaskan)[^.\n]*\.\s*/gi, "");
+}
+
+/**
+ * "Based on the available information, there are no details on how to apply
+ * for … ." as the first sentence of an answer that then gives real details:
+ * the answer should start with those details. Runs on the final answer only,
+ * after the gap check that looks for these phrases.
+ */
+const OPENING_GAP = /^(?:based on the (?:available|provided) (?:information|documents),?\s*)?(?:there (?:is|are) no (?:specific |clear |detailed )?(?:details?|information|mention)|(?:the )?(?:available|provided) (?:information|documents) (?:do(?:es)? not|don't|doesn't)|i (?:could not|couldn't|was unable to) find)[^.\n]*\.\s*/i;
+
+export function dropOpeningGap(text: string): string {
+    const t = String(text || "");
+    const m = t.match(OPENING_GAP);
+    if (!m) return t;
+    const rest = t.slice(m[0].length).trim();
+    return rest.length >= 120 ? rest : t;
 }

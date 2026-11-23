@@ -61,3 +61,17 @@ Anything personal or interactive: results, student feedback, applications, Micro
 
 - PDFs over 4 MB (Vercel request limit): save as Word and upload that (Word, HTML and text are converted to Markdown in the browser, so size is not an issue).
 - Bus timetables are not taken from the knowledge base: `lib/busSchedule.ts` holds them as data (update each schedule period).
+
+## Staff research expertise (monthly)
+
+The monthly sync also builds one "Staff research expertise" document per department from the public research profiles (`www2.utar.edu.my/cv_V2`) of academic staff in the Staff Directory: their listed areas of expertise, industry roles, research projects and recent publications. Staff who list no areas get their project and publication titles instead (no AI summary, no extra cost); staff with nothing at all are left out. The documents go to the "UTAR Staff Expertise" store, answered by the Staff Expertise assistant ("who works on X?", "what does Dr Y research?").
+
+    node scripts/kb-sync.mjs --expertise-only --only FICT     # dry run, one department
+    node scripts/kb-sync.mjs --no-expertise                   # programme and official pages only
+
+## Sync now button
+
+/admin/upload → "Sync & upload history" → **Sync now** starts the same GitHub workflow immediately (e.g. at the start of a trimester) and shows the last run. One-time setup:
+
+1. GitHub → Settings → Developer settings → Fine-grained tokens → Generate: repository `cclia19/utarMultiAgentGPT` only, permission **Actions: Read and write**.
+2. Vercel → project → Settings → Environment Variables: `GITHUB_SYNC_TOKEN` = the token (Production), then redeploy.

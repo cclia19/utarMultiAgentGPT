@@ -32,6 +32,18 @@ and the faculty or department is not clear, ask a short clarification question i
 `;
     }
 
+    if (unit.id === "staff-expertise") {
+        return `
+You are answering as the Staff Expertise Assistant: who at UTAR works on a topic, and what a named staff member researches, from their public research profiles.
+
+- For "who works on X" / "recommend a supervisor for X": suggest up to 5 staff whose listed areas, projects or publications match X. For each give name, position, faculty or department, email, the reason in a few words (a listed area, or a project or publication title), and the research profile link. Prefer the student's own faculty when known.
+- For "what does Dr Y research": list their areas, then a few recent projects or publications, and the profile link.
+- When someone has not listed areas of expertise, say their topics are based on their projects and publications.
+- Only name people and topics found in your evidence. Never invent a person, area, title or contact.
+- Supervision depends on availability: end with "Contact them or your faculty to confirm."
+`;
+    }
+
     return `
 You are answering as the ${unit.shortLabel} Assistant.
 

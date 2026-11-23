@@ -13,12 +13,12 @@ import { detectAgentFromText } from "@/lib/routing";
 import { looksLikeFactualQuestion, CASUAL_INTENT_CATEGORIES } from "@/lib/factualQuestion";
 import { trySmallTalkReply, tryGreetingReply, AVO_DADDY_REPLY } from "@/lib/smallTalk";
 import { tryBusScheduleReply } from "@/lib/busSchedule";
-import { BOTH_CAMPUSES_RULE, CAMPUS_LABEL_RULE, campusFamily } from "@/lib/campusOffices";
+import { BOTH_CAMPUSES_RULE, CAMPUS_LABEL_RULE, campusFamily, campusChoices, isCampusQuestion } from "@/lib/campusOffices";
 import { formatLiveEvidence, isInternshipQuestion, livePagesFor } from "@/lib/livePages";
 import { malaysiaDay } from "@/lib/abuse/checks";
 import { dropRepeatedAnswer } from "@/lib/repeatedAnswer";
 import { findPerson } from "@/lib/people";
-import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, VERDICT_FIRST_RULE, isMapsSearchLink, stripSourceTalk } from "@/lib/answerGaps";
+import { kbAnswerHasGap, isWeakWebAnswer, ANSWER_DIRECTLY_RULE, VERDICT_FIRST_RULE, isMapsSearchLink, stripSourceTalk, dropOpeningGap } from "@/lib/answerGaps";
 import { isStudentWorkQuestion, STUDENT_WORK_RULE_EVIDENCE } from "@/lib/utarRules";
 import { isStudentLifeQuestion, CAMPUS_FOOD_FACTS } from "@/lib/studentLife";
 import { normalizeMapsLinks } from "@/lib/mapsLinks";
@@ -242,7 +242,8 @@ function cleanUserFacingText(text: string): string {
         .replace(/provided documents/gi, "available information")
         .replace(/retrieved documents/gi, "available information")
         .replace(/knowledge base/gi, "available information")
-        .replace(/(?<!Block\s)\bKB\b(?!\s*(?:Block|\d))/g, "available information")
+        // "KB" means knowledge base, except Block KB (Sungai Long), also inside Maps links ("KB+Block").
+        .replace(/(?<!Block[\s+])\bKB\b(?![\s+]*(?:Block|\d))/g, "available information")
         .replace(/This link is inferred[^.\n]*(\.)?/gi, "")
         .replace(/The exact URL was not explicitly provided[^.\n]*(\.)?/gi, "")
         .replace(/common pattern for such profiles[^.\n]*(\.)?/gi, "")
@@ -2909,7 +2910,7 @@ async function withPerson(payload: any, question: unknown) {
 function withFollowUps(payload: any) {
     if (!payload || typeof payload.text !== "string") return payload;
     const { text, followUps } = extractFollowUps(payload.text);
-    return { ...payload, text, followUps };
+    return { ...payload, text: dropOpeningGap(text), followUps: payload.followUps?.length ? payload.followUps : followUps };
 }
 
 const NDJSON_HEADERS = {
@@ -3306,12 +3307,16 @@ async function handleChat(
             });
         }
 
-        if (routerResult.needsClarification) {
+        // "Who works on X" needs no faculty: the expertise answer covers all of UTAR.
+        if (routerResult.needsClarification && routerResult.agentId !== "staff-expertise") {
+            // "Which campus?": tap Kampar or Sungai Long instead of typing; keep the question it answers.
+            const asksCampus = isCampusQuestion(routerResult.clarificationQuestion || "");
             return NextResponse.json({
                 text: await inChosenLanguage(
                     routerResult.clarificationQuestion || "May I know which faculty, programme, department, or campus this is related to?",
                     body?.language
                 ),
+                followUps: asksCampus ? campusChoices(body?.language) : [],
                 citations: [],
                 sourceMode: "none",
                 storeDisplayName: selectedAgent.storeDisplayName || "",
@@ -3319,7 +3324,7 @@ async function handleChat(
                 selectedAgentLabel: selectedAgent.label,
                 needsClarification: true,
                 pendingQuestion:
-                    (routerResult as any).conversationRelation === "new_standalone_question"
+                    (routerResult as any).conversationRelation === "new_standalone_question" && !asksCampus
                         ? null
                         : routerResult.rewrittenQuestion || enrichedMessage,
                 lastResolvedTopic,

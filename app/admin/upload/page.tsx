@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { History, Loader2, Lock, LogOut, RefreshCw, RotateCcw, Trash2, UploadCloud } from "lucide-react";
+import { History, Loader2, Lock, LogOut, Play, RefreshCw, RotateCcw, Trash2, UploadCloud } from "lucide-react";
 import { convertUpload } from "@/lib/kb/convert";
 
 /**
@@ -149,13 +149,41 @@ export default function KnowledgeBaseAdmin() {
         [handleError]
     );
 
+    // "Sync now": the monthly sync (GitHub workflow), started by hand.
+    type CloudRun = { status: string; conclusion: string | null; startedAt: string; trigger: string; url: string };
+    const [cloudRun, setCloudRun] = useState<CloudRun | null>(null);
+    const [syncNote, setSyncNote] = useState("");
+    const [syncBusy, setSyncBusy] = useState(false);
+    const loadCloudRun = useCallback(async () => {
+        try {
+            setCloudRun((await api<{ run: CloudRun | null }>("/api/admin/kb/sync")).run);
+            setSyncNote("");
+        } catch (err: any) {
+            setSyncNote(err?.message || "Could not read the sync status");
+        }
+    }, []);
+    const syncNow = async () => {
+        if (!confirm("Run the full knowledge-base sync now? It refreshes programme pages, official pages and staff research profiles, and takes about 10–15 minutes.")) return;
+        setSyncBusy(true);
+        try {
+            await api("/api/admin/kb/sync", { method: "POST" });
+            setSyncNote("Sync started. It takes about 10–15 minutes; press Refresh to see the result.");
+            setTimeout(loadCloudRun, 5000);
+        } catch (err: any) {
+            setSyncNote(err?.message || "Could not start the sync");
+        } finally {
+            setSyncBusy(false);
+        }
+    };
+
     const loadRuns = useCallback(async () => {
         try {
             setRuns((await api<{ runs: Run[] }>("/api/admin/kb?view=runs")).runs);
         } catch (err) {
             handleError(err);
         }
-    }, [handleError]);
+        loadCloudRun();
+    }, [handleError, loadCloudRun]);
 
     useEffect(() => {
         loadUnits();
@@ -506,9 +534,29 @@ export default function KnowledgeBaseAdmin() {
 
                 {tab === "runs" && (
                     <div className="space-y-3">
-                        <button onClick={loadRuns} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm">
-                            <RefreshCw className="h-4 w-4" /> Refresh
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button onClick={loadRuns} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm">
+                                <RefreshCw className="h-4 w-4" /> Refresh
+                            </button>
+                            <button
+                                onClick={syncNow}
+                                disabled={syncBusy || cloudRun?.status === "in_progress" || cloudRun?.status === "queued"}
+                                className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1 text-sm text-white disabled:opacity-50"
+                            >
+                                {syncBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Sync now
+                            </button>
+                            {cloudRun && (
+                                <span className="text-sm text-zinc-600">
+                                    Last sync: {fmtDate(cloudRun.startedAt)} ({cloudRun.trigger === "schedule" ? "monthly" : "manual"}) ·{" "}
+                                    {cloudRun.status === "completed" ? (cloudRun.conclusion === "success" ? "✅ done" : `⚠️ ${cloudRun.conclusion}`) : "⏳ running"} ·{" "}
+                                    <a href={cloudRun.url} target="_blank" rel="noreferrer" className="underline">
+                                        details
+                                    </a>
+                                </span>
+                            )}
+                        </div>
+                        {syncNote && <p className="text-sm text-zinc-600">{syncNote}</p>}
+                        <p className="text-xs text-zinc-500">Runs by itself on the 1st of every month. Use Sync now at the start of a trimester or after UTAR updates its pages.</p>
                         {runs.length === 0 && <p className="text-sm text-zinc-500">No syncs or uploads yet.</p>}
                         {runs.map((r) => {
                             const counts = r.items.reduce<Record<string, number>>((acc, i) => ((acc[i.outcome] = (acc[i.outcome] ?? 0) + 1), acc), {});

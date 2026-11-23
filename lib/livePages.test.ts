@@ -33,3 +33,11 @@ test("evidence names the page, today's date and how to use it", () => {
     assert.match(text, /Mary KUOK Pick Hoo Library is on the Sungai Long Campus/);
     assert.equal(formatLiveEvidence([], "2026-10-21"), "");
 });
+
+test("accommodation questions read the official accommodation pages", async () => {
+    const { livePagesFor } = await import("./livePages.ts");
+    for (const q of ["how do i apply for hostel", "accommodation near kampar campus", "asrama UTAR", "UTAR宿舍"]) {
+        assert.ok(livePagesFor(q).some((p: any) => p.id === "accommodation"), q);
+    }
+    assert.ok(!livePagesFor("when is the exam").some((p: any) => p.id === "accommodation"));
+});
